@@ -26,6 +26,7 @@ struct ClebschGordan{T}
 end
 
 abstract type Rot3DCoeffs{T} end
+
 """
 `ERot3DCoeffs: ` storing recursively precomputed matrix-valued coefficients for a
 rotation-equivariant basis.
@@ -91,7 +92,33 @@ function Base.iterate(mr::MRange, args...)
    error("we should never be here")
 end
 
+"""
+Given an l-vector `ll` iterate over all combinations of `mm` vectors  of
+the same length such that `abs(sum(mm)) <= 1`
+"""
 
+struct MRange1{N, T2}
+   ll::SVector{N, Int}
+   cartrg::T2
+end
+
+Base.length(mr::MRange1) = sum(_->1, _mrange1(mr.ll))
+
+_mrange1(ll) = MRange1(ll, Iterators.Stateful(
+               filter((x) -> abs(sum(x))<= 1, Tuple.(CartesianIndices(ntuple(i -> -ll[i]:ll[i], length(ll)))))
+                     ))
+
+#Iterators.product(1:3, _mrange1(ll))
+
+function Base.iterate(mr::MRange1, args...)
+   while true
+      if isempty(mr.cartrg)
+         return nothing
+      end
+      mpre = popfirst!(mr.cartrg)
+      return SVector(mpre), nothing
+   end
+end
 
 # ----------------------------------------------------------------------
 #     ClebschGordan code
@@ -213,9 +240,10 @@ end
 _key(ll::StaticVector{N}, mm::StaticVector{N}, kk::StaticVector{N}) where {N} =
       (SVector{N, Int}(ll), SVector{N, Int}(mm), SVector{N, Int}(kk))
 
-function (A::Rot3DCoeffs{T})(ll::StaticVector{N},
+function (A::IRot3DCoeffs{T})(ll::StaticVector{N},
                             mm::StaticVector{N},
                             kk::StaticVector{N}) where {T, N}
+
    if       sum(mm) != 0 ||
             sum(kk) != 0 ||
             !all(abs.(mm) .<= ll) ||
@@ -248,7 +276,30 @@ function (A::IRot3DCoeffs{T})(ll::StaticVector{1},
    end
 end
 
+function (A::ERot3DCoeffs{T})(ll::StaticVector{N},
+                            mm::StaticVector{N},
+                            kk::StaticVector{N}) where {T, N}
+   if       abs(sum(mm)) > 1 ||
+            abs(sum(kk)) > 1 ||
+            !all(abs.(mm) .<= ll) ||
+            !all(abs.(kk) .<= ll)
+      return get0val(A)
+   end
+   vals = get_vals(A, Val(N))  # this should infer the type!
+   key = _key(ll, mm, kk)
+   if haskey(vals, key)
+      val  = vals[key]
+   else
+      val = _compute_val(A, key...)
+      vals[key] = val
+   end
+   return val
+end
 
+
+"""
+rmatrices[(m,mu)] = int_{SO(3)} Q^T D^1_{mu,m}(Q) dQ
+"""
 
 rmatrices = Dict(
 (-1,-1) => SMatrix{3, 3, ComplexF64, 9}(1/6, 1im/6, 0, -1im/6, 1/6, 0, 0, 0, 0),
@@ -257,10 +308,20 @@ rmatrices = Dict(
 (0,-1) => SMatrix{3, 3, ComplexF64, 9}(0, 0, 1/(3*sqrt(2)), 0, 0, -1im/(3*sqrt(2)), 0, 0, 0),
 (0,0) => SMatrix{3, 3, ComplexF64, 9}(0, 0, 0, 0, 0, 0, 0, 0, 1/3),
 (0,1) => SMatrix{3, 3, ComplexF64, 9}(0, 0, -1/(3*sqrt(2)), 0, 0, -1im/(3*sqrt(2)), 0, 0, 0),
-(1,-1) => SMatrix{3, 3, ComplexF64, 9}(-1/6, 1im/6, 0, -1im/6, 1/6, 0, 0, 0, 0),
+(1,-1) => SMatrix{3, 3, ComplexF64, 9}(-1/6, 1im/6, 0, 1im/6, 1/6, 0, 0, 0, 0),
 (1,0) => SMatrix{3, 3, ComplexF64, 9}(0, 0, 0, 0, 0, 0, -1/(3*sqrt(2)), 1im/(3*sqrt(2)), 0),
 (1,1) => SMatrix{3, 3, ComplexF64, 9}(1/6, -1im/6, 0, 1im/6, 1/6, 0, 0, 0, 0)
 )
+
+
+function erot_dot(j1,m1,mu1, j2,m2,mu2)
+	"""
+	computes < E_{m1 mu1} e_j1 , E_{m2 mu2} e_j2  >
+	"""
+   E1 = rmatrices(m1,mu1)
+   E2 = rmatrices(m2,mu2)
+   return dot(E1[:,j1],E2[:,j2])
+end
 
 function (A::ERot3DCoeffs{T})(ll::StaticVector{1},
                             mm::StaticVector{1},
@@ -290,7 +351,8 @@ get0val(A::ERot3DCoeffs{T}) where T = SMatrix{3, 3, ComplexF64, 9}(0, 0, 0, 0, 0
 function _compute_val(A::Rot3DCoeffs{T}, ll::StaticVector{N},
                                         mm::StaticVector{N},
                                         kk::StaticVector{N}) where {T, N}
-   val =get0val(A)
+
+   val = get0val(A)
    llp = ll[1:N-2]
    mmp = mm[1:N-2]
    kkp = kk[1:N-2]
@@ -337,6 +399,25 @@ function compute_Al(A::IRot3DCoeffs{T}, ll::SVector, ::Val{false}) where {T}
       CC[ik, im] = A(ll, mm, kk)
    end
    return CC
+end
+
+function re_basis(A::ERot3DCoeffs{T}, ll::SVector; ordered=false) where {T}
+	GG = compute_gl(A, ll, Val(ordered))
+	svdG = svd(GG)
+	rk = rank(Diagonal(svdC.S))
+	return svdC.U[:, 1:rk]'
+end
+
+function compute_gl(A::ERot3DCoeffs{T}, ll::SVector, ::Val{false}) where {T}
+	len = length(_mrange1(ll))
+   GG = zeros(T, len, len) # = Gramian of rotational eqiuvariant span
+   # kk = mprime
+   for (im, (jm,mm)) in enumerate(Iterators.product(1:3, _mrange1(ll))), (ik, (jk,kk)) in enumerate(Iterators.product(1:3, _mrange1(ll)))
+	   for mu in _mrange1(ll)
+	  		GG[im,ik] += dot(A(ll, mm, mu)[:,im],A(ll, kk, mu)[:,ik])
+		end
+   end
+   return GG
 end
 
 # # ordered; TODO: check this out, clean it up and test it!!!
