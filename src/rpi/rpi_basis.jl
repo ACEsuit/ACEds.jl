@@ -17,13 +17,14 @@ using LinearAlgebra: mul!
 `struct RPIBasis` formerly RPIBasis
 """
 
-struct RPIBasis{T, BOP, NZ, TIN} <: IPBasis
+struct RPIBasis{T, BOP, NZ, TIN} <: IPBasis #struct RPIBasis{T, BOP, NZ, TIN,L} <: IPBasis
    pibasis::PIBasis{BOP, NZ, TIN}
    A2Bmaps::NTuple{NZ, SparseMatrixCSC{T, Int}}
    Bz0inds::NTuple{NZ, UnitRange{Int}}
    L::Int
+   #valL::Val{L}
 end
-
+#getL(::RPIBasis{T, BOP, NZ, TIN,L}) where { R,BOP,NZ, TIN, L} = L
 RPIBasis(pibasis,A2Bmaps, Bz0inds) = RPIBasis(pibasis,A2Bmaps, Bz0inds,0)
 
 
@@ -104,7 +105,7 @@ function RPIBasis(pibasis::PIBasis, L=0)
       idx0 += len
    end
 
-   return RPIBasis(pibasis, A2Bmaps, tuple(Bz0inds...),L)
+   return RPIBasis(pibasis, A2Bmaps, tuple(Bz0inds...),L) # Val(L) or Val{L}()
 end
 
 # TODO NOW: graphevaluator, standardevaluator
@@ -125,11 +126,18 @@ end
 #       iseven( sum(b.l for b in pib.oneps) ) &&
 #       (sum(b.m for b in pib.oneps) == 0) )
 
-function _rpi_A2B_matrix(rotc::Rot3DCoeffs,
+function _rpi_A2B_matrix(rotc::Rot3DCoeffs{T,L},
                          pibasis::PIBasis,
-                         iz0)
+                         iz0) where {T,L}
    # allocate triplet format
-   Irow, Jcol, vals = Int[], Int[], real(fltype(pibasis.basis1p))[]
+   Irow, Jcol = Int[], Int[]
+
+   if L == 0
+      vals = real(fltype(pibasis.basis1p))[]
+   elseif L==1
+      vals = SVector{3,Complex{T}}[]
+   end
+   #real(fltype(pibasis.basis1p))[]
    # count the number of PI basis functions = number of rows
    idxB = 0
    # loop through all (zz, kk, ll) tuples; each specifies 1 to several B
@@ -223,7 +231,8 @@ end
 
 alloc_temp(basis::RPIBasis, args...) =
    ( AA = site_alloc_B(basis.pibasis, args...),
-     AAr = real(site_alloc_B(basis.pibasis, args...)),
+   #AAr = real(site_alloc_B(basis.pibasis, args...)),
+     AAr = site_alloc_B(basis.pibasis, args...),
      tmp_pibasis = alloc_temp(basis.pibasis, args...)
    )
 
@@ -233,10 +242,12 @@ function evaluate!(B, tmp, basis::RPIBasis, Rs, Zs, z0)
    # TODO: this could be done better maybe by adding the real function into
    #       site_evaluate!, or by writing a real version of it...
    AAr = @view tmp.AAr[1:length(AA)]
-   AAr[:] .= real.(AA)
+   AAr[:] .= AA
+   #AAr[:] .= real.(AA)
    Bview = @view B[basis.Bz0inds[iz0]]
+
    mul!(Bview, basis.A2Bmaps[iz0], AAr)
-   return B
+   return real.(B)
 end
 
 # ------- gradient

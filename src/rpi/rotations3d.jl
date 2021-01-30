@@ -254,11 +254,11 @@ rmatrices = Dict(
     (1,1) => SMatrix{3, 3, ComplexF64, 9}(1/6, -1im/6, 0, 1im/6, 1/6, 0, 0, 0, 0)
     )
 
-	function (A::Rot3DCoeffs{T,L})(ll::StaticVector{1},
-   							 mm::StaticVector{1},
-   							 kk::StaticVector{1}) where {T,L}
-   	ErrorException("Not implemented for L = " + string(L))
-    end
+function (A::Rot3DCoeffs{T,L})(ll::StaticVector{1},
+							 mm::StaticVector{1},
+							 kk::StaticVector{1}) where {T,L}
+	ErrorException("Not implemented for L = " + string(L))
+end
 
 
 function _compute_val(A::Rot3DCoeffs{T,L}, ll::StaticVector{N},
@@ -322,6 +322,7 @@ function re_basis(A::Rot3DCoeffs{T,L}, ll::SVector{N, Int}) where {T,L,N}
 end
 
 imag_tol = 1e-15
+
 function _gramian(A::Rot3DCoeffs{T,1}, ll::SVector) where {T}
 	len = length(_mrange(ll,1))*3
 	GG = zeros(ComplexF64, len, len) # = Gramian of rotational eqiuvariant span
@@ -354,12 +355,64 @@ function rpi_basis(A::Rot3DCoeffs{T,L},
 	return Diagonal(sqrt.(S.S[1:rk])) * Urpi * Ure, Mre
 end
 
+function rpi_basis(A::Rot3DCoeffs{T,1},
+						 zz::SVector{N},
+						 nn::SVector{N, Int},
+						 ll::SVector{N, Int}) where {T,N}
+	Mre = collect( _mrange(ll, 1))   # rows...
+	G = _gramian(A, zz, nn, ll, Mre)
+	#print("G type :", typeof(G),"\n")
+   	S = svd(G)
+   	rk = rank(G; rtol =  1e-7)
+	Urepi = Diagonal(1/sqrt.(S.S[1:rk])) * S.U[:, 1:rk]'
+	Utilde = zeros(SArray{Tuple{3},Complex{T},1,3}, rk, length(Mre))
+	for α in 1:rk
+		for (imu, mu) in enumerate(Mre)
+			for (i, (k,mm)) in enumerate(Iterators.product(1:3, Mre))
+				Utilde[α,imu] += Urepi[α,i] * A(ll,mu,mm)[:,k]
+			end
+		end
+	end
+	#print("Urpi type :", typeof(Urpi),"\n")
+	return Utilde, Mre
+end
+
+
+function _gramian(A::Rot3DCoeffs{T,1}, zz, nn, ll::SVector{N}, Mre) where{T,N}
+  	len = length(Mre)*3
+	GG = zeros(Complex{T}, len, len)
+
+	for (i1, (k1,mm1)) in enumerate(Iterators.product(1:3, _mrange(ll, 1))), (i2, (k2,mm2)) in enumerate(Iterators.product(1:3, _mrange(ll, 1)))
+		for σ_ in permutations(1:N)
+			σ = SVector{N,Int}(σ_)
+	      	if ( zz[σ] != zz) || (nn[σ] != nn) || (ll[σ] != ll); continue; end
+			for mu1 in  _mrange(ll, 1), mu2 in _mrange(ll, 1)
+	        	if mu1[σ] == mu2
+					#print(ll,"\n")
+					#A(ll, mm2, mu2)
+					#@show typeof(mu2)
+					#@show typeof(ll[σ])
+					#GG[i1, i2] += sum(A(ll[σ], mu1[σ],mm1[σ])[k1,:] .* A(ll,mu2,mm2)[:,k2])
+	               	#GG[i1, i2] += dot(A(ll[σ], mm1[σ], mu1[σ])[:,k1],A(ll, mm2, mu2)[:,k2]) #old verions correct?
+					#GG[i1, i2] += sum( conj(A(ll,mu2,mm2)[:,k2]).* A(ll[σ], mu1[σ],mm1[σ])[:,k1]  )
+					# works GG[i1, i2] += dot(A(ll, mm2, mu2)[:,k2],A(ll[σ], mm1[σ], mu1[σ])[:,k1])
+					#GG[i1, i2] += dot(A(ll,mu2,mm2)[:,k2],A(ll[σ],mu1[σ],mm1[σ])[:,k1])
+					GG[i1, i2] += dot(A(ll, mu2, mm2)[:,k2],A(ll[σ], mu1[σ], mm1[σ])[:,k1])
+	         	end
+	      	end
+	   	end
+	end
+   	return GG
+	#@assert all(abs.(imag(GG)) .<= imag_tol)
+	#return real.(GG)
+end
 
 function _gramian(zz, nn, ll, Uri, Mri)
    N = length(nn)
    nri = size(Uri, 1)
    @assert size(Uri, 1) == nri
    G = zeros(Float64,nri, nri)
+
    for σ in permutations(1:N)
       if (zz[σ] != zz) || (nn[σ] != nn) || (ll[σ] != ll); continue; end
       for (iU1, mm1) in enumerate(Mri), (iU2, mm2) in enumerate(Mri)
@@ -374,5 +427,6 @@ function _gramian(zz, nn, ll, Uri, Mri)
    #@assert all(abs.(imag(G)) .<= imag_tol)
    #return real.(G)
 end
+
 
 end
