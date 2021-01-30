@@ -388,15 +388,6 @@ function _gramian(A::Rot3DCoeffs{T,1}, zz, nn, ll::SVector{N}, Mre) where{T,N}
 	      	if ( zz[σ] != zz) || (nn[σ] != nn) || (ll[σ] != ll); continue; end
 			for mu1 in  _mrange(ll, 1), mu2 in _mrange(ll, 1)
 	        	if mu1[σ] == mu2
-					#print(ll,"\n")
-					#A(ll, mm2, mu2)
-					#@show typeof(mu2)
-					#@show typeof(ll[σ])
-					#GG[i1, i2] += sum(A(ll[σ], mu1[σ],mm1[σ])[k1,:] .* A(ll,mu2,mm2)[:,k2])
-	               	#GG[i1, i2] += dot(A(ll[σ], mm1[σ], mu1[σ])[:,k1],A(ll, mm2, mu2)[:,k2]) #old verions correct?
-					#GG[i1, i2] += sum( conj(A(ll,mu2,mm2)[:,k2]).* A(ll[σ], mu1[σ],mm1[σ])[:,k1]  )
-					# works GG[i1, i2] += dot(A(ll, mm2, mu2)[:,k2],A(ll[σ], mm1[σ], mu1[σ])[:,k1])
-					#GG[i1, i2] += dot(A(ll,mu2,mm2)[:,k2],A(ll[σ],mu1[σ],mm1[σ])[:,k1])
 					GG[i1, i2] += dot(A(ll, mu2, mm2)[:,k2],A(ll[σ], mu1[σ], mm1[σ])[:,k1])
 	         	end
 	      	end
