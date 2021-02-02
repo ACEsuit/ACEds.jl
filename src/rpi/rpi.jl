@@ -9,10 +9,11 @@
 
 module RPI
 
-path_to_ACE_src = "/Users/msachs2/Documents/GitHub/ACE.jl/src"
-include(string(path_to_ACE_src, "/extimports.jl"))
+import ACE
+path_to_ACE_src = pathof(ACE)[1:end-6]
+include(string(path_to_ACE_src, "extimports.jl"))
 
-include(string(path_to_ACE_src,"/aceimports.jl"))
+include(string(path_to_ACE_src,"aceimports.jl"))
 
 
 import ACE.SphericalHarmonics: SHBasis, index_y
