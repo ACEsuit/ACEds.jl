@@ -25,7 +25,6 @@ Pr = transformed_jacobi(maxdeg, trans, rcut; pcut = 2)
 D = SparsePSHDegree()
 P1 = BasicPSH1pBasis(Pr; species = :X, D = D)
 
-
 #---
 pibasis = PIBasis(P1, N, D, maxdeg)
 #rpibasis = RPIBasis(P1, N, D, maxdeg)

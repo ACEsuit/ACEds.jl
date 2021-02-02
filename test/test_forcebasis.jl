@@ -24,12 +24,25 @@ r0 = 1.0
 rcut = 3.0
 trans = ACE.PolyTransform(1, r0)
 Pr = ACE.transformed_jacobi(maxdeg, trans, rcut; pcut = 2)
-D = ACE.SparsePSHDegree()
-P1 = ACE.BasicPSH1pBasis(Pr; species = :X, D = D)
-pibasis = ACE.PIBasis(P1, N, D, maxdeg)
-rpibasis = ACEds.RPI.RPIBasis(P1, N, D, maxdeg, L=1
-           )
+D = SparsePSHDegree()
+P1 = BasicPSH1pBasis(Pr; species = :X, D = D)
+pibasis = PIBasis(P1, N, D, maxdeg)
+rpibasis = ACEds.RPI.RPIBasis(P1, N, D, maxdeg, L=1)
 
 #---
 
-# frcbasis = ACEds.For
+# evaluate the force basis
+
+frcbasis = ACEds.EquivForceBasis(rpibasis)
+at = bulk(:C, cubic=true) * 2
+rattle!(at, 0.1)
+at.Z .= 0
+forces(frcbasis, at)
+
+
+#---
+
+# evaluate the force model
+
+frccalc = ACEds.EquivForceCalculator(rpibasis, randn(length(rpibasis)))
+forces(frccalc, at)
