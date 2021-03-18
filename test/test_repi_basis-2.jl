@@ -10,7 +10,9 @@ using ACEds.RPI: RPIBasis, SparsePSHDegree, BasicPSH1pBasis, PIBasis, Rot3DCoeff
 using Random, Printf, Test, LinearAlgebra, JuLIP, JuLIP.Testing
 using JuLIP: evaluate, evaluate_d, evaluate_ed
 using JuLIP.MLIPs: combine
+
 using StaticArrays
+using Combinatorics: permutations
 
 #---
 
@@ -25,12 +27,13 @@ Pr = transformed_jacobi(maxdeg, trans, rcut; pcut = 2)
 D = SparsePSHDegree()
 P1 = BasicPSH1pBasis(Pr; species = :X, D = D)
 
+
 #---
 pibasis = PIBasis(P1, N, D, maxdeg)
 #rpibasis = RPIBasis(P1, N, D, maxdeg)
 rpibasis = RPIBasis(P1, N, D, maxdeg,L=1)
 #---
-
+#rebasis = re_basis(A::Rot3DCoeffs{T,L}, ll::SVector{N, Int})
 
 
 #---
@@ -52,7 +55,7 @@ B = evaluate(rpibasis, Rs, Zs, z0)
 #print(Q*real.(B[1]), "     ", B_rot[1],"\n")
 N_basis = length(B)
 
-@info("check for equivariance")
+@info("check for rotation equivariance")
 
 B_rot = evaluate(rpibasis, Rs_rot, Zs, z0)
 #for i in 1:N_basis
@@ -82,3 +85,26 @@ end
 
 print("Rank: ", rank(B_array,atol=atol),"\n")
 @test rank(B_array,atol=atol) == N_basis
+
+
+tol = 1E-9
+@info("check for inversion equivariance")
+
+B_inv = evaluate(rpibasis, -Rs, Zs, z0)
+#for i in 1:N_basis
+#    print(norm(Q*B[i]-B_rot[i])<1E-5,"\n")
+#    print(Q*B[i], "     ", B_rot[i],"\n")
+#end
+@test all([ norm(-B[i]-B_inv[i])<tol for i in 1:length(B)])
+
+
+
+@info("check for permutation equivariance")
+
+σ = randperm(Nat)
+B_perm = evaluate(rpibasis, Rs[σ], Zs[σ], z0)
+#for i in 1:N_basis
+#    print(norm(Q*B[i]-B_rot[i])<1E-5,"\n")
+#    print(Q*B[i], "     ", B_rot[i],"\n")
+#end
+@test all([ norm(B[i]-B_perm[i])<tol for i in 1:length(B)])
