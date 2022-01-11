@@ -4,4 +4,6 @@ module ACEds
 #include("./siteDiffusion.jl")
 include("./utils.jl")
 include("./matrixmodels.jl")
+include("./futils.jl")
+include("./linsolvers.jl")
 end

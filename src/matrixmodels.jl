@@ -10,13 +10,15 @@ using StaticArrays
 using NeighbourLists
 using LinearAlgebra 
 using ACEatoms
-
+using ACE: AbstractProperty, EuclideanVector, EuclideanMatrix, SymmetricBasis
 #import ChainRules
 #import ChainRules: rrule, NoTangent
 using Zygote
 using ACEds.Utils: toMatrix
 
 export MatrixModel, SpeciesMatrixModel, E1MatrixModel, E2MatrixModel, evaluate, evaluate!, Sigma, Gamma
+
+Base.abs(::AtomicNumber) = .0
 
 abstract type MatrixModel end
 
@@ -36,18 +38,22 @@ function _get_basisinds(onsite_basis,offsite_basis)
     return inds
 end
 
+get_inds(m::MatrixModel,onsite::Bool) = m.inds[onsite] 
 
-function evaluate(m::MatrixModel, at::AbstractAtoms; nlist=nothing)
+function evaluate(m::MatrixModel, at::AbstractAtoms; nlist=nothing, indices=nothing)
     B = allocate_B(m, length(at))
-    evaluate!(B, m, at; nlist=nlist)
+    evaluate!(B, m, at; nlist=nlist, indices=indices)
     return B
 end
 
-function evaluate!(B::AbstractVector{Matrix{SVector{3, Float64}}}, m::MatrixModel, at::AbstractAtoms; nlist=nothing)
+function evaluate!(B::AbstractVector{M}, m::MatrixModel, at::AbstractAtoms; nlist=nothing, indices=nothing) where {M <: Union{Matrix{SVector{3,T}},Matrix{SMatrix{3, 3,T,9}}} where {T<:Number}}
     if nlist === nothing
         nlist = neighbourlist(at, cutoff(m))
     end
-    for k=1:length(at)
+    if indices==nothing
+        indices = 1:length(at)
+    end
+    for k in indices
         evaluate_onsite!(B[m.inds[true]], m, at, k, nlist)
         evaluate_offsite!(B[m.inds[false]],m, at, k, nlist)
     end
@@ -64,15 +70,19 @@ Fields:
 *onsite_basis: `EuclideanVector`-valued symmetric basis with cutoff `r_cut`
 *offsite_basis: `EuclideanVector`-valued symmetric basis defined on `offsite_env::BondEnvelope`
 """
-struct E1MatrixModel <: MatrixModel
-    onsite_basis
-    offsite_basis
-    inds::Dict{AtomicNumber, UnitRange{Int}}
+
+struct E1MatrixModel{BOP} <: MatrixModel
+    onsite_basis::ACE.SymmetricBasis{BOP,<:EuclideanVector}
+    offsite_basis::ACE.SymmetricBasis{BOP,<:EuclideanVector} 
+    inds::Dict{Bool, UnitRange{Int}}
     r_cut::Real
     offsite_env::BondEnvelope      
 end
 E1MatrixModel(onsite, offsite, r_cut::Real, offsite_env::BondEnvelope) = E1MatrixModel(onsite, offsite, _get_basisinds(onsite,offsite), r_cut, offsite_env) 
 
+function ACE.scaling(m::E1MatrixModel;p=2)
+    return hcat(ACE.scaling(m.onsite_basis;p=p),ACE.scaling(m.offsite_basis;p=p))
+end
 _allocate_B(::Type{E1MatrixModel}, len::Int, n_atoms::Int) = [zeros(SVector{3,Float64},n_atoms,n_atoms) for n=1:len]
 #[zeros(SVector{3,Float64},n_atoms,n_atoms) for n=1:length(basis)]
 
@@ -113,20 +123,30 @@ Fields:
 If `onsite_basis` is `EuclideanVector`-valued, then onsite elements are by construction symmetric positive definite.
 *`offsite_basis`: `EuclideanMatrix`-valued symmetric basis defined on the bond environment `offsite_env::BondEnvelope`.
 """
-struct E2MatrixModel <: MatrixModel
-    onsite_basis
-    offsite_basis
-    inds::Dict{AtomicNumber, UnitRange{Int}}
+
+abstract type E2MatrixModel <:MatrixModel
+    
+struct E2MatrixModel{PROP,BOP1,BOP2} <: MatrixModel where {BOP1,BOP2,PROP <:Union{EuclideanMatrix,EuclideanVector}}
+    onsite_basis::SymmetricBasis{BOP1,PROP}
+    offsite_basis::SymmetricBasis{BOP2,<:EuclideanMatrix}
+    inds::Dict{Bool, UnitRange{Int}}
     r_cut::Real
-    offsite_env::BondEnvelope      
+    offsite_env::BondEnvelope     
 end
 
-E2MatrixModel(onsite, offsite, r_cut::Real, offsite_env::BondEnvelope) = E2MatrixModel(onsite, offsite, _get_basisinds(onsite,offsite), r_cut, offsite_env) 
-
-_allocate_B(::Type{E2MatrixModel}, len::Int, n_atoms::Int) = [zeros(SMatrix{3,3,Float64,9},n_atoms,n_atoms) for n=1:length(basis)]
+E2MatrixModel(onsite, offsite, r_cut::Real, offsite_env::BondEnvelope) where {BOP} = E2MatrixModel(onsite, offsite, _get_basisinds(onsite,offsite), r_cut, offsite_env) 
 
 
-function evaluate_onsite!(B::AbstractVector{Matrix{SVector{3, Float64}}}, m::E2MatrixModel, at::AbstractAtoms, k::Int, nlist::PairList)
+function ACE.scaling(m::E2MatrixModel{EuclideanVector};p=2)
+    return hcat(ACE.scaling(m.onsite_basis;p=p).^2,ACE.scaling(m.offsite_basis;p=p))
+end
+function ACE.scaling(m::E2MatrixModel{EuclideanMatrix};p=2) 
+    return hcat(ACE.scaling(m.onsite_basis;p=p),ACE.scaling(m.offsite_basis;p=p))
+end
+
+_allocate_B(::Type{<:E2MatrixModel}, len::Int, n_atoms::Int) = [zeros(SMatrix{3,3,Float64,9},n_atoms,n_atoms) for n=1:len]
+
+function evaluate_onsite!(B::AbstractVector{Matrix{SMatrix{3,3,T,9}}}, m::E2MatrixModel, at::AbstractAtoms, k::Int, nlist::PairList) where {T<:Number}
     Js, Rs = NeighbourLists.neigs(nlist, k)
     Zs = at.Z[Js]
     onsite_cfg = [ ACE.State(rr = r, mu = z)  for (r,z) in zip( Rs,Zs) if norm(r) <= m.r_cut] |> ACEConfig
@@ -139,7 +159,7 @@ end
 _symmetrize(val::SVector{3, T}) where {T} = real(val) * real(val)' 
 _symmetrize(val::SMatrix{3, 3, T, 9}) where {T} = real(val) + transpose(real(val)) 
 
-function evaluate_offsite!(B::AbstractVector{Matrix{SVector{3, Float64}}}, m::E2MatrixModel, at::AbstractAtoms, k::Int, nlist::PairList)
+function evaluate_offsite!(B::AbstractVector{Matrix{SMatrix{3,3,T,9}}}, m::E2MatrixModel, at::AbstractAtoms, k::Int, nlist::PairList) where {T<:Number}
     Js, Rs = NeighbourLists.neigs(nlist, k)
     Zs = at.Z[Js]
     bondatoms =  [(j = j,r=r,z=z) for (j,r,z) in zip(Js,Rs,Zs ) if norm(r)<= m.offsite_env.r0cut] # atoms within max bond length
@@ -148,6 +168,9 @@ function evaluate_offsite!(B::AbstractVector{Matrix{SVector{3, Float64}}}, m::E2
         bond_config = [c for c in config if filter(m.offsite_env, c)] |> ACEConfig
         B_vals = ACE.evaluate(m.offsite_basis, bond_config) # can be improved by pre-allocating memory
         for (b,b_vals) in zip(B,B_vals)
+            if ba.j == k
+                @warn "Mirror images of particle $k are interacting" 
+            end
             b[ba.j,k]+= .5*real(b_vals.val)
             b[k,ba.j]+= .5*transpose(real(b_vals.val))
         end
@@ -157,12 +180,12 @@ end
 
 struct SpeciesMatrixModel{M} <: MatrixModel where {M<:MatrixModel}
     models::Dict{AtomicNumber, M}  # model = basis
-    inds::Dict{Tuple{AtomicNumber,Bool}, UnitRange{Int}}
+    inds::Dict{AtomicNumber, UnitRange{Int}}
 end
 
-_allocate_B(::Type{SpeciesMatrixModel{M}}, len::Int, n_atoms::Int) where {M<:MatrixModel}= _allocate_B(M, len, n_atoms)
+_allocate_B(::Type{<:SpeciesMatrixModel{<:M}}, len::Int, n_atoms::Int) where {M<:MatrixModel}= _allocate_B(M, len, n_atoms)
 
-SpeciesMatrixModel(models::Dict{AtomicNumber, M}) where {M<:MatrixModel} = SpeciesMatrixModel(models, _get_basisinds(models)) 
+SpeciesMatrixModel(models::Dict{AtomicNumber, <:M}) where {M<:MatrixModel} = SpeciesMatrixModel(models, _get_basisinds(models)) 
 
 
 cutoff(basis::SpeciesMatrixModel) = maximum(cutoff, values(basis.models))
@@ -172,39 +195,69 @@ cutoff_offsite(basis::SpeciesMatrixModel) = maximum(cutoff_offsite, values(basis
 Base.length(basis::SpeciesMatrixModel) = sum(length, values(basis.models))
 
 
-function _get_basisinds(models::Dict{AtomicNumber, E1MatrixModel})
-    inds = Dict{Tuple{AtomicNumber,Bool}, UnitRange{Int}}()
-    i0 = 0
+function _get_basisinds(models::Dict{AtomicNumber, <:MatrixModel})
+    inds = Dict{AtomicNumber, UnitRange{Int}}()
+    i0 = 1
     onsite = true
     for (z, mo) in models
         len = length(mo)
-        for onsite in [true,false]
-            inds[(z,onsite)] = i0 .+ _get_basisinds(mo)[onsite]
-        end
+        inds[z] = i0:(i0+len-1)
         i0 += len
     end
     return inds
  end
 
-function evaluate!(B::AbstractVector{Matrix{SVector{3, Float64}}}, m::SpeciesMatrixModel, at::AbstractAtoms; nlist=nothing)
-    if nlist === nothing
-        nlist = neighbourlist(at, cutoff(m))
-    end
-    for k=1:length(at)
-        z0 = at.Z[k]
-        evaluate_onsite!(B[m.inds[(z0,true)]], m.models[z0], at, k, nlist)
-        evaluate_offsite!(B[m.inds[(z0,false)]], m.models[z0], at, k, nlist)
-    end
+
+
+get_inds(m::SpeciesMatrixModel, z::AtomicNumber) = m.inds[z]
+
+function get_inds(m::SpeciesMatrixModel, z::AtomicNumber, onsite::Bool) 
+    return get_inds(m, z)[get_inds(m.models[z],onsite)]
+end
+
+function get_inds(m::SpeciesMatrixModel, onsite::Bool) 
+    return union(get_inds(m,z,onsite) for z in keys(m.models))
 end
 
 
+function evaluate!(B::AbstractVector{M}, m::SpeciesMatrixModel, at::AbstractAtoms; nlist=nothing, indices=nothing) where {M<:(Union{Array{SVector{3, T}, 2}, Array{SMatrix{3, 3, T, 9}, 2}} where T<:Number)}
+    if nlist === nothing
+        nlist = neighbourlist(at, cutoff(m))
+    end
+    if indices===nothing
+        indices = 1:length(at)
+    end
+    for (z,mo) in pairs(m.models)
+        z_indices = findall(x->x.==z,at.Z[indices])
+        evaluate!(view(B,get_inds(m, z)), mo, at; nlist=nlist, indices=indices[z_indices])
+    end
+    #= #Alternative implementation
+    for k=indices
+        z0 = at.Z[k]
+        #evaluate!(B[get_inds(m, z0)], m.models[z0], at, k, nlist)
+        evaluate_onsite!( view(B,get_inds(m, z0, true)), m.models[z0], at, k, nlist)
+        evaluate_offsite!( view(B,get_inds(m, z0, false)), m.models[z0], at, k, nlist)
+    end
+    =#
+end
 
-MSMatrix{T} = Union{SMatrix{N,M,T}, Matrix{T}} where {N, M, T}
 
-function Sigma(params::Vector{T}, B::AbstractVector{MSMatrix{T}}, n_rep::Int) where {T<: Real}
+function ACE.scaling(m::SpeciesMatrixModel; p=2)
+    scal = zeros(length(m))
+    for (z,mo) in m.models
+        scal[get_inds(mo,z)] = ACE.scaling(mo;p=p)
+    end
+    return scal
+end
+
+Sigma(m::SpeciesMatrixModel{<:M}, params::Vector{T}, B; n_rep=1) where {M<:MatrixModel,T<:Number} = Sigma(M, params, B; n_rep=n_rep)
+Gamma(m::SpeciesMatrixModel{<:M}, params::Vector{T}, B; n_rep=1) where {M<:MatrixModel,T<:Number} = Gamma(M, params, B; n_rep=n_rep)
+
+
+function Sigma(model::E1MatrixModel, params::Vector{T}, B::Union{AbstractVector{Matrix{SVector{3, T}}}, AbstractVector{Matrix{T}}}; n_rep=1) where {T<: Real}
     """
     Computes a (covariant) diffusion Matrix as a linear combination of the basis elements evalations in 'B' evaluation and the weights given in the parameter vector `paramaters`.
-    * `B::AbstractVector{MSMatrix{T}}`: vector of basis evaluations of a covariant Matrix model 
+    * `B::Union{AbstractVector{Matrix{SVector{3, T}}}, AbstractVector{Matrix{T}}}`: vector of basis evaluations of a covariant Matrix model 
     * `params::Vector{T}`: vector of weights and which is of same length as `B`
     * `n_rep::Int`: if n_rep > 1, then the diffusion matrix is a concatation of `n_rep` matrices, i.e.,
     ```math
@@ -214,13 +267,13 @@ function Sigma(params::Vector{T}, B::AbstractVector{MSMatrix{T}}, n_rep::Int) wh
     """
     n_basis = length(B)
     @assert length(params) == n_rep * n_basis
-    return hcat( [Sigma(params[((i-1)*n_basis+1):(i*n_basis)], B) for i=1:n_rep]... )
+    return hcat( [_Sigma(model,params[((i-1)*n_basis+1):(i*n_basis)], B) for i=1:n_rep]... )
 end
 
-Sigma(params::Vector{T}, B::AbstractVector{MSMatrix{T}}) where {T <: Real} = sum( p * b for (p, b) in zip(params, B) )
+_Sigma(::MODEL,params::Vector{T}, B::Union{AbstractVector{Matrix{SVector{3, T}}}, AbstractVector{Matrix{T}}}) where {T <: Real, MODEL<:E1MatrixModel} = sum( p * b for (p, b) in zip(params, B) )
 
 
-function Gamma(params::Vector{T}, B::AbstractVector{MSMatrix{T}}; n_rep = 1) where {T<: Real}
+function Gamma(model::MODEL, params::Vector{T}, B::Union{AbstractVector{Matrix{SVector{3, T}}}, AbstractVector{Matrix{T}}}; n_rep = 1) where {T<: Real, MODEL<:E1MatrixModel}
     """
     Computes a (equivariant) friction matrix Γ as the matrix product 
     ```math
@@ -228,10 +281,26 @@ function Gamma(params::Vector{T}, B::AbstractVector{MSMatrix{T}}; n_rep = 1) whe
     ```
     where `Σ = Sigma(params, B, n_rep)`.
     """
-    S = Sigma(params, B, n_rep)
+    S = Sigma(model,params, B; n_rep=n_rep)
     return outer(S,S)
 end
 
+@doc raw"""
+function Gamma:
+Computes a (equivariant) friction matrix Γ as the matrix product 
+```math
+Γ = \sum_{i=1} params_i B_i
+```
+"""
+
+function Gamma(::MODEL, params::Vector{T}, B::Union{AbstractVector{Matrix{SMatrix{3,3,T,9}}}, AbstractVector{Matrix{T}}}; n_rep=nothing) where {T<: Real, MODEL<:E2MatrixModel}
+    return sum(p*b for (p,b) in zip(params,B))
+end
+
+function Sigma(::MODEL,params::Vector{T}, B::Union{AbstractVector{Matrix{SMatrix{3,3,T,9}}}, AbstractVector{Matrix{T}}}; n_rep=nothing) where {T <: Real, MODEL<:E2MatrixModel} 
+    Γ = sum( p * b for (p, b) in zip(params, B) )
+    return cholesky(Γ)
+end
 
 
 function outer( A::Matrix{T}, B::Matrix{T}) where {T}
@@ -259,6 +328,8 @@ function get_dataset(model::MatrixModel, raw_data; inds = nothing)
         end
         for (at,Γ) in raw_data ]
 end
+
+
 
 #=
 function Sigma(params_vec::Vector{Vector{T}}, basis) where {T <: Real}
