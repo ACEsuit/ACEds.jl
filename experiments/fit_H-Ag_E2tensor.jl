@@ -55,19 +55,20 @@ RnYlm = ACE.Utils.RnYlm_1pbasis(;   r0 = ACE.cutoff_radialbasis(env),
 
 
 onsite_H = ACEatoms.SymmetricSpecies_basis(ACE.EuclideanVector(Float64), Bsel; r_cut=rcut, RnYlm = RnYlm, species = species );
-offsite_H = ACEatoms.SymmetricBondSpecies_basis(ACE.EuclideanVector(Float64), env, Bsel; RnYlm = RnYlm, species = species );
+offsite_H = ACEatoms.SymmetricBondSpecies_basis(ACE.EuclideanMatrix(Float64), env, Bsel; RnYlm = RnYlm, species = species );
 
-onsite_Ag = ACEatoms.SymmetricSpecies_basis(ACE.EuclideanVector(Float64), Bsel; r_cut=rcut, RnYlm = RnYlm, species = species );
-offsite_Ag = ACEatoms.SymmetricBondSpecies_basis(ACE.EuclideanVector(Float64), env, Bsel; RnYlm = RnYlm, species = species );
+#onsite_Ag = ACEatoms.SymmetricSpecies_basis(ACE.EuclideanVector(Float64), Bsel; r_cut=rcut, RnYlm = RnYlm, species = species );
+#offsite_Ag = ACEatoms.SymmetricBondSpecies_basis(ACE.EuclideanMatrix(Float64), env, Bsel; RnYlm = RnYlm, species = species );
 
 
-basis_H = E1MatrixModel(onsite_H,offsite_H,cutoff_radialbasis(env), env);
-basis_Ag = E1MatrixModel(onsite_Ag,offsite_Ag,cutoff_radialbasis(env), env);
+model_H = E2MatrixModel(onsite_H,offsite_H,cutoff_radialbasis(env), env);
+#basis_Ag = E2MatrixModel(onsite_Ag,offsite_Ag,cutoff_radialbasis(env), env);
 
-model = SpeciesMatrixModel(Dict(AtomicNumber(:H) => basis_H, AtomicNumber(:Ag) => basis_Ag  ));
+#model = SpeciesMatrixModel(Dict(AtomicNumber(:H) => basis_H, AtomicNumber(:Ag) => basis_Ag  ));
+model = SpeciesMatrixModel(Dict(AtomicNumber(:H) => basis_H ));
+B= evaluate(model, train_data[2].at);
+B_ind= evaluate(model, train_data[2].at;indices=1:2);
 
-B= evaluate(basis_H, train_data[1].at);
-B= evaluate(model, train_data[1].at);
 using ACEds.Utils: toMatrix
 
 function get_dataset(model, data; exp_species=nothing)
@@ -76,10 +77,10 @@ function get_dataset(model, data; exp_species=nothing)
         exp_species = species
     end
     # Select all basis functions but the ones that correspond to onsite models of not explicitly modeled species
-    binds = vcat([model.inds[k] for k in keys(model.inds) if k[1] in AtomicNumber.(exp_species) ]...)
+    #binds = vcat(get_inds(model, z) for z in AtomicNumber.(exp_species))
     return @showprogress [ 
         begin
-            B = evaluate(model,at)[binds]
+            B = evaluate(model,at)
             if exp_species === nothing 
                 ainds = 1:length(at)
             else

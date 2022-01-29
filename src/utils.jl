@@ -3,6 +3,8 @@ module Utils
 using StaticArrays
 using ProgressMeter
 
+submatrix(A,inds) = A[inds,inds]
+
 function toMatrix(mat::Matrix{SVector{3,Float64}})
     n,m = size(mat)
     smat = fill(0.0, 3*n, m )
@@ -45,6 +47,21 @@ function stack_B(B_list::Vector{Vector{Matrix{Float64}}} )
         B_tensor[:,:,:,i] = stack_Γ(B)
     end
     return B_tensor
+end
+
+
+
+function mtrain!(opt,loss, params::Vector{Float64}, train_loader; n_epochs= 1 )
+    loss_traj = [loss_all(params, train_bdata)]
+    for epoch in 1:n_epochs 
+        @show epoch
+        @showprogress for (B_list, Γ_list) in train_loader  # access via tuple destructuring
+            grads2 = Flux.gradient(() -> loss(params, B_list, Γ_list), Flux.Params([params]))
+            Flux.Optimise.update!(opt, params, grads2[params])
+            push!(loss_traj,loss_all(params, B_list, Γ_list))
+        end
+    end
+    return loss_traj
 end
 
 using LinearAlgebra

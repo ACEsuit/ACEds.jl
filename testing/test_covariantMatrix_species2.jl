@@ -1,16 +1,15 @@
-using ACEds
-using JuLIP
-using JuLIP: sites
-using ACE
-using ACE: BondEnvelope, cutoff_env, cutoff_radialbasis, ACEBasis
+using ACE, ACEds, JuLIP
+#using JuLIP: sites
+using ACE: BondEnvelope, cutoff_env, cutoff_radialbasis #, ACEBasis
 using LinearAlgebra: norm
-using StaticArrays
-using LinearAlgebra
+using StaticArrays, LinearAlgebra
 using Flux
-using ACEds.DiffTensor: R3nVector, evaluate_basis, CovariantR3nMatrix, evaluate_basis!, contract, contract2
+
 @info("Create random Al configuration")
 zAl = AtomicNumber(:Al)
-at = bulk(:Al, cubic=true) * 2 
+zTi = AtomicNumber(:Ti)
+at = bulk(:Al, cubic=true) 
+at.Z[2:2:end] .= zTi
 at = rattle!(at, 0.1)
 
 r0cut = 2*rnn(:Al)
@@ -20,7 +19,7 @@ zcut = 2 * rnn(:Al)
 env = ACE.EllipsoidBondEnvelope(r0cut, rcut, zcut; p0=1, pr=1, floppy=false, λ= 0.5)
 
 maxorder = 2
-Bsel = ACE.PNormSparseBasis(maxorder; p = 2, default_maxdeg = 4) 
+Bsel = ACE.PNormSparseBasis(maxorder; p = 2, default_maxdeg = 2) 
 
 RnYlm = ACE.Utils.RnYlm_1pbasis(;   r0 = ACE.cutoff_radialbasis(env), 
                                            rin = 0.0,
@@ -35,22 +34,45 @@ nlist = neighbourlist(at, cutoff_env(env))
 
 
 #%%
-using ACEds.CovariantMatrix: MatrixModel, evaluate!, Sigma, Gamma, outer, MatrixModelEvaluater, MatrixModelFitter
-using ACEds.Utils: toMatrix
-onsite = ACE.SymmetricBasis(ACE.EuclideanVector(Float64), RnYlm, Bsel;)
-offsite = ACE.Utils.SymmetricBond_basis(ACE.EuclideanVector(Float64), env, Bsel; RnYlm = RnYlm)
-
 using ACEatoms
-ACEatoms.cutoff(onsite)
+using ACEds.CovariantMatrix: CovSpeciesMatrixBasis, CovMatrixBasis, MatrixModel, evaluate, evaluate!, Sigma
+using ACEds.CovariantMatrix: Gamma, outer
+using ACEds.Utils: toMatrix
+species = [:Al,:Ti]
+#ZμRnYlm = ACEatoms.ZμRnYlm_1pbasis(; RnYlm = RnYlm, init = false, species = species, Bsel = Bsel)
+#ACE.init1pspec!(ZμRnYlm, Bsel)
+onsite1 = ACEatoms.SymmetricSpecies_basis(ACE.EuclideanVector(Float64), Bsel; r_cut=rcut, RnYlm = RnYlm, species = species )
+offsite1 = ACEatoms.SymmetricBondSpecies_basis(ACE.EuclideanVector(Float64), env, Bsel; RnYlm = RnYlm, species = species )
+
+onsite2 = ACEatoms.SymmetricSpecies_basis(ACE.EuclideanVector(Float64), Bsel; r_cut=rcut, RnYlm = RnYlm, species = species )
+offsite2 = ACEatoms.SymmetricBondSpecies_basis(ACE.EuclideanVector(Float64), env, Bsel; RnYlm = RnYlm, species = species )
 
 n_atoms = length(at)
-n_atoms
-model_ref = MatrixModelEvaluater(onsite, offsite, cutoff_radialbasis(env), env, n_atoms;);
-model = MatrixModelEvaluater(onsite, offsite, cutoff_radialbasis(env), env, n_atoms;);
-evaluate!(model_ref, at;)
-evaluate!(model, at;)
+basis1 = CovMatrixBasis(onsite1,offsite1,cutoff_radialbasis(env), env)
+basis2 = CovMatrixBasis(onsite2,offsite2,cutoff_radialbasis(env), env)
 
-model.params = rand(length(model.basis))
+models = Dict(AtomicNumber(:Ti) => basis1, AtomicNumber(:Al) => basis2  )
+
+model = CovSpeciesMatrixBasis(models)
+
+#B = evaluate(model.models[AtomicNumber(:Ti)], at;)
+B = evaluate(model, at;)
+B_dense = toMatrix.(B)
+
+n_basis = length(B)
+params_ref = rand(n_basis)
+
+#evaluate!(B, model, at;)
+
+Σ_ref = Sigma(params_ref, B_dense)
+Γ_ref = Gamma(params_ref, B_dense)
+
+params = params_ref + .001* rand(n_basis)
+Σ = Sigma(params, B_dense)
+Γ = Gamma(params, B_dense)
+
+
+model_ref.params = rand(length(model.basis))
 Σ_ref = Sigma(model_ref)
 Γ_ref = Gamma(model_ref)
 
@@ -59,7 +81,7 @@ model.params = rand(length(model.basis))
 Γ = Gamma(model)
 
 fmodel = MatrixModelFitter(model)
-model_ref.params = rand(length(model.basis))
+#fmodel.params = rand(length(model.basis))
 fΣ = Sigma(fmodel)
 fΓ = Gamma(fmodel)
 # Test outer product function
@@ -82,9 +104,9 @@ Zygote.refresh()
 
 g = Zygote.gradient(loss_Sigma, fmodel)[1]
 
-#using Plots
+using Plots
 
-#Plots.plot(real(e))
+Plots.plot(real(e))
 
 
 #=
