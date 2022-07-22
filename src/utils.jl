@@ -2,10 +2,29 @@ module Utils
 
 using StaticArrays
 using ProgressMeter
+using SparseArrays
 
+
+
+
+
+
+include("./bondutils2.jl")
+include("./butils.jl")
+export toMatrix
 submatrix(A,inds) = A[inds,inds]
 
-function toMatrix(mat::Matrix{SVector{3,Float64}})
+function sparsesub(Γ,inds,nmax,mmax)
+    I = [i for i in inds for j in inds]
+    J = [j for i in inds for j in inds]
+    V = [Γ[i,j] for i in inds for j in inds]
+    return sparse(I,J,V,nmax,mmax )
+end
+
+function toMatrix(mat::Matrix{SVector{3,Float64}}; indices = nothing)
+    if indices !==nothing
+        mat = submatrix(mat,indices)
+    end
     n,m = size(mat)
     smat = fill(0.0, 3*n, m )
     for i=1:n
@@ -26,6 +45,34 @@ function toMatrix(mat::Matrix{SMatrix{3, 3, Float64, 9}})
     end
     return smat
 end
+
+
+function toMatrix(vec::Vector{SMatrix{3,3,Float64,9}}; indices = nothing)
+    if indices !==nothing
+        vec = submatrix(vec,indices)
+    end
+    n = length(vec)
+    smat = fill(0.0, 3*n, 3)
+    for i=1:n
+        smat[(3*(i-1)+1):(3*i), 1:3] = vec[i]  
+    end
+    return smat
+end
+
+
+function dMatrix2bMatrix(dmat::Matrix{T}) where {T <: Number}
+    n, m  = size(dmat)
+    @assert  n % 3 == 0 && m % 3 == 0
+    N,M = Int(n/3), Int(m/3)
+    bmat = zeros(SMatrix{3,3,T,9},N,M)
+    for k1=1:N
+        for k2 =1:M
+            bmat[k1,k2]= SMatrix{3,3,T,9}(dmat[(3*(k1-1)+1):(3*k1), (3*(k2-1)+1):(3*k2)])
+        end
+    end
+    return bmat
+end
+
 
 function dot2(A::Matrix{Float64}, B::Matrix{SMatrix{3, 3, Float64, 9}})
     return A

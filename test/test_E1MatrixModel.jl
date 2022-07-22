@@ -27,7 +27,7 @@ maxorder = 2
 Bsel = ACE.SparseBasis(;maxorder=maxorder, p = 2, default_maxdeg = 5) 
 RnYlm = ACE.Utils.RnYlm_1pbasis(;   r0 = 0.01, 
                                            rin = 0.01,
-                                           pcut = 1,
+                                           pcut = 0,
                                            pin = 1, Bsel = Bsel,
                                            rcut = maximum([cutoff_env(env),rcut])
                                        )
@@ -36,7 +36,7 @@ offsite = ACE.Utils.SymmetricBond_basis(ACE.EuclideanVector(Float64), env, Bsel;
 model = E1MatrixModel(onsite,offsite,cutoff_radialbasis(env), env)
 
 n_rep = 3
-n_params = length(model) *n_rep 
+n_params = length(model) * n_rep 
 tol = 1e-10
 
 @info(string("check for rotation covariance for basis elements"))

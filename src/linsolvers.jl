@@ -15,16 +15,21 @@ function get_X_Y(bdata)
     xlen = length(bdata[1].B)
     X = zeros(Ylen,xlen)
     Y = zeros(Ylen)
-    @showprogress for (i, (B,Γ)) in enumerate(bdata)
-        Y[(i-1)*ylen+1:i*ylen] = Γ[:]
-        for (j,b) in enumerate(B)
+    @showprogress for (i, d) in enumerate(bdata)
+        Y[(i-1)*ylen+1:i*ylen] = d.Γ[:]
+        for (j,b) in enumerate(d.B)
             X[(i-1)*ylen+1:i*ylen,j] = b[:]
         end
     end
     return X,Y
 end
 
-qr_solve(X::Matrix{T}, Y::Vector{T}; reg=nothing,precond=false) where {T<:Real} = qr_solve!(copy(X), Y, reg, Val(precond))
+function qr_solve(X::Matrix{T}, Y::Vector{T}; reg=nothing,precond=false) where {T<:Real} 
+    c = qr_solve!(copy(X), copy(Y), reg, Val(precond))
+    rel_rms = rel_error(c,X,Y; p=2)
+    @info("rel_rms = $rel_rms")
+    return c
+end
     
  #=   
     if precond

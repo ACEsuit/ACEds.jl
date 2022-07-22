@@ -16,9 +16,11 @@ using ACE: AbstractProperty, EuclideanVector, EuclideanMatrix, SymmetricBasis
 using Zygote
 using ACEds.Utils: toMatrix
 
-export MatrixModel, SpeciesMatrixModel, E1MatrixModel, E2MatrixModel, evaluate, evaluate!, Sigma, Gamma
-
+export MatrixModel, SpeciesMatrixModel, SpeciesE2MatrixModel, OnSiteModel, OffSiteModel, E1MatrixModel, E2MatrixModel, evaluate, evaluate!, Sigma, Gamma, cutoff
+export get_inds
 Base.abs(::AtomicNumber) = .0
+
+JuLIP.chemical_symbol(s::Symbol) = s
 
 abstract type MatrixModel end
 
@@ -40,13 +42,13 @@ end
 
 get_inds(m::MatrixModel,onsite::Bool) = m.inds[onsite] 
 
-function evaluate(m::MatrixModel, at::AbstractAtoms; nlist=nothing, indices=nothing)
+function evaluate(m::MatrixModel, at::AbstractAtoms; nlist=nothing, indices=nothing, use_chemical_symbol=false)
     B = allocate_B(m, length(at))
-    evaluate!(B, m, at; nlist=nlist, indices=indices)
+    evaluate!(B, m, at; nlist=nlist, indices=indices,use_chemical_symbol=use_chemical_symbol)
     return B
 end
 
-function evaluate!(B::AbstractVector{M}, m::MatrixModel, at::AbstractAtoms; nlist=nothing, indices=nothing) where {M <: Union{Matrix{SVector{3,T}},Matrix{SMatrix{3, 3,T,9}}} where {T<:Number}}
+function evaluate!(B::AbstractVector{M}, m::MatrixModel, at::AbstractAtoms;  nlist=nothing, indices=nothing, use_chemical_symbol=false) where {M <: Union{Matrix{SVector{3,T}},Matrix{SMatrix{3, 3,T,9}}} where {T<:Number}}
     if nlist === nothing
         nlist = neighbourlist(at, cutoff(m))
     end
@@ -151,16 +153,26 @@ _allocate_B(::Type{<:E2MatrixModel}, len::Int, n_atoms::Int) = [zeros(SMatrix{3,
 
 function evaluate_onsite!(B::AbstractVector{Matrix{SMatrix{3,3,T,9}}}, m::E2MatrixModel, at::AbstractAtoms, k::Int, nlist::PairList) where {T<:Number}
     Js, Rs = NeighbourLists.neigs(nlist, k)
-    #Rs = [r - at.X[k] for r in Rs]
     Zs = at.Z[Js]
     onsite_cfg = [ ACE.State(rr = r, mu = z)  for (r,z) in zip(Rs,Zs) if norm(r) <= m.r_cut] |> ACEConfig
-    B_vals = ACE.evaluate(m.onsite_basis, onsite_cfg) # can be improved by pre-allocating memory
+    evaluate_onsite!(B, m.onsite_basis, k, onsite_cfg)
+end
+
+function evaluate_onsite!(B::AbstractVector{Matrix{SMatrix{3,3,T,9}}}, onsite_basis::SymmetricBasis, k::Int, onsite_cfg) where {T<:Number}
+    B_vals = ACE.evaluate(onsite_basis, onsite_cfg) # can be improved by pre-allocating memory
     for (b,b_vals) in zip(B,B_vals)
         b[k,k] += _symmetrize(b_vals.val)
     end
 end
 
-_symmetrize(val::SVector{3, T}) where {T} = .5 *  real(val) * real(val)' + .5 * transpose(real(val) * real(val)' )
+
+function _symmetrize(val::SVector{3, T}) where {T} 
+    B = real(val * val')
+    #@show B
+    return B
+end
+#real(val) * transpose(real(val)) #.5 *  real(val) * real(val)' + .5 * transpose(real(val) * real(val)' )
+#_symmetrize(val::SMatrix{3, 3, T, 9}) where {T} = real(val)
 _symmetrize(val::SMatrix{3, 3, T, 9}) where {T} = .5 * real(val) + .5 * transpose(real(val)) 
 
 function evaluate_offsite!(B::AbstractVector{Matrix{SMatrix{3,3,T,9}}}, m::E2MatrixModel, at::AbstractAtoms, k::Int, nlist::PairList) where {T<:Number}
@@ -169,28 +181,23 @@ function evaluate_offsite!(B::AbstractVector{Matrix{SMatrix{3,3,T,9}}}, m::E2Mat
     bondatoms =  [(j = j,r=r,z=z) for (j,r,z) in zip(Js,Rs,Zs ) if norm(r)<= m.offsite_env.r0cut] # atoms within max bond length
     for ba in bondatoms
         config = [ ACE.State(rr = (j==ba.j ? ba.r :  r-.5 * ba.r), rr0 = ba.r, be = (j==ba.j ? :bond : :env ), mu = z)  for (j,r,z) in zip(Js, Rs,Zs)] 
+        #config = [ ACE.State(rr = (j==ba.j ? ba.r :  r-.5 * ba.r), rr0 = ba.r, be = (j==ba.j ? :bond : z), mu = z)  for (j,r,z) in zip(Js, Rs,Zs)] 
         bond_config = [c for c in config if filter(m.offsite_env, c)] |> ACEConfig
         #config2 = [ ACE.State(rr = r-.5 * ba.r, rr0 = -ba.r, be = (j==ba.j ? :bond : :env ), mu = z)  for (j,r,z) in zip(Js, Rs,Zs)] 
         #bond_config2 = [c for c in config2 if filter(m.offsite_env, c)] |> ACEConfig
         #println(all( [norm(at1.X - at2.X)==0.0 for (at1,at2) in zip(bond_config,bond_config2)]))
         #println(length(bond_config) == length(bond_config2))
-        B_vals = ACE.evaluate(m.offsite_basis, bond_config) # can be improved by pre-allocating memory
-        for (b,b_vals) in zip(B,B_vals)
-            if ba.j == k
-                @warn "Mirror images of particle $k are interacting" 
-            end
-            # if k < ba.j 
-            #      b[k,ba.j] += .5 * real(b_vals.val) 
-            #      b[ba.j,k]+= .5 * transpose(real(b_vals.val))
-            # else
-            #     b[k,ba.j] += .5 * transpose(real(b_vals.val))
-            #     b[ba.j,k] += .5 * real(b_vals.val) 
-            # end
-            b[k,ba.j] += real(b_vals.val)
-            #(k < ba.j ? real(b_vals.val) : transpose(real(b_vals.val)))
-            #b[k,ba.j]+=  .5 * real(b_vals.val) 
-            #b[ba.j,k]+= .5 * transpose(real(b_vals.val))
+        evaluate_offsite!(B, m.offsite_basis, k, ba.j, bond_config) 
+    end
+end
+
+function evaluate_offsite!(B::AbstractVector{Matrix{SMatrix{3,3,T,9}}}, offsite_basis::SymmetricBasis, k::Int, j::Int, bond_config ) where {T<:Number}
+    B_vals = ACE.evaluate(offsite_basis, bond_config)
+    for (b,b_vals) in zip(B,B_vals)
+        if j == k
+            @warn "Mirror images of particle $k are interacting" 
         end
+        b[k,j] += (k < j ? real(b_vals.val) : transpose(real(b_vals.val)))
     end
 end
 
@@ -268,6 +275,9 @@ function evaluate_offsite!(B::AbstractVector{Matrix{SMatrix{3,3,T,9}}}, m::E3Mat
     end
 end
 
+
+#abstract type SpeciesMatrixModel <: MatrixModel
+
 struct SpeciesMatrixModel{M} <: MatrixModel where {M<:MatrixModel}
     models::Dict{AtomicNumber, M}  # model = basis
     inds::Dict{AtomicNumber, UnitRange{Int}}
@@ -300,17 +310,19 @@ function _get_basisinds(models::Dict{AtomicNumber, <:MatrixModel})
 
 
 get_inds(m::SpeciesMatrixModel, z::AtomicNumber) = m.inds[z]
+get_inds(m::SpeciesMatrixModel, s::Symbol) = get_inds(m, AtomicNumber(s))
 
 function get_inds(m::SpeciesMatrixModel, z::AtomicNumber, onsite::Bool) 
     return get_inds(m, z)[get_inds(m.models[z],onsite)]
 end
+get_inds(m::SpeciesMatrixModel, s::Symbol, onsite::Bool) = get_inds(m, AtomicNumber(s), onsite)
 
 function get_inds(m::SpeciesMatrixModel, onsite::Bool) 
     return union(get_inds(m,z,onsite) for z in keys(m.models))
 end
 
 
-function evaluate!(B::AbstractVector{M}, m::SpeciesMatrixModel, at::AbstractAtoms; nlist=nothing, indices=nothing) where {M<:(Union{Array{SVector{3, T}, 2}, Array{SMatrix{3, 3, T, 9}, 2}} where T<:Number)}
+function evaluate!(B::AbstractVector{M}, m::SpeciesMatrixModel, at::AbstractAtoms; onsite = true, offsite = true, nlist=nothing, indices=nothing) where {M<:(Union{Array{SVector{3, T}, 2}, Array{SMatrix{3, 3, T, 9}, 2}} where T<:Number)}
     if nlist === nothing
         nlist = neighbourlist(at, cutoff(m))
     end
@@ -319,7 +331,7 @@ function evaluate!(B::AbstractVector{M}, m::SpeciesMatrixModel, at::AbstractAtom
     end
     for (z,mo) in pairs(m.models)
         z_indices = findall(x->x.==z,at.Z[indices])
-        evaluate!(view(B,get_inds(m, z)), mo, at; nlist=nlist, indices=indices[z_indices])
+        evaluate!(view(B,get_inds(m, z)), mo, at; onsite = onsite, offsite = offsite, nlist=nlist, indices=indices[z_indices])
     end
     #= #Alternative implementation
     for k=indices
@@ -339,6 +351,220 @@ function ACE.scaling(m::SpeciesMatrixModel, p=2)
     end
     return scal
 end
+
+abstract type SiteModel end
+
+Base.length(m::SiteModel ) = length(m.basis)
+ACE.scaling(m::SiteModel,p::Int) = ACE.scaling(m.basis,p)
+
+struct OnSiteModel <: SiteModel
+    basis::SymmetricBasis
+    rcut::Float64
+end
+cutoff(m::OnSiteModel ) = m.rcut
+
+
+struct OffSiteModel <: SiteModel
+    basis::SymmetricBasis
+    env::BondEnvelope
+end
+cutoff(m::OffSiteModel) = cutoff_env(m.env)
+
+
+struct SpeciesE2MatrixModel <: MatrixModel 
+    models::Dict{Union{AtomicNumber,Tuple{AtomicNumber,AtomicNumber}}, SiteModel}
+    inds::Dict{Union{Tuple{AtomicNumber,AtomicNumber},AtomicNumber}, UnitRange{Int}}
+end
+
+_allocate_B(::Type{SpeciesE2MatrixModel}, len::Int, n_atoms::Int) = _allocate_B(E2MatrixModel, len, n_atoms)
+
+function SpeciesE2MatrixModel(models::Dict{Any, Union{OnSiteModel,SiteModel}}) where {B} # should we replace as Union{OnSiteModel,SiteModel} = SiteModel ? 
+    return SpeciesE2MatrixModel(Dict{Union{AtomicNumber,Tuple{AtomicNumber,AtomicNumber}}, SiteModel}(models), _get_basisinds(models)) 
+end
+
+
+cutoff(m::SpeciesE2MatrixModel) = maximum(cutoff,values(m.models))
+
+Base.length(basis::SpeciesE2MatrixModel) = sum(length, values(basis.models))
+
+
+function _get_basisinds(models::Dict{Any, SiteModel}) where {B}
+    inds = Dict{Union{AtomicNumber,Tuple{AtomicNumber,AtomicNumber}}, UnitRange{Int}}()
+    i0 = 1
+    for (zz, mo) in models
+        len = length(mo.basis)
+        inds[zz] = i0:(i0+len-1)
+        i0 += len
+    end
+    return inds
+ end
+
+
+
+get_inds(m::SpeciesE2MatrixModel, zz) = m.inds[AtomicNumber.(zz)]
+get_basis(m::SpeciesE2MatrixModel, zz) = m.models[AtomicNumber.(zz)].basis
+get_model(m::SpeciesE2MatrixModel, zz) = m.models[AtomicNumber.(zz)]
+
+_sort(z1,z2) = (z1<z2 ? (z1,z2) : (z2,z1))
+
+function evaluate!(B::AbstractVector{M}, m::SpeciesE2MatrixModel, at::AbstractAtoms;  nlist=nothing, indices=nothing, use_chemical_symbol=false) where {M<:(Union{Array{SVector{3, T}, 2}, Array{SMatrix{3, 3, T, 9}, 2}} where T<:Number)}
+    if nlist === nothing
+        nlist = neighbourlist(at, cutoff(m))
+    end
+    if indices===nothing
+        indices = 1:length(at)
+    end
+    for k=indices
+        Js, Rs = NeighbourLists.neigs(nlist, k)
+        Zs = (use_chemical_symbol ? chemical_symbol.(at.Z[Js]) :  AtomicNumber.(at.Z[Js]))
+        z0 = at.Z[k]
+        # evaluate on-site model
+
+        onsite_cfg = [ ACE.State(rr = r, mu = z)  for (r,z) in zip( Rs,Zs) if norm(r) <= cutoff(m.models[z0])] |> ACEConfig   
+        evaluate_onsite!( view(B,get_inds(m, z0)), get_basis(m, z0), k, onsite_cfg)
+
+        # evaluate off-site model
+
+        bondatoms =  [(j = j,r=r,z=z) for (j,r,z) in zip(Js,Rs,Zs ) if j in indices && norm(r)<= m.models[_sort(z0,AtomicNumber(z))].env.r0cut]
+        for ba in bondatoms
+            zz =  (use_chemical_symbol ? chemical_symbol.(_sort(z0,AtomicNumber(ba.z))) : _sort(z0,ba.z))
+            Bv = view(B, get_inds(m, zz))
+            config = [ ACE.State(rr = (j==ba.j ? ba.r :  r-.5 * ba.r), rr0 = ba.r, be = (j==ba.j ? :bond : z ), mu = z)  for (j,r,z) in zip(Js, Rs,Zs)] 
+            bond_config = [c for c in config if filter(get_model(m, zz).env, c)] |> ACEConfig
+            evaluate_offsite!(Bv, get_basis(m, zz), k, ba.j, bond_config) 
+        end
+
+    end
+end
+
+# function set_params(model::MatrixModel, site::Symbol ) #:offsite,:onsite
+
+# end
+
+# function collect_envs(model::MatrixModel, site::Symbol, at::AbstractAtoms )
+
+# end
+
+# function set_params(model::SpeciesE2MatrixModel, site::Union{AtomicNumber,Tuple{AtomicNumber,AtomicNumber} )
+
+# end
+
+function get_data(model::OnSiteModel, z0::AtomicNumber, at::AbstractAtoms, Γ; use_chemical_symbol=false )
+    rcut = cutoff(model)
+    basis = model.basis
+    nlist = neighbourlist(at, rcut)
+    indices = [i for i = 1:length(at) if at.Z[i]== z0]
+    #B = [zeros( SMatrix{3,3,Float64,9},length(basis)) for _ in length(indices)] # todo: generic type 
+    Blist = [] 
+    for k in indices
+        Js, Rs = NeighbourLists.neigs(nlist, k)
+        Zs = (use_chemical_symbol ? chemical_symbol.(at.Z[Js]) :  AtomicNumber.(at.Z[Js]))
+        onsite_cfg = [ ACE.State(rr = r, mu = z)  for (r,z) in zip( Rs,Zs) ] |> ACEConfig   
+        B = ACE.evaluate(basis, onsite_cfg)
+        push!(Blist, (B=map(x->x.val,B), Γ=Γ[k,k]))
+    end
+    return Blist
+end
+
+
+function get_bondatoms(Js, Rs, Zs, z01::Tuple{Symbol,Symbol}, k::Int, r0cut)
+    (z0,z1) = z01
+    if z0 !=z1
+        return [(j = j,r=r,z=z) for (j,r,z) in zip(Js,Rs,Zs ) if z == z1 && norm(r)<= r0cut]
+    else
+        # ensure that the index of the center atom is smaller to avoid adding configurations to the data set twice
+        return [(j = j,r=r,z=z) for (j,r,z) in zip(Js,Rs,Zs ) if z == z1 && k < j && norm(r)<= r0cut]
+    end
+end
+    
+# function Gamma_dict( Γ, inds)
+#     Γ = d.friction_tensor, inds = d.friction_indices
+# end
+function get_data(model::OffSiteModel, z01::Tuple{AtomicNumber,AtomicNumber}, at::AbstractAtoms, Γ; use_chemical_symbol = false)
+    rcut = cutoff(model)
+    basis = model.basis
+    nlist = neighbourlist(at, rcut)
+
+    Blist = [] 
+    #Vector{Vector{SMatrix{3, 3, Float64, 9}}}([])
+    #Vector{SMatrix{3, 3, Float64, 9}}([])
+    #[zeros( SMatrix{3,3,Float64,9},length(basis)) for _ in 1:length(indices)] # todo: generic type 
+    (z0,z1) = z01
+    for k = 1:length(at)
+        if z0 == at.Z[k]
+            Js, Rs = NeighbourLists.neigs(nlist, k)
+            Zs = (use_chemical_symbol ? chemical_symbol.(at.Z[Js]) :  AtomicNumber.(at.Z[Js]))
+            bondatoms = get_bondatoms(Js, Rs, Zs, chemical_symbol.((z0,z1)),k,  model.env.r0cut)
+            @show length(bondatoms)
+            @show [ at.Z[ba.j] for ba in bondatoms  ]
+            @show [ norm(ba.r) for ba in bondatoms  ] 
+            @show [ ba.r for ba in bondatoms  ] 
+            @show [ (k,ba.j) for ba in bondatoms  ]             #@show length(basis)
+            #Bk =  [zeros( SMatrix{3,3,Float64,9},length(basis)) for _ in 1:length(bondatoms)]
+            #γk =  [Γ[k,ba.j] for ba in bondatoms]
+            for (i,ba) in enumerate(bondatoms)
+                config = [ ACE.State(rr = (j==ba.j ? ba.r :  r-.5 * ba.r), rr0 = ba.r, be = (j==ba.j ? :bond : z ), mu = z)  for (j,r,z) in zip(Js, Rs,Zs)] 
+                bond_config = [c for c in config if filter(model.env, c)] |> ACEConfig
+                #@show size(Bk[i])
+                B = ACE.evaluate(basis, bond_config)
+                push!(Blist, (B=B, Γ=Γ[k,ba.j]))
+                #evaluate_offsite!(Bk[i], basis, k, ba.j, bond_config) 
+            end
+        end
+    end
+    return Blist
+end
+
+function get_data_block(model::OffSiteModel, z01::Tuple{AtomicNumber,AtomicNumber}, at::AbstractAtoms, Γ; use_chemical_symbol = false)
+    rcut = cutoff(model)
+    basis = model.basis
+    nlist = neighbourlist(at, rcut)
+
+    Blist = [] 
+    #Vector{Vector{SMatrix{3, 3, Float64, 9}}}([])
+    #Vector{SMatrix{3, 3, Float64, 9}}([])
+    #[zeros( SMatrix{3,3,Float64,9},length(basis)) for _ in 1:length(indices)] # todo: generic type 
+    (z0,z1) = z01
+    for k = 1:length(at)
+        if z0 == at.Z[k]
+            Js, Rs = NeighbourLists.neigs(nlist, k)
+            Zs = (use_chemical_symbol ? chemical_symbol.(at.Z[Js]) :  AtomicNumber.(at.Z[Js]))
+            bondatoms = get_bondatoms(Js, Rs, Zs, chemical_symbol.((z0,z1)),k,  model.env.r0cut)
+            #@show length(bondatoms)
+            #@show length(basis)
+            #Bk =  [zeros( SMatrix{3,3,Float64,9},length(basis)) for _ in 1:length(bondatoms)]
+            #γk =  [Γ[k,ba.j] for ba in bondatoms]
+            for (i,ba) in enumerate(bondatoms)
+                config = [ ACE.State(rr = (j==ba.j ? ba.r :  r-.5 * ba.r), rr0 = ba.r, be = (j==ba.j ? :bond : z ), mu = z)  for (j,r,z) in zip(Js, Rs,Zs)] 
+                bond_config = [c for c in config if filter(model.env, c)] |> ACEConfig
+                #@show size(Bk[i])
+                B = ACE.evaluate(basis, bond_config)
+                #push!(Blist, (B=B, Γ=Γ[k,ba.j]))
+                #evaluate_offsite!(Bk[i], basis, k, ba.j, bond_config) 
+            end
+        end
+    end
+    return Blist
+end
+
+
+
+
+function ACE.scaling(m::SpeciesE2MatrixModel, p=2)
+    scal = zeros(length(m))
+    for (zz,mo) in m.models
+        scal[get_inds(m,zz)] = ACE.scaling(mo,p)
+    end
+    return scal
+end
+
+Sigma(::SpeciesE2MatrixModel, params::Vector{T}, B) where {T<:Real} = Sigma(E2MatrixModel, params, B)
+Gamma(::SpeciesE2MatrixModel, params::Vector{T}, B) where {T<:Real} = Gamma(E2MatrixModel, params, B)
+
+
+
+#########
+
 
 Gamma(m::MatrixModel,params::Vector{T},B) where {T<:Real} = Gamma(typeof(m), params,B)
 Sigma(m::MatrixModel,params::Vector{T},B) where {T<:Real} = Sigma(typeof(m), params,B)
@@ -409,7 +635,7 @@ function outer( A::Matrix{SVector{3, Float64}}, B::Matrix{SVector{3, Float64}})
 end
 
 
-
+#=
 function get_dataset(model::MatrixModel, raw_data; inds = nothing)
     return @showprogress [ 
         begin
@@ -422,7 +648,7 @@ function get_dataset(model::MatrixModel, raw_data; inds = nothing)
         end
         for (at,Γ) in raw_data ]
 end
-
+=#
 
 
 #=
