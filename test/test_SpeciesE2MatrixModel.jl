@@ -1,5 +1,7 @@
 using ACE, ACEatoms
-using ACE: BondEnvelope, cutoff_env, cutoff_radialbasis, ACEBasis, EuclideanVector, EuclideanMatrix
+using ACE: ACEBasis, EuclideanVector, EuclideanMatrix
+using ACEbonds
+using ACEbonds: BondEnvelope, cutoff_env, cutoff_radialbasis, EllipsoidBondEnvelope
 using JuLIP
 using LinearAlgebra, StaticArrays
 using LinearAlgebra: norm
@@ -27,7 +29,13 @@ zTi = AtomicNumber(:Ti)
 
 
 
-env = ACE.EllipsoidBondEnvelope(r0cut, rcut, zcut; p0=1, pr=1, floppy=false, λ= 0.0)
+env = EllipsoidBondEnvelope(r0cut, rcut, zcut; p0=1, pr=1, floppy=false, λ= 0.0)
+
+# ACE.get_spec(offsite)
+# Bc = ACE.Categorical1pBasis([:bond, :env]; varsym = :be, idxsym = :be )
+
+
+
 maxorder = 2
 Bsel = ACE.SparseBasis(;maxorder=maxorder, p = 2, default_maxdeg = 5) 
 RnYlm = ACE.Utils.RnYlm_1pbasis(;   r0 = 0.01, 
@@ -40,7 +48,8 @@ RnYlm = ACE.Utils.RnYlm_1pbasis(;   r0 = 0.01,
 
 onsite_posdef = ACE.SymmetricBasis(EuclideanVector(Float64), RnYlm, Bsel;);
 onsite_em = ACE.SymmetricBasis(EuclideanMatrix(Float64), RnYlm, Bsel;);
-offsite = ACE.Utils.SymmetricBond_basis(EuclideanMatrix(Float64), env, Bsel; RnYlm = RnYlm, bondsymmetry="Invariant");
+offsite = ACEds.Utils.SymmetricBond_basis(EuclideanMatrix(Float64), env, Bsel; RnYlm = RnYlm, bondsymmetry="Invariant");
+
 
 
 models = Dict(  zTi => OnSiteModel(onsite_posdef,rcut), 
@@ -54,9 +63,19 @@ model = SpeciesE2MatrixModel(models);
 
 @info(string("check for rotation equivariance for basis elements B"))
 
+function ACEbonds._inner_evaluate(env::ACEbonds.BondEnvelope, X::ACE.AbstractState)
+    if X.be == :env
+       return ACEbonds._evaluate_env(env, X)
+    elseif X.be == :bond
+       return ACEbonds._evaluate_bond(env, X)
+    else
+       error("invalid X.be value: ", X.be)
+    end
+ end
+
 tol = 1e-10
-for (onsite, onsite_type) in zip([onsite_posdef, onsite_em], ["positive definite on-site model", "general indefinite on-site model"])
-    
+#for (onsite, onsite_type) in zip([onsite_posdef, onsite_em], ["positive definite on-site model", "general indefinite on-site model"])
+for (onsite, onsite_type) in zip([onsite_em], ["general indefinite on-site model"])  
     @info(string("check for rotation equivariance with ", onsite_type))
 
     models = Dict(  zTi => OnSiteModel(onsite,rcut), 

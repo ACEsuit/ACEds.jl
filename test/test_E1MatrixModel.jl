@@ -1,5 +1,6 @@
 using ACE, ACEatoms
-using ACE: BondEnvelope, cutoff_env, cutoff_radialbasis, ACEBasis, EuclideanVector, EuclideanMatrix
+using ACE: ACEBasis, EuclideanVector, EuclideanMatrix
+using ACEbonds: BondEnvelope, cutoff_env, cutoff_radialbasis
 using JuLIP
 using LinearAlgebra, StaticArrays
 using LinearAlgebra: norm

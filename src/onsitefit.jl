@@ -13,7 +13,7 @@ using ACEds.LinSolvers
 using ACEds.MatrixModels
 #SMatrix{3,3,Float64,9}([1.0,0,0,0,1.0,0,0,0,1.0])
 
-using ACE: BondEnvelope, cutoff_env, cutoff_radialbasis
+using ACEbonds: BondEnvelope, cutoff_env, cutoff_radialbasis
 using ACEds
 using ACEds.Utils: toMatrix
 

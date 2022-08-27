@@ -4,7 +4,8 @@ using ProgressMeter
 using JuLIP
 using JuLIP: sites
 using ACE
-using ACE: BondEnvelope, cutoff_env, cutoff_radialbasis, ACEBasis
+using ACE: ACEBasis
+using ACEbonds: BondEnvelope, cutoff_env, cutoff_radialbasis
 using LinearAlgebra: norm, dot
 using StaticArrays
 using NeighbourLists
@@ -429,7 +430,7 @@ function evaluate!(B::AbstractVector{M}, m::SpeciesE2MatrixModel, at::AbstractAt
         for ba in bondatoms
             zz =  (use_chemical_symbol ? chemical_symbol.(_sort(z0,AtomicNumber(ba.z))) : _sort(z0,ba.z))
             Bv = view(B, get_inds(m, zz))
-            config = [ ACE.State(rr = (j==ba.j ? ba.r :  r-.5 * ba.r), rr0 = ba.r, be = (j==ba.j ? :bond : z ), mu = z)  for (j,r,z) in zip(Js, Rs,Zs)] 
+            config = [ ACE.State(rr = (j==ba.j ? ba.r :  r-.5 * ba.r), rr0 = ba.r, be = (j==ba.j ? :bond : :env ), mu = z)  for (j,r,z) in zip(Js, Rs,Zs)] 
             bond_config = [c for c in config if filter(get_model(m, zz).env, c)] |> ACEConfig
             evaluate_offsite!(Bv, get_basis(m, zz), k, ba.j, bond_config) 
         end

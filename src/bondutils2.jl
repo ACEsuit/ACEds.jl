@@ -1,6 +1,6 @@
 
 import ACE: PolyTransform, transformed_jacobi, Rn1pBasis, init1pspec!, Ylm1pBasis, Product1pBasis, SimpleSparseBasis
-using ACE
+using ACE, ACEbonds
 
 BondBasisSelector(Bsel::ACE.SparseBasis; 
                   isym=:be, bond_weight = 1.0, env_weight = 1.0) = 
@@ -14,7 +14,7 @@ BondBasisSelector(Bsel::ACE.SparseBasis;
             weight_cat = Dict(:bond => bond_weight, :env=> env_weight) 
          )
 
-function SymmetricBond_basis(ϕ::ACE.AbstractProperty, env::ACE.BondEnvelope, Bsel::ACE.SparseBasis; RnYlm = nothing, bondsymmetry=nothing, kwargs...)
+function SymmetricBond_basis(ϕ::ACE.AbstractProperty, env::ACEbonds.BondEnvelope, Bsel::ACE.SparseBasis; RnYlm = nothing, bondsymmetry=nothing, kwargs...)
    BondSelector =  BondBasisSelector(Bsel; kwargs...)
    if RnYlm === nothing
        RnYlm = RnYlm_1pbasis(;   r0 = ACE.cutoff_radialbasis(env), 
@@ -37,6 +37,30 @@ function SymmetricBond_basis(ϕ::ACE.AbstractProperty, env::ACE.BondEnvelope, Bs
    return ACE.SymmetricBasis(ϕ, B1p, BondSelector; filterfun = filterfun)
 end
 
+function SymmetricBond_basis(ϕ::ACE.AbstractProperty, Bsel::ACE.SparseBasis, rcut::Real; RnYlm = nothing, bondsymmetry=nothing, kwargs...)
+    BondSelector =  BondBasisSelector(Bsel; kwargs...)
+    if RnYlm === nothing
+        RnYlm = RnYlm_1pbasis(;   r0 = rcut, 
+                                            rin = 0.0,
+                                            trans = PolyTransform(2, ACE.cutoff_radialbasis(env)), 
+                                            pcut = 2,
+                                            pin = 0, 
+                                            kwargs...
+                                        )
+    end
+    filterfun = _->true
+    if bondsymmetry == "Invariant"
+       filterfun = ACE.EvenL(:be, [:bond])
+    end
+    if bondsymmetry == "Covariant"
+       filterfun = x -> !(ACE.EvenL(:be, [:bond])(x))
+    end
+    Bc = ACE.Categorical1pBasis([:bond, :env]; varsym = :be, idxsym = :be )
+    B1p =  Bc * RnYlm
+    return ACE.SymmetricBasis(ϕ, B1p, BondSelector; filterfun = filterfun)
+ end
+
+
 
 BondSpeciesBasisSelector(Bsel::ACE.SparseBasis; 
                   isym=:be, bond_weight = 1.0, env_weight = 1.0,  species =[:env], 
@@ -52,7 +76,7 @@ BondSpeciesBasisSelector(Bsel::ACE.SparseBasis;
          )
 
 
-function SymmetricBondSpecies_basis(ϕ::ACE.AbstractProperty, env::ACE.BondEnvelope, Bsel::ACE.SparseBasis; RnYlm = nothing, bondsymmetry=nothing, species = [:env], kwargs...)
+function SymmetricBondSpecies_basis(ϕ::ACE.AbstractProperty, env::ACEbonds.BondEnvelope, Bsel::ACE.SparseBasis; RnYlm = nothing, bondsymmetry=nothing, species = [:env], kwargs...)
     BondSelector =  BondSpeciesBasisSelector(Bsel; species = species, kwargs...)
     @show BondSelector.maxorder_dict
     if RnYlm === nothing
