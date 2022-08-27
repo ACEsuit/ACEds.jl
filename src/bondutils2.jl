@@ -37,7 +37,7 @@ function SymmetricBond_basis(ϕ::ACE.AbstractProperty, env::ACEbonds.BondEnvelop
    return ACE.SymmetricBasis(ϕ, B1p, BondSelector; filterfun = filterfun)
 end
 
-function SymmetricBond_basis(ϕ::ACE.AbstractProperty, Bsel::ACE.SparseBasis, rcut::Real; RnYlm = nothing, bondsymmetry=nothing, kwargs...)
+function SymmetricBond_basis(ϕ::ACE.AbstractProperty, Bsel::ACE.SparseBasis; RnYlm = nothing, bondsymmetry=nothing, kwargs...)
     BondSelector =  BondBasisSelector(Bsel; kwargs...)
     if RnYlm === nothing
         RnYlm = RnYlm_1pbasis(;   r0 = rcut, 

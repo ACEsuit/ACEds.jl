@@ -37,10 +37,10 @@ Base.transpose(φ::EuclideanMatrix{T}) where {T <: Number} = EuclideanMatrix{T}(
 
 notzero(U,a,b) = intersect(U[a,:].nzind, U[b,:].nzind)
 
-function symmetrize(b; rtol = 1e-7, varsym = :be, varsymval = :bond)
+function symmetrize(b; rtol = 1e-7, varsym = :be, varsumval = :bond)
     A = ACE.get_spec(b.pibasis)
     #U = dropzeros(adjoint.(b.A2Bmap) * perm(A)) #* sparse(diagm( [(-1)^(sort(A[j])[1].l) for j = 1 : length(A)] )))
-    U = dropzeros(adjoint.(b.A2Bmap) * perm(A) * Diagonal([(-1)^(sum( a.l for a in A[j] if getfield(a,varsym) == varysumval )) for j in eachindex(A)]))
+    U = dropzeros(adjoint.(b.A2Bmap) * perm(A) * Diagonal([(-1)^(sum( a.l for a in A[j] if getfield(a,varsym) == varsumval )) for j in eachindex(A)]))
     U_new = dropzeros((b.A2Bmap + U).*.5)
     # get rid of linear dependence
     G = [ length(notzero(U_new,a,b)) == 0 ? 0 : sum( real(coco_dot(U_new[a,i], U_new[b,i])) for i in notzero(U_new,a,b) ) for a = 1:size(U_new)[1], b = 1:size(U_new)[1] ]
