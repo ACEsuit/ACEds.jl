@@ -7,9 +7,9 @@ end
 #include("./aspecies1_basis.jl")
 #include("./siteDiffusion.jl")
 include("./utils.jl")
-include("./matrixmodels.jl")
-include("./futils.jl")
-include("./linsolvers.jl")
-include("./onsitefit.jl")
+include("./matrixmodels2.jl")
+# include("./futils.jl")
+# include("./linsolvers.jl")
+# include("./onsitefit.jl")
 include("./patches.jl")
 end
