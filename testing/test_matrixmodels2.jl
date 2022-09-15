@@ -5,7 +5,7 @@ using JuLIP, ACE
 using ACEbonds: EllipsoidBondEnvelope #, cutoff_env
 using ACE: EuclideanMatrix, EuclideanVector
 using ACEds.Utils: SymmetricBond_basis, SymmetricBondSpecies_basis
-
+using ACEds: SymmetricEuclideanMatrix
 using LinearAlgebra
 
 
@@ -42,7 +42,7 @@ RnYlm = ACE.Utils.RnYlm_1pbasis(;   r0 = r0,
 
 Bz = ACE.Categorical1pBasis(species; varsym = :mu, idxsym = :mu )
 #onsite_posdef = ACE.SymmetricBasis(EuclideanVector(Float64), RnYlm, Bsel;);
-onsite = ACE.SymmetricBasis(EuclideanMatrix(Float64), RnYlm * Bz, Bsel;);
+onsite = ACE.SymmetricBasis(SymmetricEuclideanMatrix(Float64), RnYlm * Bz, Bsel;);
 offsite = SymmetricBondSpecies_basis(EuclideanMatrix(Float64), Bsel;species=species);
 offsite = ACEds.symmetrize(offsite; varsym = :mube, varsumval = :bond)
 #offsite_sym = symmetrize(offsite)
@@ -70,7 +70,19 @@ OnSiteModels(models_on, env_on );
 OffSiteModels(models_off, env_off);
 mb = basis(m);
 
+# offsite
+# m = models_off[(zAl,zTi)]
+# set_params!(m,cAlTi )
 
+# set_params!(m.evaluator, m.basis, cAlTi )
+# eltype(m.basis.A2Bmap)
+# eltype(cAlTi)
+# len_AA = length(m.evaluator.pibasis)
+# zeros(promote_type(eltype(basis.A2Bmap), eltype(cAlTi)), len_AA)
+
+# promote_type(eltype(m.basis.A2Bmap), eltype(cAlTi))
+
+# models_off[(zAl,zTi)]
 #allocate_Gamma(M::ACEMatrixBasis, at::Atoms, T=Float64)
 
 
@@ -88,6 +100,16 @@ max_er = maximum(norm(Γ[i,j]-transpose(Γ[j,i])) for i in 1:N for j in 1:N if i
 max_rel_er = maximum(norm(Γ[i,j]-transpose(Γ[j,i])/norm(Γ[i,j])) for i in 1:N for j in 1:N if norm(Γ[i,j])>0 && i !=j)
 maxval = maximum(norm(Γ[i,j]) for i in 1:N for j in 1:N if i!=j)
 
+norm(Γ-transpose(Γ))
+norm(Γ-transpose(transpose.(Γ)))
+transpose(transpose.(Γ))[1,2]
+Γ[1,2]
+@show Γ[1,2]
+@show transpose(transpose.(Γ))[2,1]
+@show Γ[2,1]
+@show transpose(Γ)[1,2]
+
+
 @show er
 @show max_er
 @show max_rel_er
@@ -96,11 +118,29 @@ maxval = maximum(norm(Γ[i,j]) for i in 1:N for j in 1:N if i!=j)
 B = ACEds.MatrixModels.allocate_Gamma(mb, at, Float64,:dense);
 
 B = ACEds.MatrixModels.Gamma(mb, at)
-ACEds.MatrixModels.get_interaction(mb, 1417)
-B[1418]
+ACEds.MatrixModels.get_interaction(mb, 1300)
 
-ACEds.MatrixModels.get_range(mb, AtomicNumber(:Al), AtomicNumber(:Al))
-a= 1
+ACEds.MatrixModels.get_range(mb, (AtomicNumber(:Al), AtomicNumber(:Al)))
+
+
+
+length(B)
+nparams(mb)
+θ = params(mb)
+set_params!(mb,θ)
+
+
+θ2 = params(mb)
+ons = getfield(mb, :onsite);
+ons.models
+getfield(mb, :onsite).models;
+for site in [:onsite,:offsite]
+    @show keys(getfield(mb, :onsite).models)
+end
+
+ons2 = mb.onsite;
+typeof(ons2)
+typeof(getfield(mb, :onsite))
 # G = Γ - transpose(Γ)
 # G[1,2]
 # R = [(a=2,g=4),(a=3,g=5)]

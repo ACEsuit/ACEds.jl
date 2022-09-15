@@ -11,5 +11,6 @@ include("./matrixmodels2.jl")
 # include("./futils.jl")
 # include("./linsolvers.jl")
 # include("./onsitefit.jl")
-include("./patches.jl")
+include("./patches/symmetrization.jl")
+include("./patches/symeuclideanmatrix.jl")
 end

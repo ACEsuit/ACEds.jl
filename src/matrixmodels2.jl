@@ -1,10 +1,11 @@
 module MatrixModels
 
 
-export EllipsoidCutoff, SphericalCutoff, SiteModels, OnSiteModels, OffSiteModels, SiteInds, ACEMatrixModel, ACEMatrixBasis,SiteModel, basis, Gamma
+export EllipsoidCutoff, SphericalCutoff, SiteModels, OnSiteModels, OffSiteModels, SiteInds, ACEMatrixModel, ACEMatrixBasis,SiteModel, basis, Gamma, params, nparams, set_params!
 using JuLIP, ACE, ACEbonds
 using JuLIP: chemical_symbol
 using ACE: SymmetricBasis, LinearACEModel, evaluate
+import ACE: nparams, params, set_params!
 using ACEbonds: BondEnvelope, bonds #, env_cutoff
 using LinearAlgebra
 using StaticArrays
@@ -120,17 +121,17 @@ function get_range(inds::SiteInds, z::AtomicNumber)
     return inds.onsite[z]
 end
 
-function get_range(inds::SiteInds, z1::AtomicNumber, z2::AtomicNumber)
-    return length(inds, :onsite) .+ inds.offsite[_sort(z1,z2)]
+function get_range(inds::SiteInds, zz::Tuple{AtomicNumber, AtomicNumber})
+    return length(inds, :onsite) .+ inds.offsite[_sort(zz...)]
 end
 
 function get_interaction(inds::SiteInds, index::Int)
     for site in [:onsite,:offsite]
         site_inds = getfield(inds, site)
-        for z in keys(site_inds)
-            zrange = get_range(inds, z...)
+        for zzz in keys(site_inds)
+            zrange = get_range(inds, zzz)
             if index in zrange
-                return site, zrange, z
+                return site, zrange, zzz
             end
         end
     end
@@ -140,7 +141,10 @@ end
 abstract type AbstractMatrixModel end
 abstract type AbstractMatrixBasis end
 
-struct ACEMatrixModel <: AbstractMatrixModel
+
+
+
+struct ACEMatrixModel 
     filter
     onsite::OnSiteModels
     offsite::OffSiteModels
@@ -153,12 +157,13 @@ function ACEMatrixModel(onsitemodels::Dict{AtomicNumber, TM},offsitemodels::Dict
     return ACEMatrixModel(filter, onsite, offsite)
 end
 
-struct ACEMatrixBasis <: AbstractMatrixBasis
+struct ACEMatrixBasis
     filter
     onsite::OnSiteModels
     offsite::OffSiteModels
     inds::SiteInds
 end
+
 
 #Base.length(m::ACEMatrixBasis) = sum(length, values(m.models.onsite)) + sum(length, values(m.models.offsite))
 Base.length(m::ACEMatrixBasis,args...) = length(m.inds,args...)
@@ -178,6 +183,8 @@ ACEMatrixCalc = Union{ACEMatrixModel, ACEMatrixBasis}
 
 # cutoff(m::ACEMatrixCalc) = m.cutoff
 
+
+
 function _get_basisinds(M::ACEMatrixCalc, site::Symbol)
     if site == :onsite
         inds = Dict{AtomicNumber, UnitRange{Int}}()
@@ -190,7 +197,7 @@ function _get_basisinds(M::ACEMatrixCalc, site::Symbol)
     sitemodel = getfield(M,site)
     for (zz, mo) in sitemodel.models
         @assert typeof(mo) <: ACE.LinearACEModel
-        len = length(mo.basis)
+        len = nparams(mo)
         inds[zz] = i0:(i0+len-1)
         i0 += len
     end
@@ -210,9 +217,25 @@ function basis(M::ACEMatrixModel)
 
 
 _sort(z1,z2) = (z1<=z2 ? (z1,z2) : (z2,z1))
-_get_model(calc::ACEMatrixCalc, zi, zj) = 
-      calc.offsite.models[_sort(zi,zj)]
-_get_model(calc::ACEMatrixCalc, zi) = calc.onsite.models[zi]
+# _get_model(calc::ACEMatrixCalc, zi, zj) = 
+#       calc.offsite.models[_sort(zi,zj)]
+# _get_model(calc::ACEMatrixCalc, zi) = calc.onsite.models[zi]
+
+_get_model(calc::ACEMatrixCalc, zz::Tuple{AtomicNumber,AtomicNumber}) = calc.offsite.models[_sort(zz...)]
+_get_model(calc::ACEMatrixCalc, z::AtomicNumber) =  calc.onsite.models[z]
+
+
+function params(calc::ACEMatrixCalc, zzz)
+    return params(_get_model(calc,zzz))
+end
+
+function nparams(calc::ACEMatrixCalc, zzz)
+    return nparams(_get_model(calc,zzz))
+end
+
+function set_params(calc::ACEMatrixCalc, zzz, θ)
+    return set_params!(_get_model(calc,zzz),θ)
+end
 
 function allocate_Gamma(M::ACEMatrixModel, at::Atoms, T=Float64)
     N = sum( M.filter(i) for i in 1:length(at) ) 
@@ -243,7 +266,7 @@ function Gamma!(M::ACEMatrixModel, at::Atoms, Γ::AbstractMatrix{SMatrix{3,3,T,9
         # end
         if M.filter(i)
             # find the right ace model 
-            sm = _get_model(M, at.Z[i], at.Z[j])
+            sm = _get_model(M, (at.Z[i], at.Z[j]))
             # transform the ellipse to a sphere
             cfg = env_transform(rrij, at.Z[i], at.Z[j], Rs, Zs, M.offsite.env)
             # evaluate 
@@ -289,8 +312,8 @@ function Gamma!(M::ACEMatrixBasis, at::Atoms, B) where {T<:Number}
         # end
         if M.filter(i)
             # find the right ace model 
-            sm = _get_model(M, at.Z[i], at.Z[j])
-            inds = get_range(M, at.Z[i],at.Z[j])
+            sm = _get_model(M, (at.Z[i], at.Z[j]))
+            inds = get_range(M, (at.Z[i],at.Z[j]))
             #@show inds
             # transform the ellipse to a sphere
             cfg = env_transform(rrij, at.Z[i], at.Z[j], Rs, Zs, M.offsite.env)
@@ -310,7 +333,51 @@ function Gamma!(M::ACEMatrixBasis, at::Atoms, B) where {T<:Number}
     return B
 end
 
+function params(mb::ACEMatrixBasis)
+    θ = zeros(nparams(mb))
+    for z_list in [keys(mb.onsite.models),keys(mb.offsite.models)]
+        for z in z_list
+            sm = _get_model(mb, z)
+            inds = get_range(mb, z)
+            θ[inds] = params(sm) 
+        end
+    end
+    return θ
+end
 
+function params(mb::ACEMatrixBasis, site::Symbol)
+    θ = zeros(nparams(mb, site))
+    for z in keys(getfield(mb,site).models)
+        sm = _get_model(mb, z)
+        θ[mb.inds[z]] = params(sm) 
+    end
+    return θ
+end
+
+
+function nparams(mb::ACEMatrixBasis)
+    return length(mb.inds)
+end
+
+function nparams(mb::ACEMatrixBasis, site)
+    return length(mb.inds, site)
+end
+
+
+function set_params!(mb::ACEMatrixBasis, θ)
+    set_params!(mb, :onsite, θ)
+    set_params!(mb, :offsite, θ)
+end
+
+function set_params!(mb::ACEMatrixBasis, site::Symbol, θ)
+    sitedict = getfield(mb, site).models
+    for z in keys(sitedict)
+        @show z
+        @show get_range(mb.inds, z)
+        @show typeof(_get_model(mb,z))
+        set_params!(_get_model(mb,z),θ[get_range(mb.inds, z)]) 
+    end
+end
 
 
 # function energy(basis::ACEBondPotentialBasis, at::Atoms)
