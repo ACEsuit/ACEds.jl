@@ -1,7 +1,8 @@
 module MatrixModels
 
 
-export EllipsoidCutoff, SphericalCutoff, SiteModels, OnSiteModels, OffSiteModels, SiteInds, ACEMatrixModel, ACEMatrixBasis,SiteModel, basis, Gamma, params, nparams, set_params!
+export EllipsoidCutoff, SphericalCutoff, SiteModels, OnSiteModels, OffSiteModels, SiteInds, ACEMatrixModel, ACEMatrixBasis,SiteModel
+export evaluate, basis, Gamma, params, nparams, set_params!
 using JuLIP, ACE, ACEbonds
 using JuLIP: chemical_symbol
 using ACE: SymmetricBasis, LinearACEModel, evaluate
@@ -10,8 +11,9 @@ using ACEbonds: BondEnvelope, bonds #, env_cutoff
 using LinearAlgebra
 using StaticArrays
 using SparseArrays
+import ACEbase: evaluate, evaluate!
 
-
+import ACE: scaling
 """
 Speciefies the parametric model (e.g. )
 """
@@ -83,14 +85,14 @@ abstract type SiteModels end
  
 Base.length(m::SiteModels) = sum(length(mo.basis) for mo in m.models)
 
-struct OnSiteModels{TM}
+struct OnSiteModels{TM} <:SiteModels
     models::Dict{AtomicNumber, TM}
     env::SphericalCutoff
 end
 OnSiteModels(models::Dict{AtomicNumber, TM}, rcut::T) where {T<:Real,TM} = 
     OnSiteModels(models,SphericalCutoff(rcut))
 
-struct OffSiteModels{TM}
+struct OffSiteModels{TM} <:SiteModels
     models::Dict{Tuple{AtomicNumber,AtomicNumber}, TM}
     env::EllipsoidCutoff
 end
@@ -99,10 +101,20 @@ function OffSiteModels(models::Dict{Tuple{AtomicNumber, AtomicNumber},TM},
     return OffSiteModels(models, EllipsoidCutoff(rcutbond, rcutenv, zcutenv))
 end
 
+
 ACEbonds.bonds(at::Atoms, offsite::OffSiteModels) = ACEbonds.bonds( at, offsite.env.rcutbond, 
     max(offsite.env.rcutbond*.5 + offsite.env.zcutenv, 
         sqrt((offsite.env.rcutbond*.5)^2+ offsite.env.rcutenv^2)),
                 (r, z) -> env_filter(r, z, offsite.env) )
+
+ACEbonds.bonds(at::Atoms, offsite::OffSiteModels, filter) = ACEbonds.bonds( at, offsite.env.rcutbond, 
+    max(offsite.env.rcutbond*.5 + offsite.env.zcutenv, 
+        sqrt((offsite.env.rcutbond*.5)^2+ offsite.env.rcutenv^2)),
+                (r, z) -> env_filter(r, z, offsite.env), filter )
+# ACEbonds.bonds(at::Atoms, offsite::OffSiteModels, filter) = ACEbonds.bonds( at, offsite.env.rcutbond, 
+# max(offsite.env.rcutbond*.5 + offsite.env.zcutenv, 
+#     sqrt((offsite.env.rcutbond*.5)^2+ offsite.env.rcutenv^2)),
+#             (r, z) -> env_filter(r, z, offsite.env), filter )
 
 struct SiteInds
     onsite::Dict{AtomicNumber, UnitRange{Int}}
@@ -145,25 +157,39 @@ abstract type AbstractMatrixBasis end
 
 
 struct ACEMatrixModel 
-    filter
     onsite::OnSiteModels
     offsite::OffSiteModels
 end
 
 function ACEMatrixModel(onsitemodels::Dict{AtomicNumber, TM},offsitemodels::Dict{Tuple{AtomicNumber, AtomicNumber}, TM},
-    rcut::T, rcutbond::T, rcutenv::T, zcutenv::T, filter=_->true) where {TM, T<:Real}
+    rcut::T, rcutbond::T, rcutenv::T, zcutenv::T) where {TM, T<:Real}
     onsite = OnSiteModels(onsitemodels, rcut)
     offsite = OffSiteModels(offsitemodels, rcutbond, rcutenv, zcutenv) 
-    return ACEMatrixModel(filter, onsite, offsite)
+    return ACEMatrixModel(onsite, offsite)
 end
 
 struct ACEMatrixBasis
-    filter
     onsite::OnSiteModels
     offsite::OffSiteModels
     inds::SiteInds
 end
 
+# function ACE.scaling(site::SiteModels)
+#     scale = ones(length(onsite))
+#     for (zz, mo) in site.models
+#         scale[] = ACE.scaling(mo)
+#     end
+# end
+function ACE.scaling(mb::ACEMatrixBasis, p::Int) 
+    scale = ones(length(mb))
+    for site in [:onsite,:offsite]
+        site = getfield(mb,site)
+        for (zz, mo) in site.models
+            scale[get_range(mb,zz)] = ACE.scaling(mo.basis,p)
+        end
+    end
+    return scale
+end
 
 #Base.length(m::ACEMatrixBasis) = sum(length, values(m.models.onsite)) + sum(length, values(m.models.offsite))
 Base.length(m::ACEMatrixBasis,args...) = length(m.inds,args...)
@@ -205,7 +231,7 @@ function _get_basisinds(M::ACEMatrixCalc, site::Symbol)
 end
 
 function basis(M::ACEMatrixModel)
-    return ACEMatrixBasis(M.filter, deepcopy(M.onsite),  
+    return ACEMatrixBasis(deepcopy(M.onsite),  
             deepcopy(M.offsite), _get_basisinds(M))
  end
 
@@ -237,34 +263,41 @@ function set_params(calc::ACEMatrixCalc, zzz, θ)
     return set_params!(_get_model(calc,zzz),θ)
 end
 
-function allocate_Gamma(M::ACEMatrixModel, at::Atoms, T=Float64)
-    N = sum( M.filter(i) for i in 1:length(at) ) 
-    return zeros(SMatrix{3,3,T,9},N,N)
-end
 
-function Gamma(M::ACEMatrixCalc, at::Atoms, T=Float64) 
-    Γ = allocate_Gamma(M, at, T)
-    Gamma!(M, at, Γ)
+function allocate_Gamma(M::ACEMatrixCalc, at::Atoms, sparse=:sparse, T=Float64)
+    # N = sum( filter(i) for i in 1:length(at) ) 
+    N = length(at)
+    if sparse == :sparse
+        Γ = spzeros(SMatrix{3, 3, T, 9},N,N)
+    else
+        Γ = zeros(SMatrix{3, 3, T, 9},N,N)
+    end
     return Γ
 end
 
-function Gamma!(M::ACEMatrixModel, at::Atoms, Γ::AbstractMatrix{SMatrix{3,3,T,9}}) where {T<:Number}
-    for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
-        if M.filter(i)
-            Zs = at.Z[neigs]
-            sm = _get_model(M, at.Z[i])
-            cfg = env_transform(Rs, Zs, M.onsite.env)
-            Γ[i,i] += evaluate(sm, cfg)
-        end
-    end
+function Gamma(M::ACEMatrixCalc, at::Atoms, filter=_->true, sparse=:sparse, T=Float64, filtermode=:new) 
+    Γ = allocate_Gamma(M, at, sparse, T)
+    Gamma!(M, at, Γ, filter, filtermode)
+    return Γ
+end
 
-    for (i, j, rrij, Js, Rs, Zs) in bonds(at, M.offsite)
-        # if i in [1,2] && j in [1,2]
-        #     @show (i,j)
-        #     @show rrij
-        #     @show Rs
-        # end
-        if M.filter(i)
+function Gamma!(M::ACEMatrixCalc, at::Atoms, Γ::AbstractMatrix{SMatrix{3,3,T,9}}, filter=_->true, filtermode=:new) where {T<:Number}
+    if filtermode == :new
+        for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
+            if filter(i)
+                Zs = at.Z[neigs]
+                sm = _get_model(M, at.Z[i])
+                cfg = env_transform(Rs, Zs, M.onsite.env)
+                Γ[i,i] += evaluate(sm, cfg)
+            end
+        end
+
+        for (i, j, rrij, Js, Rs, Zs) in bonds(at, M.offsite, filter)
+            # if i in [1,2] && j in [1,2]
+            #     @show (i,j)
+            #     @show rrij
+            #     @show Rs
+            # end
             # find the right ace model 
             sm = _get_model(M, (at.Z[i], at.Z[j]))
             # transform the ellipse to a sphere
@@ -272,16 +305,42 @@ function Gamma!(M::ACEMatrixModel, at::Atoms, Γ::AbstractMatrix{SMatrix{3,3,T,9
             # evaluate 
             Γ[i,j] += evaluate(sm, cfg)
         end
+    else
+        for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
+            if filter(i)
+                Zs = at.Z[neigs]
+                sm = _get_model(M, at.Z[i])
+                cfg = env_transform(Rs, Zs, M.onsite.env)
+                Γ[i,i] += evaluate(sm, cfg)
+            end
+        end
+
+        for (i, j, rrij, Js, Rs, Zs) in bonds(at, M.offsite)
+            # if i in [1,2] && j in [1,2]
+            #     @show (i,j)
+            #     @show rrij
+            #     @show Rs
+            # end
+            if filter(i,j)
+                # find the right ace model 
+                sm = _get_model(M, (at.Z[i], at.Z[j]))
+                # transform the ellipse to a sphere
+                cfg = env_transform(rrij, at.Z[i], at.Z[j], Rs, Zs, M.offsite.env)
+                # evaluate 
+                Γ[i,j] += evaluate(sm, cfg)
+            end
+        end
     end
     return Γ
 end
 
 
-function allocate_Gamma(M::ACEMatrixBasis, at::Atoms, T=Float64, sparse=:sparse)
-    N = sum(M.filter(i) for i in 1:length(at)) 
+function allocate_B(M::ACEMatrixBasis, at::Atoms, sparsity= :sparse, T=Float64)
+    #N = sum(filter(i) for i in 1:length(at)) 
+    N = length(at)
     B_onsite = [Diagonal( zeros(SMatrix{3, 3, T, 9},N)) for _ in 1:length(M.inds,:onsite)]
-    @assert sparse in [:sparse, :dense]
-    if sparse == :sparse
+    @assert sparsity in [:sparse, :dense]
+    if sparsity == :sparse
         B_offsite = [spzeros(SMatrix{3, 3, T, 9},N,N) for _ in 1:length(M.inds,:offsite)]
     else
         B_offsite = [zeros(SMatrix{3, 3, T, 9},N,N) for _ in 1:length(M.inds,:offsite)]
@@ -289,28 +348,35 @@ function allocate_Gamma(M::ACEMatrixBasis, at::Atoms, T=Float64, sparse=:sparse)
     return cat(B_onsite,B_offsite,dims=1)
 end
 
+function evaluate(M::ACEMatrixBasis, at::Atoms, filter=_->true, sparsity= :sparse, T=Float64, filtermode=:new) 
+    B = allocate_B(M, at, sparsity, T)
+    evaluate!(B, M, at, filter, filtermode)
+    return B
+end
+
 #Convention on evaluate! or here Gamma! (add values or first set to zeros and then add )
-function Gamma!(M::ACEMatrixBasis, at::Atoms, B) where {T<:Number}
-    for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
-        if M.filter(i)
-            Zs = at.Z[neigs]
-            sm = _get_model(M, at.Z[i])
-            inds = get_range(M, at.Z[i])
-            cfg = env_transform(Rs, Zs, M.onsite.env)
-            Bii = evaluate(sm.basis, cfg)
-            for (k,b) in zip(inds,Bii)
-                B[k][i,i] += b.val
+function evaluate!(B, M::ACEMatrixBasis, at::Atoms, filter=_->true, filtermode=:new ) where {T<:Number}
+    if filtermode == :new
+        for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
+            if filter(i)
+                Zs = at.Z[neigs]
+                sm = _get_model(M, at.Z[i])
+                inds = get_range(M, at.Z[i])
+                cfg = env_transform(Rs, Zs, M.onsite.env)
+                Bii = evaluate(sm.basis, cfg)
+                for (k,b) in zip(inds,Bii)
+                    B[k][i,i] += b.val
+                end
             end
         end
-    end
 
-    for (i, j, rrij, Js, Rs, Zs) in bonds(at, M.offsite)
-        # if i in [1,2] && j in [1,2]
-        #     @show (i,j)
-        #     @show rrij
-        #     @show Rs
-        # end
-        if M.filter(i)
+        for (i, j, rrij, Js, Rs, Zs) in bonds(at, M.offsite, filter)
+            # if i in [1,2] && j in [1,2]
+            #     @show (i,j)
+            #     @show rrij
+            #     @show Rs
+            # end
+
             # find the right ace model 
             sm = _get_model(M, (at.Z[i], at.Z[j]))
             inds = get_range(M, (at.Z[i],at.Z[j]))
@@ -329,6 +395,46 @@ function Gamma!(M::ACEMatrixBasis, at::Atoms, B) where {T<:Number}
             #     @show B[inds[end]][i,j]
             # end
         end
+    else
+        for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
+            if filter(i)
+                Zs = at.Z[neigs]
+                sm = _get_model(M, at.Z[i])
+                inds = get_range(M, at.Z[i])
+                cfg = env_transform(Rs, Zs, M.onsite.env)
+                Bii = evaluate(sm.basis, cfg)
+                for (k,b) in zip(inds,Bii)
+                    B[k][i,i] += b.val
+                end
+            end
+        end
+    
+        for (i, j, rrij, Js, Rs, Zs) in bonds(at, M.offsite)
+            # if i in [1,2] && j in [1,2]
+            #     @show (i,j)
+            #     @show rrij
+            #     @show Rs
+            # end
+            if filter(i,j)
+                # find the right ace model 
+                sm = _get_model(M, (at.Z[i], at.Z[j]))
+                inds = get_range(M, (at.Z[i],at.Z[j]))
+                #@show inds
+                # transform the ellipse to a sphere
+                cfg = env_transform(rrij, at.Z[i], at.Z[j], Rs, Zs, M.offsite.env)
+                # evaluate 
+                # (_ , _, z) = get_interaction(M, inds[1])
+                
+                Bij =  evaluate(sm.basis, cfg)
+                for (k,b) in zip(inds,Bij)
+                    B[k][i,j] += b.val
+                end
+                # if z == (AtomicNumber(:Al),AtomicNumber(:Al))
+                #     @show Bij
+                #     @show B[inds[end]][i,j]
+                # end
+            end
+        end
     end
     return B
 end
@@ -345,7 +451,7 @@ function params(mb::ACEMatrixBasis)
     return θ
 end
 
-function params(mb::ACEMatrixBasis, site::Symbol)
+function params(mb::ACEMatrixCalc, site::Symbol)
     θ = zeros(nparams(mb, site))
     for z in keys(getfield(mb,site).models)
         sm = _get_model(mb, z)
@@ -355,21 +461,21 @@ function params(mb::ACEMatrixBasis, site::Symbol)
 end
 
 
-function nparams(mb::ACEMatrixBasis)
+function nparams(mb::ACEMatrixCalc)
     return length(mb.inds)
 end
 
-function nparams(mb::ACEMatrixBasis, site)
+function nparams(mb::ACEMatrixCalc, site)
     return length(mb.inds, site)
 end
 
 
-function set_params!(mb::ACEMatrixBasis, θ)
+function set_params!(mb::ACEMatrixCalc, θ)
     set_params!(mb, :onsite, θ)
     set_params!(mb, :offsite, θ)
 end
 
-function set_params!(mb::ACEMatrixBasis, site::Symbol, θ)
+function set_params!(mb::ACEMatrixCalc, site::Symbol, θ)
     sitedict = getfield(mb, site).models
     for z in keys(sitedict)
         @show z
@@ -378,6 +484,32 @@ function set_params!(mb::ACEMatrixBasis, site::Symbol, θ)
         set_params!(_get_model(mb,z),θ[get_range(mb.inds, z)]) 
     end
 end
+
+function rank_dict(numbs_sorted)
+    A = Dict{Int,Int}[]
+    i = 1
+    for s in numbs_sorted
+        if !(s in A)
+            A[s]= i
+            i += 1
+        end
+    end
+    return A
+end
+# function  compress(Γ::AbstractSparseMatrix{T}, friction_indices) where {T}
+#     (Is, Js, Vs) = findnz(Γ)
+#     Iss, Jss = set(Is),set(Jss)
+#     @assert Iss == Jss
+#     N = length(Iss)
+#     p = sortperm(Is)
+#     rd = rank_dict(Is[p])
+#     A = zeros(T, N, N)
+#     for i = 1:length(Is)
+#         j =  rd[Js[p[i]]]
+#         A[i, j] = Vs[p[i]]
+#     end
+#     return A
+# end 
 
 
 # function energy(basis::ACEBondPotentialBasis, at::Atoms)

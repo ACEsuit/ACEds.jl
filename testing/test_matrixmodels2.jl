@@ -115,9 +115,18 @@ transpose(transpose.(Γ))[1,2]
 @show max_rel_er
 @show maxval
 
-B = ACEds.MatrixModels.allocate_Gamma(mb, at, Float64,:dense);
+Γb1 = ACEds.MatrixModels.allocate_Gamma(mb, at, Float64);
 
-B = ACEds.MatrixModels.Gamma(mb, at)
+Γb1 = ACEds.MatrixModels.Gamma(mb, at)
+
+Γb1-Γ
+B = ACEds.MatrixModels.allocate_B(mb, at, :sparse);
+
+B = ACEds.MatrixModels.evaluate(mb, at, :sparse)
+θ= params(mb)
+Γb2 = Matrix(sum(θ .*  B))
+sum(norm.(Γb2-Γ))
+
 ACEds.MatrixModels.get_interaction(mb, 1300)
 
 ACEds.MatrixModels.get_range(mb, (AtomicNumber(:Al), AtomicNumber(:Al)))

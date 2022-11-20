@@ -9,8 +9,10 @@ end
 include("./utils.jl")
 include("./matrixmodels2.jl")
 # include("./futils.jl")
-# include("./linsolvers.jl")
+include("./linsolvers.jl")
 # include("./onsitefit.jl")
+include("./patches/ACEbonds_patches.jl")
 include("./patches/symmetrization.jl")
 include("./patches/symeuclideanmatrix.jl")
+include("./patches/acefit_interface.jl")
 end
