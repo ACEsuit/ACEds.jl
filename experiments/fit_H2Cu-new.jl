@@ -11,14 +11,18 @@ using ACEds: EuclideanMatrix
 using ACEds.MatrixModels
 using JSON3
 using ACEds
+using JLD
+using ACEds: EllipsoidCutoff, SphericalCutoff
+using ACEds: SymmetricEuclideanMatrix
+using ACEds.Utils: SymmetricBondSpecies_basis
 #SMatrix{3,3,Float64,9}([1.0,0,0,0,1.0,0,0,0,1.0])
 
 
-fname = "/refit.jld"
-path_to_data = "./output/tests"
+fname = "/h2cu_20220713_friction"
+path_to_data = "/Users/msachs2/Documents/Projects/data/friction_tensors/H2Cu"
 filename = string(path_to_data,fname,".jld")
 
-
+raw_data =JLD.load(filename)["data"]
 #species = chemical_symbol.(unique(hcat([unique(d.at.Z) for d in data]...)))
 
 
@@ -48,17 +52,10 @@ RnYlm = ACE.Utils.RnYlm_1pbasis(;   r0 = r0,
 
 Bz = ACE.Categorical1pBasis(species; varsym = :mu, idxsym = :mu )
 
-using ACEds: SymmetricEuclideanMatrix
+
 onsite = ACE.SymmetricBasis(SymmetricEuclideanMatrix(Float64), RnYlm * Bz, Bsel;);
-using ACEds.Utils: SymmetricBondSpecies_basis
 offsite = SymmetricBondSpecies_basis(EuclideanMatrix(Float64), Bsel;species=species);
 offsite = ACEds.symmetrize(offsite; varsym = :mube, varsumval = :bond)
-
-fieldnames(typeof(offsite.pibasis.basis1p.bases[1]))
-length(offsite.pibasis.basis1p.bases[2])
-offsite.pibasis.basis1p.bases[2]
-RnYlm["Rn"]
-
 
 zH, zAg = AtomicNumber(:H), AtomicNumber(:Cu)
 gen_param(N) = randn(N) ./ (1:N).^2

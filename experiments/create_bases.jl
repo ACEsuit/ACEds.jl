@@ -1,12 +1,14 @@
+using ACEds
 using ACE
 using ACEatoms
 using ACE, ACEatoms, JuLIP, ACEbase
-using ACE: save_json, load_json
-
+using ACE: save_json, load_json, EuclideanMatrix, SymmetricBasis
+using ACEds: SymmetricEuclideanMatrix
 
 basis_dict = Dict()
-path = "./bases/onsite/symmetric"
-Threads.@threads for (maxorder,maxdeg) = [(2,4)]#[(4,4),(3,5),(3,6),(3,7),(4,5)]
+path = "./bases/onsite"
+Threads.@threads for (maxorder,maxdeg) = [(2,2),(2,3),(2,4),(2,5),(2,6),(3,2),(3,3),(3,4)]#[(2,7),(2,8),(4,4),(3,5),(3,6)]
+    #[(2,2),(2,3),(2,4),(2,5),(2,6),(3,2),(3,3),(3,4)]#[(4,4),(3,5),(3,6),(3,7),(4,5)]
     #[(2,2),(2,3),(2,4),(2,5),(2,6),(3,2),(3,3),(3,4)]
     #[(3,2)]#[(3,3),(3,4),(3,5)]
     #[(2,2),(2,3),(2,4),(2,5),(2,6),(2,7),(2,8)]#[(3,6),(3,7),(4,4),(4,5)] #,(4,6),(4,7),(4,8),(5,5),(4,9)]# [(2,4),(2,8),(2,12),(2,14),(3,4),(3,6),(4,4),(4,6),(3,8),(3,10)] 
@@ -25,11 +27,12 @@ Threads.@threads for (maxorder,maxdeg) = [(2,4)]#[(4,4),(3,5),(3,6),(3,7),(4,5)]
                                     maxdeg=maxdeg
                                 );
     species = [:H, :Ag ]
-    Zk = ACE.Categorical1pBasis(species; varsym = :mu, idxsym = :mu, label = "Zk")
+    Zk = ACE.Categorical1pBasis(species; varsym = :mu, idxsym = :mu) #label = "Zk"
     B1p = RnYlm * Zk
     if !((maxorder,maxdeg) in keys(basis_dict))
         start = time()
-        basis_dict[(maxorder,maxdeg)] = ACE.SymmetricBasis(ACE.EuclideanMatrix(Float64,:symmetric), B1p, Bsel)
+        basis_dict[(maxorder,maxdeg)] = ACE.SymmetricBasis(SymmetricEuclideanMatrix(Float64), B1p, Bsel;);
+        #ACE.SymmetricBasis(ACE.EuclideanMatrix(Float64,:symmetric), B1p, Bsel)
         println("Maxorder = ", maxorder,", maxdeg = ",maxdeg, ", time = ", time() - start)
     end
     save_json(string(path,"/test-max-",maxorder,"maxdeg-",maxdeg,".json"),write_dict(basis_dict[(maxorder,maxdeg)]);)

@@ -64,7 +64,9 @@ env_filter(r::StaticVector{3,T}, cutoff::SphericalCutoff) where {T<:Real} = (sum
     Zs::AbstractVector{<: AtomicNumber}, 
     sc::SphericalCutoff, filter=false)
 
-TBW
+
+Warning: unlike in the case of EllipsoidCutoff the function env_transform with 
+SphericalCutoff does not map the configuraiton to a unit sphere. 
 """
 function env_transform(Rs::AbstractVector{<: SVector}, 
     Zs::AbstractVector{<: AtomicNumber}, 
