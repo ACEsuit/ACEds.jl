@@ -46,13 +46,13 @@ function FilteredBondsIterator(at::Atoms, rcutbond::Real, rcutenv::Real, env_fil
 
 function increment(iter::FilteredBondsIterator, state)
     ic, ib, Js, Rs = state
-    ib = ib + 1 
-    if ib > length(Js)
-        ic = ic + 1
-        if ic > length(iter.subset)
-            return (nothing, ib, Js, Rs)
+    ib = ib + 1 # increase bond index
+    if ib > length(Js) # iterated over all atoms in environment ? 
+        ic = ic + 1 # increase index of center atom 
+        if ic > length(iter.subset) # all relevant center atoms already visited?  
+            return (nothing, ib, Js, Rs) # if yes, done! 
         else
-            ib = 1
+            ib = 1 # if no start at first atom in next environment
             Js, Rs = neigs(iter.nlist_bond, iter.subset[ic])
         end
     end 
@@ -77,11 +77,13 @@ function Base.iterate(iter::FilteredBondsIterator, state)
    if ic > length(iter.subset)    # nothing left to do 
     return nothing
    end
+   #println("Before while")
+   #@show Js
    while(true)
         (ic, ib, Js, Rs) = increment(iter, (ic, ib, Js, Rs))
         if isnothing(ic)
             return nothing
-        elseif Js[ib] in iter.subset # here we could add a finer filter criterion, e.g. iter.fiter(iter.subset[ic], Js[ib], iter.at )
+        elseif !isempty(Js) && Js[ib] in iter.subset # here we could add a finer filter criterion, e.g. iter.fiter(iter.subset[ic], Js[ib], iter.at )
             break
         end
    end

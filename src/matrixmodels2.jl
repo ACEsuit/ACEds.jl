@@ -286,7 +286,7 @@ end
 function Gamma!(M::ACEMatrixCalc, at::Atoms, Γ::AbstractMatrix{SMatrix{3,3,T,9}}, filter=_->true, filtermode=:new) where {T<:Number}
     if filtermode == :new
         for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
-            if filter(i)
+            if filter(i, at)
                 Zs = at.Z[neigs]
                 sm = _get_model(M, at.Z[i])
                 cfg = env_transform(Rs, Zs, M.onsite.env)
@@ -309,7 +309,7 @@ function Gamma!(M::ACEMatrixCalc, at::Atoms, Γ::AbstractMatrix{SMatrix{3,3,T,9}
         end
     else
         for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
-            if filter(i)
+            if filter(i, at)
                 Zs = at.Z[neigs]
                 sm = _get_model(M, at.Z[i])
                 cfg = env_transform(Rs, Zs, M.onsite.env)

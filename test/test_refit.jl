@@ -35,7 +35,7 @@ species = [:Cu,:H]
 env_on = SphericalCutoff(rcut)
 env_off = EllipsoidCutoff(rcutbond, rcutenv, zcutenv)
 
-maxorder = 3
+maxorder = 2
 r0 = .4 * rcut
 Bsel = ACE.SparseBasis(;maxorder=maxorder, p = 2, default_maxdeg = 5) 
 RnYlm = ACE.Utils.RnYlm_1pbasis(;   r0 = r0, 
@@ -122,7 +122,16 @@ n_train = 1200
 train_data = data[1:n_train]
 test_data = data[n_train+1:end]
 
+zH, zAg = AtomicNumber(:H), AtomicNumber(:Cu)
+gen_param(N) = randn(N) ./ (1:N).^2
+n_on, n_off = length(onsite),  length(offsite)
+cH = gen_param(n_on) 
+cHH = gen_param(n_off)
+
+p = length(mb)
+set_params!(mb, rand(p))
 mb = ACEds.MatrixModels.basis(m);
+G= reinterpret(Matrix,Gamma(m,at,filter)[special_atoms_indices,special_atoms_indices] |> Matrix)
 
 using ACEfit
 using ACEfit: count_observations, feature_matrix, linear_assemble
@@ -256,3 +265,26 @@ ax[2].plot(tentries[tt]["true"][:offdiag][.!mask], tentries[tt]["fit"][:offdiag]
 ax[1].set_title(string(transl[:offdiag]," elements < $tol"))
 ax[2].set_title(string(transl[:offdiag]," elements > $tol"))
 display(gcf())
+
+#%%
+
+#%%
+function onsite_evaluate(at::Atoms, basis, onsite_env, inds )
+    B = zeros(SMatrix{3,3,Float64,9},length(basis), length(inds) )
+    for (i, neigs, Rs) in sites(at, ACEds.MatrixModels.env_cutoff(onsite_env))
+        if i in inds
+            Zs = at.Z[neigs]
+            cfg = ACEds.MatrixModels.env_transform(Rs, Zs, onsite_env)
+            Bii = evaluate(basis, cfg)
+            for (k,b) in zip(inds,Bii)
+                B[k,i] = b.val
+            end
+        end
+    end
+    return B
+end
+
+special_atoms_indices = [1,2]
+at = rand_config(;si=special_atoms_indices)
+onsite_env = SphericalCutoff(rcut)
+B = onsite_evaluate(at, onsite, onsite_env, special_atoms_indices )

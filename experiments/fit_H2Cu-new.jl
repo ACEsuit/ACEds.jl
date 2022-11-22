@@ -12,9 +12,11 @@ using ACEds.MatrixModels
 using JSON3
 using ACEds
 using JLD
-using ACEds: EllipsoidCutoff, SphericalCutoff
 using ACEds: SymmetricEuclideanMatrix
 using ACEds.Utils: SymmetricBondSpecies_basis
+using ACEds.MatrixModels
+
+using ACEds.Utils: array2svector
 #SMatrix{3,3,Float64,9}([1.0,0,0,0,1.0,0,0,0,1.0])
 
 
@@ -25,12 +27,31 @@ filename = string(path_to_data,fname,".jld")
 raw_data =JLD.load(filename)["data"]
 #species = chemical_symbol.(unique(hcat([unique(d.at.Z) for d in data]...)))
 
+rng = MersenneTwister(1234)
+shuffle!(rng, raw_data)
+data = @showprogress [ 
+    begin 
+        at = JuLIP.Atoms(;X=array2svector(d.positions), Z=d.atypes, cell=d.cell,pbc=d.pbc)
+        set_pbc!(at,d.pbc)
+        (at=at, E=d.energy, F=d.forces, friction_tensor = 
+        reinterpret(Matrix{SMatrix{3,3,Float64,9}}, d.friction_tensor), 
+        friction_indices = d.friction_indices, 
+        hirshfeld_volumes=d.hirshfeld_volumes,
+        no_friction = d.no_friction) 
+    end 
+    for d in raw_data ];
 
-rcutbond = 3.0*rnn(:Cu)
-rcutenv = 4.0 * rnn(:Cu)
-zcutenv = 4.0 * rnn(:Cu)
 
-rcut = 3.0 * rnn(:Cu)
+rcutbond = 4.5 #3.0*rnn(:Cu)
+rcutenv = 6.5 # * rnn(:Cu)
+zcutenv = 8.5 # rnn(:Cu)
+rcut = 7.0
+
+# rcutbond = 3.0*rnn(:Cu)
+# rcutenv = 4 * rnn(:Cu)
+# zcutenv = 4 * rnn(:Cu)
+# rcut =rcutenv 
+#3.0 * rnn(:Cu)
 
 zAg = AtomicNumber(:Cu)
 species = [:Cu,:H]
@@ -40,84 +61,50 @@ env_on = SphericalCutoff(rcut)
 env_off = EllipsoidCutoff(rcutbond, rcutenv, zcutenv)
 
 maxorder = 3
+
 r0 = .4 * rcut
-Bsel = ACE.SparseBasis(;maxorder=maxorder, p = 2, default_maxdeg = 5) 
+Bsel = ACE.SparseBasis(;maxorder=maxorder, p = 2, default_maxdeg = 4) 
 RnYlm = ACE.Utils.RnYlm_1pbasis(;   r0 = r0, 
                                 rcut=rcut,
-                                rin = 0.0,
+                                rin = 0.4,
                                 trans = PolyTransform(2, r0), 
                                 pcut = 2,
-                                pin = 0
+                                pin = 2
                                 )
 
 Bz = ACE.Categorical1pBasis(species; varsym = :mu, idxsym = :mu )
 
-
 onsite = ACE.SymmetricBasis(SymmetricEuclideanMatrix(Float64), RnYlm * Bz, Bsel;);
-offsite = SymmetricBondSpecies_basis(EuclideanMatrix(Float64), Bsel;species=species);
-offsite = ACEds.symmetrize(offsite; varsym = :mube, varsumval = :bond)
+offsite_ns = SymmetricBondSpecies_basis(EuclideanMatrix(Float64), Bsel;species=species);
+offsite = ACEds.symmetrize(offsite_ns; varsym = :mube, varsumval = :bond)
 
 zH, zAg = AtomicNumber(:H), AtomicNumber(:Cu)
+
 gen_param(N) = randn(N) ./ (1:N).^2
 n_on, n_off = length(onsite),  length(offsite)
 cH = gen_param(n_on) 
 cHH = gen_param(n_off)
 
-special_atoms_indices = [1,2]
-function rand_config(;factor=2, lz=:Cu, sz= :H, si=special_atoms_indices, rf=.01 )
-    at = bulk(lz, cubic=true)*factor
-    if rf > 0.0
-        rattle!(at,rf)
-    end
-    for i in si
-        at.Z[i] = AtomicNumber(sz)
-    end
-    return at
-end
 
-at = rand_config()
-length(at)
 
 using ACE
 m = ACEMatrixModel( OnSiteModels(Dict( zH => ACE.LinearACEModel(onsite, cH)), env_on), 
                             OffSiteModels(Dict( (zH,zH) => ACE.LinearACEModel(offsite, cHH)), env_off)
 );
 
-filter(i::Int) = (i in special_atoms_indices)
-filter(i::Int,at::Atoms) = filter(i)
-filter(i::Int, j::Int) = filter(i) && filter(j)
+data[1].at.Z
+#filter(i::Int) = (i in special_atoms_indices)
+filter(i::Int, at::Atoms) = (at.Z[i] == AtomicNumber(:H))
+#filter(i::Int, j::Int) = filter(i) && filter(j)
 
-#%%
-using Random
-rng = MersenneTwister(1234)
-
-A= Gamma(m,at,filter)[special_atoms_indices,special_atoms_indices] |> Matrix
-ndata = 1600
-σ=0.0#1E-8
-data = @showprogress [ 
-    begin 
-        n_atoms = length(special_atoms_indices)
-        at = rand_config(;rf=.01 )
-        friction_tensor = Matrix(Gamma(m,at,filter)[special_atoms_indices,special_atoms_indices]) 
-        friction_tensor += σ.*randn(eltype(friction_tensor), n_atoms,n_atoms)
-        (at=at, 
-        E=nothing, 
-        F=nothing, 
-        friction_tensor = friction_tensor, 
-        friction_indices = special_atoms_indices, 
-        hirshfeld_volumes=nothing,
-        no_friction = false
-        ) 
-    end 
-    for _ = 1:ndata ];
-
-
-
-
+reinterpret(Matrix,train_data[1].friction_tensor)
+length(onsite) + length(offsite)
 
 n_train = 1200
 train_data = data[1:n_train]
 test_data = data[n_train+1:end]
+
+train_data[1].friction_tensor
 
 mb = ACEds.MatrixModels.basis(m);
 
@@ -134,30 +121,39 @@ Dict(), nothing) for d in test_data]
 fdata = [ACEds.FrictionData(d.at, d.friction_tensor, d.friction_indices, 
 Dict(), nothing) for d in data]
 
-import ACE
-length(mb)
-length(onsite) + length(offsite)
-ACE.scaling(onsite,2)
-ACE.scaling(offsite,2)
-using PyPlot
-plot(ACE.scaling(offsite,2))
-display(gcf())
-plot(ACE.scaling(onsite,2))
-display(gcf())
-basis = ACE.SymmetricBasis(ACE.Invariant(), RnYlm * Bz, Bsel;);
-plot(ACE.scaling(basis,2))
-display(gcf())
-plot(ACE.scaling(basis,2))
-display(gcf())
 
+#A= Gamma(m,at,filter)
+G= Gamma(m,at,filter)[special_atoms_indices,special_atoms_indices] |> Matrix
 
 scale = ACE.scaling(mb,2)
-A, Y, W = linear_assemble(fdata_train, mb, :distributed)
+A, Y, W = linear_assemble(fdata_train, mb)
+R = randn(size(A,2),1417)
+AR = A*R
+cond(A*R)
+length(mb)
+rank(A)
+size(A)
+#%%
 A_test, Y_test, W_test = linear_assemble(fdata_test, mb, :distributed)
+AR_test = A_test*R
 #solver = ACEfit.SKLEARN_ARD(1000,.001,1000000)
 cond(A)
+cond(A_test)
 solver = ACEfit.QR()
 sol1 = ACEfit.linear_solve(solver, A, Y)
+sol1R = ACEfit.linear_solve(solver, AR, Y)
+
+using StatsBase
+norm(Y - A * sol1)/norm(Y)
+mean(abs.(Y - A * sol1)./abs.(Y .+ 1))
+norm(Y_test - A_test * sol1)/norm(Y)
+
+norm(Y - AR * sol1R)/norm(Y)
+mean(abs.(Y - AR * sol1R)./abs.(Y .+ .1))
+norm(Y_test - AR_test * sol1R)/norm(Y)
+
+R_inv * R
+R_inv = inv(transpose(R)*R) *transpose(R)
 
 mbfit = deepcopy(mb);
 set_params!(mbfit, sol1 ) 
@@ -227,8 +223,73 @@ for (i, symb) in enumerate([:diag, :subdiag, :offdiag])
     ax[i].set_title(string(transl[symb]," elements"))
 end
 display(gcf())
+#%%
+function onsite_evaluate(at::Atoms, basis, onsite_env, special_inds, scale=nothing )
+    scale = (scale===nothing ? ones(length(basis)) : scale)
+    B = zeros(SMatrix{3,3,Float64,9},length(basis), length(special_inds) )
+    for (i, neigs, Rs) in sites(at, ACEds.MatrixModels.env_cutoff(onsite_env))
+        if i in special_inds 
+            Zs = at.Z[neigs]
+            cfg = ACEds.MatrixModels.env_transform(Rs, Zs, onsite_env)
+            Bii = evaluate(basis, cfg)
+            for (k,b) in enumerate(Bii)
+                B[k,i] = b.val * scale[k]
+            end
+        end
+    end
+    return B
+end
+function on_off_diag(B)
+    B_flat = B[:]
+    N = length(B_flat)
+    B_diag = zeros(length(B_flat),3)
+    B_off_diag = zeros(length(B_flat),3)
+    for i = 1:N
+        B_diag[i,:] = diag(B_flat[i])
+        B_off_diag[i,:] = [B_flat[i][1,2],B_flat[i][1,3],B_flat[i][2,1]]
+    end
+    return B_diag, B_off_diag
+end
+
+            
+
+scale = ACE.scaling(onsite,12)
+special_atoms_indices = [1,2]
+onsite_env = SphericalCutoff(rcut)
+
+at = rand_config(;si=special_atoms_indices)
+B = onsite_evaluate(at, onsite, onsite_env, special_atoms_indices )
+
+nsqrt = Int(floor(sqrt(size(B,1))))
+Bsqr = reshape(B[1:nsqrt^2],nsqrt,nsqrt)
+Bd = log.(abs.(reinterpret(Matrix,Bsqr)))
+fig,ax = PyPlot.subplots()
+ax.matshow(Bd)
+display(gcf())
 
 
+N = 10
+B = []
+for i =1:N
+    at = rand_config(;si=special_atoms_indices)
+    push!(B,onsite_evaluate(at, onsite, onsite_env, special_atoms_indices )...)
+end
+B_on, B_off = on_off_diag(B)
+
+
+
+fig,ax = PyPlot.subplots()
+ax.plot(B_on, B_off,"b.")
+display(gcf())
+
+fig,ax = PyPlot.subplots()
+ax.loglog(norm.(B_on), norm.(B_off),"b.")
+ax.set_xlabel("Diagonal")
+ax.set_ylabel("Off-diagonal")
+display(gcf())
+
+
+#%%
 fig,ax = PyPlot.subplots(1,3,figsize=(15,5))
 for (i, symb) in enumerate([:diag, :subdiag, :offdiag])
     ax[i].hist(tentries[tt]["true"][symb])

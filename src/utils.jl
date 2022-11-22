@@ -48,6 +48,9 @@ function reinterpret(::Type{Matrix}, mat::Matrix{SMatrix{3, 3, T, 9}}) where {T<
     return smat
 end
 
+function array2svector(x::Array{T,2}) where {T}
+    return [ SVector{3}(x[i,:]) for i in 1:size(x)[1] ]
+end
 
 
 # using LinearAlgebra
