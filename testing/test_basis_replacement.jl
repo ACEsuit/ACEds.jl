@@ -155,7 +155,7 @@ end
     #Zk2 = ACE.Categorical1pBasis([:bond,:env]; varsym = :be, idxsym = :be, label = "Zk2")
     B1p = RnYlm * Zk
     #env = ACE.EllipsoidBondEnvelope(r0cut, rcut, zcut; p0=1, pr=1, floppy=false, λ= 0.0)
-    offsite = SymmetricBondSpecies_basis(ACE.EuclideanMatrix(Float64), Bsel;species=species);
+    offsite = SymmetricBondSpecies_basis(ACE.EuclideanMatrix(Float64), Bsel;RnYlm=RnYlm,species=species);
     offsite = ACEds.symmetrize(offsite; varsym = :mube, varsumval = :bond)
     #offsite_H = ACE.Utils.SymmetricBond_basis(ACE.EuclideanMatrix(), env, Bsel; RnYlm = B1p, bondsymmetry="symmetric")
     offsite_new = modify_Rn(offsite; r0 = r0, 
@@ -163,8 +163,13 @@ end
         trans = PolyTransform(2, r0), 
         pcut = 1,
         pin = 2, 
-        rcut=rcut, Rn_index = 2)
+        rcut=rcut)
     
+    zH, zAg = AtomicNumber(:H), AtomicNumber(:Cu)
+    gen_param(N) = randn(N) ./ (1:N).^2
+    n_on, n_off = length(onsite),  length(offsite)
+    cH = gen_param(n_on) 
+    cHH = gen_param(n_off)
     m = ACEMatrixModel( OnSiteModels(Dict( zH => ACE.LinearACEModel(onsite, cH)), env_on), 
         OffSiteModels(Dict( (zH,zH) => ACE.LinearACEModel(offsite, cHH)), env_off)
     );
@@ -172,12 +177,12 @@ end
         OffSiteModels(Dict( (zH,zH) => ACE.LinearACEModel(offsite_new, cHH)), env_off)
     );
     at = rand_config()
-    afilter(i::Int) = (i in special_atoms_indices)
-    afilter(i::Int,at::Atoms) = afilter(i)
-    afilter(i::Int, j::Int) = afilter(i) && afilter(j)
-    B_val = Gamma(m, at, afilter)
-    B_val_new = Gamma(m_new, at, afilter)
-
-
-    print_tf(@test all(norm.(B_val-B_val2).<1E-10))
+    # afilter(i::Int) = (i in special_atoms_indices)
+    # afilter(i::Int,at::Atoms) = afilter(i)
+    # afilter(i::Int, j::Int) = afilter(i) && afilter(j)
+    B_val = Gamma(m, at,:dense)
+    B_val_new = Gamma(m_new, at,:dense)
+    B_val
+    norm.(B_val[1]-B_val_new[1])
+    print_tf(@test all(norm.(B_val-B_val_new).<1E-10))
 #end

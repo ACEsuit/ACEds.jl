@@ -25,7 +25,6 @@ path_to_data = "/Users/msachs2/Documents/Projects/data/friction_tensors/H2Cu"
 filename = string(path_to_data,fname,".jld")
 
 raw_data =JLD.load(filename)["data"]
-#species = chemical_symbol.(unique(hcat([unique(d.at.Z) for d in data]...)))
 
 rng = MersenneTwister(1234)
 shuffle!(rng, raw_data)
@@ -127,38 +126,56 @@ G= Gamma(m,at,filter)[special_atoms_indices,special_atoms_indices] |> Matrix
 
 scale = ACE.scaling(mb,2)
 A, Y, W = linear_assemble(fdata_train, mb)
+
+A = Diagonal(W)*A
+Y = Diagonal(W)*Y
 R = randn(size(A,2),1417)
 AR = A*R
 cond(A*R)
 length(mb)
 rank(A)
 size(A)
-#%%
+
+
 A_test, Y_test, W_test = linear_assemble(fdata_test, mb, :distributed)
 AR_test = A_test*R
+
+R2 = randn(size(A,2),1000)
+AR2 = A*R2
+R3 = randn(size(A,2),500)
+AR3 = A*R3
 #solver = ACEfit.SKLEARN_ARD(1000,.001,1000000)
 cond(A)
 cond(A_test)
 solver = ACEfit.QR()
 sol1 = ACEfit.linear_solve(solver, A, Y)
 sol1R = ACEfit.linear_solve(solver, AR, Y)
-
+sol1R2 = ACEfit.linear_solve(solver, AR2, Y)
+sol1R3 = ACEfit.linear_solve(solver, AR3, Y)
+#maximum(abs.(sol1R)/minimum(abs.(sol1R)))
 using StatsBase
+@show norm(Y - A * sol1)^2
 norm(Y - A * sol1)/norm(Y)
 mean(abs.(Y - A * sol1)./abs.(Y .+ 1))
 norm(Y_test - A_test * sol1)/norm(Y)
 
-norm(Y - AR * sol1R)/norm(Y)
+@show norm(Y - AR * sol1R)
 mean(abs.(Y - AR * sol1R)./abs.(Y .+ .1))
 norm(Y_test - AR_test * sol1R)/norm(Y)
 
+#R * sol1R = sol1Lift
 R_inv * R
-R_inv = inv(transpose(R)*R) *transpose(R)
+R_inv_l = inv(transpose(R)*R) *transpose(R)
+
 
 mbfit = deepcopy(mb);
 set_params!(mbfit, sol1 ) 
-
-
+mbfitR = deepcopy(mb);
+set_params!(mbfitR, R*sol1R) 
+mbfitR2 = deepcopy(mb);
+set_params!(mbfitR2, R2*sol1R2) 
+mbfitR3 = deepcopy(mb);
+set_params!(mbfitR3, R3*sol1R3)
 function tensor_error(fdata, mb, filter)
     #G_res = reinterpret(Matrix, reinterpret(Matrix,d.friction_tensor - Gamma(mb,d.atoms, filter)[d.friction_indices,d.friction_indices]))
     g_res = @showprogress [reinterpret(Matrix, d.friction_tensor - Gamma(mb,d.atoms, filter)[d.friction_indices,d.friction_indices])
@@ -194,35 +211,60 @@ function friction_entries(fdata, mb, filter; entry_types = [:diag,:subdiag,:offd
     return data_true, data_fit
 end
 
-
-rmse, mae = tensor_error(fdata_test, mb, filter)
-@show rmse, mae
-rmse_train, mae_train = tensor_error(fdata_train, mb, filter)
-@show rmse_train, mae_train
-#fp = friction_pairs(fdata_test, mb, filter)
-tentries = Dict("test" => Dict(), "test" => Dict(),
-            "train" => Dict(), "train" => Dict()
-)
-
-tentries["test"]["true"],tentries["test"]["fit"]  = friction_entries(fdata_test, mb, filter)
-tentries["train"]["true"],tentries["train"]["fit"]  = friction_entries(fdata_train, mb, filter)
-
-# using Plots
-# using StatsPlots
-using PyPlot
-
-
-#fig,ax = PyPlot.subplots(1,3,figsize=(15,5),sharex=true, sharey=true)
-tt = "train"
-fig,ax = PyPlot.subplots(1,3,figsize=(15,5))
-transl = Dict(:diag=>"Diagonal", :subdiag=>"Sub-Diagonal", :offdiag=>"Off Diagonal" )
-for (i, symb) in enumerate([:diag, :subdiag, :offdiag])
-    ax[i].plot(tentries[tt]["true"][symb], tentries[tt]["fit"][symb],"b.")
-    ax[i].set_xlabel("True entry")
-    ax[i].set_ylabel("Fitted entry value")
-    ax[i].set_title(string(transl[symb]," elements"))
+for mb in [mbfitR2]#[mbfit,mbfitR,mbfitR2]
+    rmse, mae = tensor_error(fdata_test, mb, filter)
+    @show rmse, mae
+    rmse_train, mae_train = tensor_error(fdata_train, mb, filter)
+    @show rmse_train, mae_train
 end
-display(gcf())
+@show norm(Y - A * sol1)^2
+@show norm(Y_test - A_test * sol1)^2
+@show norm(Y - AR * sol1R)^2
+@show norm(Y_test - A_test * R * sol1R)^2
+mean(Y - A * sol1).^2
+mean(Y_test - A_test * sol1).^2
+
+mean(Y - AR * sol1R).^2
+mean(Y_test - A_test * R * sol1R).^2
+
+mean(abs.(Y - A * sol1))
+mean(abs.(Y_test - A_test * sol1))
+mean(abs.(Y - AR * sol1R))
+mean(abs.(Y_test - A_test * R * sol1R))
+
+fd = friction_pairs(fdata, mbfit, filter)
+reinterpret(Matrix,fd[3].Γ_true)
+reinterpret(Matrix,fd[3].Γ_fit)
+#%%
+
+for (mb,fit_info) in zip([mbfit,mbfitR,mbfitR2,mbfitR3], ["LSQR","RPLSQR","RPLSQR2","RPLSQR3"])
+    #fp = friction_pairs(fdata_test, mb, filter)
+    tentries = Dict("test" => Dict(), "test" => Dict(),
+                "train" => Dict(), "train" => Dict()
+    )
+
+    tentries["test"]["true"],tentries["test"]["fit"]  = friction_entries(fdata_test, mb, filter)
+    tentries["train"]["true"],tentries["train"]["fit"]  = friction_entries(fdata_train, mb, filter)
+
+    # using Plots
+    # using StatsPlots
+    using PyPlot
+
+
+    #fig,ax = PyPlot.subplots(1,3,figsize=(15,5),sharex=true, sharey=true)
+    fig,ax = PyPlot.subplots(2,3,figsize=(15,10))
+    for (k,tt) in enumerate(["train","test"])
+        transl = Dict(:diag=>"Diagonal", :subdiag=>"Sub-Diagonal", :offdiag=>"Off Diagonal" )
+        for (i, symb) in enumerate([:diag, :subdiag, :offdiag])
+            ax[k,i].plot(tentries[tt]["true"][symb], tentries[tt]["fit"][symb],"b.")
+            ax[k,i].set_title(string(transl[symb]," elements"))
+            ax[k,i].axis("equal")
+        end
+        ax[k,1].set_xlabel("True entry")
+        ax[k,1].set_ylabel("Fitted entry value")
+    end 
+    display(gcf())
+end
 #%%
 function onsite_evaluate(at::Atoms, basis, onsite_env, special_inds, scale=nothing )
     scale = (scale===nothing ? ones(length(basis)) : scale)

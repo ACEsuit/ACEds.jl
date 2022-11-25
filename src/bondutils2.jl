@@ -79,7 +79,7 @@ BondSpeciesBasisSelector(Bsel::ACE.SparseBasis;
 
 function SymmetricBondSpecies_basis(ϕ::ACE.AbstractProperty, Bsel::ACE.SparseBasis; RnYlm = nothing, bondsymmetry=nothing, species = [:env], kwargs...)
     BondSelector =  BondSpeciesBasisSelector(Bsel; isym=:mube, species = species, kwargs...)
-    @show BondSelector.maxorder_dict
+    #@show BondSelector.maxorder_dict
 
     if RnYlm === nothing
         r0 = .4

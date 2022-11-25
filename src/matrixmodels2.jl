@@ -109,10 +109,10 @@ ACEbonds.bonds(at::Atoms, offsite::OffSiteModels) = ACEbonds.bonds( at, offsite.
         sqrt((offsite.env.rcutbond*.5)^2+ offsite.env.rcutenv^2)),
                 (r, z) -> env_filter(r, z, offsite.env) )
 
-ACEbonds.bonds(at::Atoms, offsite::OffSiteModels, filter) = ACEbonds.bonds( at, offsite.env.rcutbond, 
+ACEbonds.bonds(at::Atoms, offsite::OffSiteModels, site_filter) = ACEbonds.bonds( at, offsite.env.rcutbond, 
     max(offsite.env.rcutbond*.5 + offsite.env.zcutenv, 
         sqrt((offsite.env.rcutbond*.5)^2+ offsite.env.rcutenv^2)),
-                (r, z) -> env_filter(r, z, offsite.env), filter )
+                (r, z) -> env_filter(r, z, offsite.env), site_filter )
 # ACEbonds.bonds(at::Atoms, offsite::OffSiteModels, filter) = ACEbonds.bonds( at, offsite.env.rcutbond, 
 # max(offsite.env.rcutbond*.5 + offsite.env.zcutenv, 
 #     sqrt((offsite.env.rcutbond*.5)^2+ offsite.env.rcutenv^2)),
@@ -277,16 +277,17 @@ function allocate_Gamma(M::ACEMatrixCalc, at::Atoms, sparse=:sparse, T=Float64)
     return Γ
 end
 
-function Gamma(M::ACEMatrixCalc, at::Atoms, filter=_->true, sparse=:sparse, T=Float64, filtermode=:new) 
+function Gamma(M::ACEMatrixCalc, at::Atoms, sparse=:sparse, filter=(_,_)->true, T=Float64, filtermode=:new) 
     Γ = allocate_Gamma(M, at, sparse, T)
     Gamma!(M, at, Γ, filter, filtermode)
     return Γ
 end
 
-function Gamma!(M::ACEMatrixCalc, at::Atoms, Γ::AbstractMatrix{SMatrix{3,3,T,9}}, filter=_->true, filtermode=:new) where {T<:Number}
+function Gamma!(M::ACEMatrixCalc, at::Atoms, Γ::AbstractMatrix{SMatrix{3,3,T,9}}, filter=(_,_)->true, filtermode=:new) where {T<:Number}
     if filtermode == :new
+        site_filter(i,at) = (haskey(M.onsite.models, at.Z[i]) && filter(i, at))
         for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
-            if filter(i, at)
+            if site_filter(i, at)
                 Zs = at.Z[neigs]
                 sm = _get_model(M, at.Z[i])
                 cfg = env_transform(Rs, Zs, M.onsite.env)
@@ -294,17 +295,20 @@ function Gamma!(M::ACEMatrixCalc, at::Atoms, Γ::AbstractMatrix{SMatrix{3,3,T,9}
             end
         end
 
-        for (i, j, rrij, Js, Rs, Zs) in bonds(at, M.offsite, filter)
+        for (i, j, rrij, Js, Rs, Zs) in bonds(at, M.offsite, site_filter)
             # if i in [1,2] && j in [1,2]
             #     @show (i,j)
             #     @show rrij
             #     @show Rs
             # end
             # find the right ace model 
+            #@show (i,j)
             sm = _get_model(M, (at.Z[i], at.Z[j]))
             # transform the ellipse to a sphere
             cfg = env_transform(rrij, at.Z[i], at.Z[j], Rs, Zs, M.offsite.env)
             # evaluate 
+            # @show params(sm)
+            #@show cfg
             Γ[i,j] += evaluate(sm, cfg)
         end
     else
@@ -350,17 +354,18 @@ function allocate_B(M::ACEMatrixBasis, at::Atoms, sparsity= :sparse, T=Float64)
     return cat(B_onsite,B_offsite,dims=1)
 end
 
-function evaluate(M::ACEMatrixBasis, at::Atoms, filter=_->true, sparsity= :sparse, T=Float64, filtermode=:new) 
+function evaluate(M::ACEMatrixBasis, at::Atoms, sparsity= :sparse, filter=(_,_)->true, T=Float64, filtermode=:new) 
     B = allocate_B(M, at, sparsity, T)
     evaluate!(B, M, at, filter, filtermode)
     return B
 end
 
 #Convention on evaluate! or here Gamma! (add values or first set to zeros and then add )
-function evaluate!(B, M::ACEMatrixBasis, at::Atoms, filter=_->true, filtermode=:new ) where {T<:Number}
+function evaluate!(B, M::ACEMatrixBasis, at::Atoms, filter=(_,_)->true, filtermode=:new ) where {T<:Number}
     if filtermode == :new
+        site_filter(i,at) = (haskey(M.onsite.models, at.Z[i]) && filter(i, at))
         for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
-            if filter(i)
+            if site_filter(i, at)
                 Zs = at.Z[neigs]
                 sm = _get_model(M, at.Z[i])
                 inds = get_range(M, at.Z[i])
@@ -371,8 +376,8 @@ function evaluate!(B, M::ACEMatrixBasis, at::Atoms, filter=_->true, filtermode=:
                 end
             end
         end
-
-        for (i, j, rrij, Js, Rs, Zs) in bonds(at, M.offsite, filter)
+        
+        for (i, j, rrij, Js, Rs, Zs) in bonds(at, M.offsite, site_filter)
             # if i in [1,2] && j in [1,2]
             #     @show (i,j)
             #     @show rrij
@@ -480,9 +485,9 @@ end
 function set_params!(mb::ACEMatrixCalc, site::Symbol, θ)
     sitedict = getfield(mb, site).models
     for z in keys(sitedict)
-        @show z
-        @show get_range(mb.inds, z)
-        @show typeof(_get_model(mb,z))
+        # @show z
+        # @show get_range(mb.inds, z)
+        # @show typeof(_get_model(mb,z))
         set_params!(_get_model(mb,z),θ[get_range(mb.inds, z)]) 
     end
 end

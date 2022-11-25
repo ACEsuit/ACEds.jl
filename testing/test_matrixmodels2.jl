@@ -64,7 +64,7 @@ models_off = Dict( (zAl,zAl) => ACE.LinearACEModel(offsite, cAl2),
 (zAl,zTi) => ACE.LinearACEModel(offsite, cAlTi),
 (zTi,zTi) => ACE.LinearACEModel(offsite, cTi2))
 
-m = ACEMatrixModel(_->true, OnSiteModels(models_on, env_on ), OffSiteModels(models_off, env_off));
+m = ACEMatrixModel( OnSiteModels(models_on, env_on ), OffSiteModels(models_off, env_off));
 
 OnSiteModels(models_on, env_on );
 OffSiteModels(models_off, env_off);
@@ -91,7 +91,7 @@ at.Z[2:2:end] .= zTi
 rattle!(at,0.1)
 #set_pbc!(at, [false,false,false])
 #Q = ACE.Random.rand_rot()
-
+typeof(at)
 Γ = Gamma(m,at);
 N = size(Γ,1)
 norm(Γ[1,2]-transpose(Γ[2,1]))

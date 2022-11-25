@@ -15,4 +15,5 @@ include("./patches/ACEbonds_patches.jl")
 include("./patches/symmetrization.jl")
 include("./patches/symeuclideanmatrix.jl")
 include("./patches/acefit_interface.jl")
+include("./analytics.jl")
 end
