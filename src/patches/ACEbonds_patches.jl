@@ -7,6 +7,7 @@ import ACEbonds: bonds, _get_bond_env
 
 # TODO: make this type-stable
 
+
 """
 * rcutbond: include all bonds (i,j) such that rij <= rcutbond 
 * `rcutenv`: include all bond environment atoms k such that `|rk - mid| <= rcutenv` 
@@ -40,6 +41,7 @@ end
 
 function FilteredBondsIterator(at::Atoms, rcutbond::Real, rcutenv::Real, env_filter, filter) 
     inds = findall(i->filter(i,at), 1:length(at) )
+    #@show inds
     return FilteredBondsIterator(at, rcutbond, rcutenv, env_filter, inds) 
  end
 
@@ -47,7 +49,7 @@ function FilteredBondsIterator(at::Atoms, rcutbond::Real, rcutenv::Real, env_fil
 function increment(iter::FilteredBondsIterator, state)
     ic, ib, Js, Rs = state
     ib = ib + 1 # increase bond index
-    if ib > length(Js) # iterated over all atoms in environment ? 
+    if ib > length(Js) # already visited/iterated over all atoms in environment ? 
         ic = ic + 1 # increase index of center atom 
         if ic > length(iter.subset) # all relevant center atoms already visited?  
             return (nothing, ib, Js, Rs) # if yes, done! 
@@ -65,7 +67,7 @@ function Base.iterate(iter::FilteredBondsIterator)
       return nothing
    else
       Js, Rs = neigs(iter.nlist_bond, iter.subset[1])
-      state = (1,1,Js,Rs)
+      state = (1,0,Js,Rs)
       return iterate(iter, state)
    end
 end
@@ -91,7 +93,7 @@ function Base.iterate(iter::FilteredBondsIterator, state)
    j = Js[ib]   # index of neighbour (in central cell)
    rr0 = rrij = Rs[ib]  # position of neighbour (in shifted cell) relative to i
    # ssj = Rs[q] - iter.at.X[j]   # shift of atom j into shifted cell
-   
+   # @show (i,j)
    # now we construct the environment 
    Js_e, Rs_e, Zs_e = _get_bond_env(iter, i, j, rrij)
 

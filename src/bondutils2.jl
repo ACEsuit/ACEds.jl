@@ -103,6 +103,45 @@ function SymmetricBondSpecies_basis(ϕ::ACE.AbstractProperty, Bsel::ACE.SparseBa
     return ACE.SymmetricBasis(ϕ, B1p, BondSelector; filterfun = filterfun)
 end
 
+# DSpeciesBasisSelector(Bsel::ACE.SparseBasis; 
+#                   isym=:mube, bond_weight = 1.0, env_weight = 1.0,  species =[:env], 
+#                   species_minorder_dict = Dict{Symbol,Int64}(), species_maxorder_dict = Dict{Symbol,Int64}()) = 
+#    ACE.CategorySparseBasis(isym, cat([:bond],species,dims=1);
+#             maxorder = ACE.maxorder(Bsel), 
+#             p = Bsel.p, 
+#             weight = Bsel.weight, 
+#             maxlevels = Bsel.maxlevels,
+#             minorder_dict = merge(Dict( :bond => 1), species_minorder_dict),
+#             maxorder_dict = merge(Dict( :bond => 1), species_maxorder_dict),
+#             weight_cat = merge(Dict(:bond => bond_weight), Dict( s => env_weight for s in species)) 
+#          )
+
+# function SymmetricDSpecies_basis(ϕ::ACE.AbstractProperty, Bsel::ACE.SparseBasis; RnYlm = nothing, bondsymmetry=nothing, species = [:env], kwargs...)
+#     BondSelector =  DSpeciesBasisSelector(Bsel; isym=:mube, species = species, kwargs...)
+#     #@show BondSelector.maxorder_dict
+
+#     if RnYlm === nothing
+#         r0 = .4 * rcut
+#         RnYlm = RnYlm_1pbasis(;   r0 = r0,  rcut=1.0,
+#                                             rin = 0.0,
+#                                             trans = PolyTransform(2, r0), 
+#                                             pcut = 2,
+#                                             pin = 0, 
+#                                             kwargs...
+#                                         )
+#     end
+#     filterfun = _->true
+#     if bondsymmetry == "Invariant"
+#         filterfun = ACE.EvenL(:mube, [:bond])
+#     end
+#     if bondsymmetry == "Covariant"
+#         filterfun = x -> !(ACE.EvenL(:mube, [:bond])(x))
+#     end
+#     Bc = ACE.Categorical1pBasis(cat([:bond],species, dims=1); varsym = :mube, idxsym = :mube )
+#     B1p =  Bc * RnYlm 
+#     return ACE.SymmetricBasis(ϕ, B1p, BondSelector; filterfun = filterfun)
+# end
+
 # function SymmetricBondSpecies_basis(ϕ::ACE.AbstractProperty, Bsel::ACE.SparseBasis; RnYlm = nothing, bondsymmetry=nothing, species = [:env], kwargs...)
 #     BondSelector =  BondSpeciesBasisSelector(Bsel; species = species, kwargs...)
 #     @show BondSelector.maxorder_dict

@@ -20,6 +20,7 @@ using ACEds.Utils: array2svector
 
 using ACEfit
 using ACEfit: count_observations, feature_matrix, linear_assemble
+using ACEds.CutoffEnv: SphericalCutoff, EllipsoidCutoff
 
 fname = "/h2cu_20220713_friction"
 path_to_data = "/Users/msachs2/Documents/Projects/data/friction_tensors/H2Cu"
@@ -50,9 +51,11 @@ species_fc = [:H]
 species_env = [:Cu]
 species = vcat(species_fc,species_env)
 
+species_swap_dict = Dict(:Ag=>:Cu)
+
 # onsite parameters 
 maxorder_on = 3
-maxdeg_on = 4
+maxdeg_on = 6
 
 r0f = .4
 rcut = 7.0
@@ -87,17 +90,12 @@ onsite = modify_Rn(onsite; r0 = pon["r0"],
     pcut = pon["pcut"],
     pin = pon["pin"], 
     rcut=pon["rcut"])
-onsite = modify_species(onsite, Dict(:Ag=>:Cu), false)
+onsite = modify_species(onsite, species_swap_dict, false)
 
-maxorder_off = 2
-maxdeg_off = 5
+maxorder_off = 3
+maxdeg_off = 4
 
-# Bsel = ACE.SparseBasis(; maxorder=maxorder_off, p = 2, default_maxdeg = maxdeg_off ) 
-# offsite = SymmetricBondSpecies_basis(ACE.EuclideanMatrix(Float64), Bsel;species=[:Cu,:H]);
-# offsite = ACEds.symmetrize(offsite; varsym = :mube, varsumval = :bond)
 
-# vcat(:bond,species)
-# cat([:bond],species, dims=1)
 offsite = read_dict(load_json(string(path,"/offsite","/sym-max-",maxorder_off,"maxdeg-",maxdeg_off,".json")));
 offsite = modify_Rn(offsite; r0 = poff["r0"], 
     rin = 0.0, #poff["rin"],
@@ -105,24 +103,8 @@ offsite = modify_Rn(offsite; r0 = poff["r0"],
     pcut = poff["pcut"],
     pin = poff["pin"], 
     rcut= 1.0);
-offsite = modify_species(offsite, Dict(:Ag=>:Cu), true);
-# offsite.pibasis.basis1p
-# offsite_mod.pibasis.basis1p
-# AtomicNumber(:Cu)
-# AtomicNumber(:H)
-# fieldnames(typeof(offsite_mod.pibasis.basis1p))
-# offsite.pibasis.basis1p
-# typeof(offsite_mod.pibasis.basis1p[1])
-# ncat = length(offsite_mod.pibasis.basis1p[1].categories)
+offsite = modify_species(offsite, species_swap_dict, true);
 
-# swap_dict = Dict(:Cu=>:Ag, :H=>:H)
-# categories = offsite_mod.pibasis.basis1p[1].categories.list
-
-# new_categories = [ (haskey(swap_dict,c) ? swap_dict[c] : c) for c in categories ]
-# ACE.Categorical1pBasis(new_categories; varsym = :mube, idxsym = :mube)
-
-# offsite_mod.pibasis.basis1p[1].categories = new_cat
-# B1p =  Bc * RnYlm 
 env_on = SphericalCutoff(pon["rcut"])
 env_off = EllipsoidCutoff(poff["rcutbond"], poff["rcutenv"], poff["zcutenv"])
 
@@ -237,116 +219,55 @@ using ACEds.Analytics: friction_entries,friction_pairs, matrix_errors, matrix_en
 # [norm(f.Γ_true-f.Γ_fit,1) - norm(g,1) for (g,f) in zip(g_res,fp)]
 # friction = friction_entries(fdata_test, mbfitR; filter=filter)
 
-import ACEds.MatrixModels: Gamma, Gamma!, ACEMatrixCalc, allocate_Gamma, _get_model, env_transform, env_cutoff, bonds
-function Gamma(M::ACEMatrixCalc, at::Atoms, sparse=:sparse, filter=(_,_)->true, T=Float64, filtermode=:new) 
-    Γ = allocate_Gamma(M, at, sparse, T)
-    Γ, cfg_list = Gamma!(M, at, Γ, filter, filtermode)
-    return Γ, cfg_list
-end
 
-function Gamma!(M::ACEMatrixCalc, at::Atoms, Γ::AbstractMatrix{SMatrix{3,3,T,9}}, filter=(_,_)->true, filtermode=:new) where {T<:Number}
-    cfg_list = []
-    if filtermode == :new
-        site_filter(i,at) = (haskey(M.onsite.models, at.Z[i]) && filter(i, at))
-        for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
-            if site_filter(i, at)
-                Zs = at.Z[neigs]
-                sm = _get_model(M, at.Z[i])
-                cfg = env_transform(Rs, Zs, M.onsite.env)
-                Γ[i,i] += evaluate(sm, cfg)
-            end
-        end
+# i = 5
+# g = friction_entries(fdata_train, mbfitR; entry_types = [:diag,:subdiag,:offdiag])
+# gp = friction_pairs(fdata_train, mbfitR)
+# mode = :fit
+# g[:true][:diag][i]
+# reinterpret(Matrix,gp[i].Γ_true)
+# g[:true][:subdiag][i]
+# reinterpret(Matrix,gp[i].Γ_true)
+# g[:true][:offdiag][i]
 
-        for (i, j, rrij, Js, Rs, Zs) in bonds(at, M.offsite, site_filter)
-            # if i in [1,2] && j in [1,2]
-            #     @show (i,j)
-            #     @show rrij
-            #     @show Rs
-            # end
-            # find the right ace model 
-            #@show (i,j)
-            sm = _get_model(M, (at.Z[i], at.Z[j]))
-            # transform the ellipse to a sphere
-            cfg = env_transform(rrij, at.Z[i], at.Z[j], Rs, Zs, M.offsite.env)
-            # evaluate 
-            # @show params(sm)
-            #@show cfg
-            push!(cfg_list, cfg)
-            Γ[i,j] += evaluate(sm, cfg)
-        end
-    else
-        for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
-            if filter(i, at)
-                Zs = at.Z[neigs]
-                sm = _get_model(M, at.Z[i])
-                cfg = env_transform(Rs, Zs, M.onsite.env)
-                Γ[i,i] += evaluate(sm, cfg)
-            end
-        end
+# g[:fit][:diag][i]
+# reinterpret(Matrix,gp[i].Γ_fit)
+# g[:fit][:subdiag][i]
+# reinterpret(Matrix,gp[i].Γ_fit)
+# g[:fit][:offdiag][i]
 
-        for (i, j, rrij, Js, Rs, Zs) in bonds(at, M.offsite)
-            # if i in [1,2] && j in [1,2]
-            #     @show (i,j)
-            #     @show rrij
-            #     @show Rs
-            # end
-            if filter(i,j)
-                # find the right ace model 
-                sm = _get_model(M, (at.Z[i], at.Z[j]))
-                # transform the ellipse to a sphere
-                cfg = env_transform(rrij, at.Z[i], at.Z[j], Rs, Zs, M.offsite.env)
-                # evaluate 
-                Γ[i,j] += evaluate(sm, cfg)
-            end
-        end
-    end
-    return Γ, cfg_list
-end
+# d = fdata_train[i]
 
-d = fdata_test[1]
-G, cfg_list= Gamma(mbfitR,d.atoms)
-d2 = fdata_test[2]
-G2, cfg_list2= Gamma(mbfitR,d2.atoms)
-
-G[d.friction_indices,d.friction_indices]
-G2[d.friction_indices,d.friction_indices]
-using JuLIP: AtomicNumber
-zz = AtomicNumber.((:H,:H))
-model = mbfitR.offsite.models[zz]
-evaluate(model,vcat(cfg_list[1][1],cfg_list2[1][2:end-4]))
-norm(cfg_list[1][1].rr)
-evaluate(model.basis, )
-for a in cfg_list2[1]
-    print(a.mube)
-end
-cfg_list2[1][2:end-4]
-cfg_list2[1][2:end]
-
-ACE.get_spec(model.basis)
-fieldnames(typeof(model.basis))
-fieldnames(typeof(model.basis.pibasis))
-fieldnames(typeof(model.basis.pibasis.basis1p["Rn"]))
-model.basis.pibasis.basis1p["Rn"].basis
-mbfitR.offsite.env
-norm(d.atoms[55]-d.atoms[56])
-friction[:fit][:diag]
-typeof(fp[1].Γ_true)
-norm(fp[1].Γ_true - fp[1].Γ_fit,1)
-norm(reinterpret(Matrix,fp[1].Γ_true - fp[1].Γ_fit),1)
-g = friction_entries(fdata_test, mbfitR; entry_types = [:diag,:subdiag,:offdiag])
 # reinterpret(Array{Float64},g[:true][:offdiag])
 # reduce(vcat,g[:true][:offdiag])
+
+
+i=90
+d = fdata_test[i]
+A = reinterpret(Matrix,Matrix(Gamma(mbfitR,d.atoms)[d.friction_indices,d.friction_indices]))
+reinterpret(Matrix,d.friction_tensor)
+
 m_rel_err =  matrix_errors(fdata_test, mbfitR; mode=:rel, reg_epsilon=.1)
 m_abs_err =  matrix_errors(fdata_test, mbfitR; mode=:abs, reg_epsilon=.0)
 
+
+e_abs_error = matrix_entry_errors(fdata_test, mbfitR; mode=:abs)
+e_rel_error = matrix_entry_errors(fdata_test, mbfitR; mode=:rel, reg_epsilon=.1)
+
+#weights = Dict(:offdiag => 18,:subdiag => 12, :diag=>6 )
+
+#%%
+tentries = Dict("test" => Dict(), "test" => Dict(),
+                "train" => Dict(), "train" => Dict()
+    )
 for (mb,fit_info) in zip([mbfit,mbfitR,mbfitR2,mbfitR3], ["LSQR","RPLSQR","RPLSQR2","RPLSQR3"])
     #fp = friction_pairs(fdata_test, mb, filter)
     tentries = Dict("test" => Dict(), "test" => Dict(),
                 "train" => Dict(), "train" => Dict()
     )
 
-    tentries["test"]["true"],tentries["test"]["fit"]  = friction_entries(fdata_test, mb, filter)
-    tentries["train"]["true"],tentries["train"]["fit"]  = friction_entries(fdata_train, mb, filter)
+    tentries["test"] = friction_entries(fdata_test, mb)
+    tentries["train"] = friction_entries(fdata_train, mb)
 
     # using Plots
     # using StatsPlots
@@ -358,7 +279,7 @@ for (mb,fit_info) in zip([mbfit,mbfitR,mbfitR2,mbfitR3], ["LSQR","RPLSQR","RPLSQ
     for (k,tt) in enumerate(["train","test"])
         transl = Dict(:diag=>"Diagonal", :subdiag=>"Sub-Diagonal", :offdiag=>"Off Diagonal" )
         for (i, symb) in enumerate([:diag, :subdiag, :offdiag])
-            ax[k,i].plot(tentries[tt]["true"][symb], tentries[tt]["fit"][symb],"b.")
+            ax[k,i].plot(reinterpret(Array{Float64},tentries[tt][:true][symb]), reinterpret(Array{Float64},tentries[tt][:fit][symb]),"b.")
             ax[k,i].set_title(string(transl[symb]," elements"))
             ax[k,i].axis("equal")
         end
@@ -367,6 +288,13 @@ for (mb,fit_info) in zip([mbfit,mbfitR,mbfitR2,mbfitR3], ["LSQR","RPLSQR","RPLSQ
     end 
     display(gcf())
 end
+#%%
+mvect = tentries["test"][:true][:offdiag]
+mvecf = tentries["test"][:fit][:offdiag]
+tol=10^-2
+mtol = 3
+findall(x->(maximum(abs.(x[1]))<tol && maximum(abs.(x[2]))>mtol),[(d1,d2) for (d1,d2) in zip(mvect,mvecf) ])
+
 #%%
 function onsite_evaluate(at::Atoms, basis, onsite_env, special_inds, scale=nothing )
     scale = (scale===nothing ? ones(length(basis)) : scale)

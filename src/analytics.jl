@@ -48,35 +48,33 @@ function matrix_errors(fdata, mb; filter=(_,_)->true, weights=ones(length(fdata)
     return err
 end
 
-function matrix_entry_errors(fdata, mb; filter=(_,_)->true, weights=ones(length(fdata)), entry_types = [:diag,:subdiag,:offdiag], mode=:abs)
+function matrix_entry_errors(fdata, mb; filter=(_,_)->true, weights=ones(length(fdata)), entry_types = [:diag,:subdiag,:offdiag], mode=:abs,reg_epsilon=0.0)
     friction = friction_entries(fdata, mb; filter=filter, entry_types = entry_types )
-    g_res = residuals(fdata, mb; filter=filter)
-    err = Dict(s=>Dict() for s in entry_types)
+    fp = friction_pairs(fdata, mb; filter=filter)
+    err = Dict(s=>Dict() for s in vcat(entry_types,:all))
     if mode==:abs
         
-        p_err(etype,p) = sum( w * mean(abs.(γ_fit-γ_true).^p) for (γ_fit,γ_true,w) in zip(friction[:fit][etype], friction[:true][etype], weights) ) / sum(weights)
+        p_abs_err(etype,p) = sum(w * mean(abs.(γ_fit-γ_true).^p) for (γ_fit,γ_true,w) in zip(friction[:fit][etype], friction[:true][etype], weights) ) / sum(weights)
         for etype in entry_types
-            err[etype][:mse] = p_err(etype,2)
-            err[etype][:mae] = p_err(etype,1)
+            err[etype][:mse] = p_abs_err(etype,2)
+            err[etype][:mae] = p_abs_err(etype,1)
         end
         
-        p_err(p) = sum(w * mean(abs.(g).^p) for (g,w) in zip(g_res,weights))/sum(weights)
-        err[:all][:mse] = p_err(2)
-        err[:all][:mae] = p_err(1)
+        p_abs_err(p) = sum(w * mean(abs.(reinterpret(Matrix,f.Γ_true - f.Γ_fit)).^p) for (f,w) in zip(fp,weights))/sum(weights)
+        err[:all][:mse] = p_abs_err(2)
+        err[:all][:mae] = p_abs_err(1)
         
 
     elseif mode ==:rel
-        p_err(etype,p) = sum( w * mean((abs.(γ_fit-γ_true)./(abs.(γ_true).+reg_epsilon)).^p) for (γ_fit,γ_true,w) in zip(friction[:fit][etype], friction[:true][etype], weights) ) / sum(weights)
+        p_rel_err(etype,p) = sum( w * mean((abs.(γ_fit-γ_true)./(abs.(γ_true).+reg_epsilon)).^p) for (γ_fit,γ_true,w) in zip(friction[:fit][etype], friction[:true][etype], weights) ) / sum(weights)
         for etype in entry_types
-            err[etype][:mse] = p_err(etype,2)
-            err[etype][:rmsd] = sqrt(p_err(etype,2))
-            err[etype][:mae] = p_err(etype,1)
+            err[etype][:mse] = p_rel_err(etype,2)
+            err[etype][:rmsd] = sqrt(p_rel_err(etype,2))
+            err[etype][:mae] = p_rel_err(etype,1)
         end
-
-        fp = friction_pairs(fdata, mb; filter=filter)
-        p_err(p) = sum(w * mean( (abs.(g)./(abs.(f.Γ_true) .+ reg_epsilon)).^p)  for (g,f,w) in zip(g_res,fp,weights))/sum(weights)
-        err[:all][:mse] = p_err(2)
-        err[:all][:mae] = p_err(1)
+        p_rel_err(p) = sum(w * mean( (abs.(reinterpret(Matrix,f.Γ_true - f.Γ_fit))./(abs.(reinterpret(Matrix,f.Γ_true)) .+ reg_epsilon)).^p)  for (f,w) in zip(fp,weights))/sum(weights)
+        err[:all][:mse] = p_rel_err(2)
+        err[:all][:mae] = p_rel_err(1)
     end
     return err
 end

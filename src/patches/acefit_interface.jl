@@ -92,7 +92,7 @@ function copy_subdiag!(y, Γ::AbstractMatrix) #::AbstractMatrix{SMatrix{3}}
     for i in 1:n_atoms
         y[3*(i-1)+1] = Γ[i,i][1,2]
         y[3*(i-1)+2] = Γ[i,i][1,3]
-        y[3*(i-1)+3] = Γ[i,i][2,1]
+        y[3*(i-1)+3] = Γ[i,i][2,3]
     end
     #return [ g for i in 1:n_atoms for g in [Γ[i,i][1,2],Γ[i,i][1,3],Γ[i,i][2,1]]]
 end
