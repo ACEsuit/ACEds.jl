@@ -256,6 +256,7 @@ function allocate_B(M::CovACEMatrixBasis, at::Atoms, sparsity= :sparse, T=Float6
     end
     return cat(B_onsite,B_offsite,dims=1)
 end
+
 Gamma(Σ_vec::Vector{SparseArrays.AbstractSparseMatrix{SVector{3, T}, Int64}}) where {T}  = sum(Σ*transpose(Σ) for Σ in Σ_vec)
 Gamma(Σ_vec::Vector{<:AbstractMatrix{SVector{3,T}}}) where {T} = sum(Σ*transpose(Σ) for Σ in Σ_vec)
 Gamma(M::CovACEMatrixCalc, at::Atoms, sparse=:sparse, filter=(_,_)->true, T=Float64, filtermode=:new) = Gamma(Sigma(M, at, sparse, filter, T, filtermode)) 
