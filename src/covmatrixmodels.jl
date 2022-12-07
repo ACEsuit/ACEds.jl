@@ -26,54 +26,54 @@ using ACEds.Utils: reinterpret
 
 #ACE.scaling(m::SiteModel,p::Int) = ACE.scaling(m.model.basis,p)
 
-abstract type SiteModels end
+# abstract type SiteModels end
  
-Base.length(m::SiteModels) = sum(length(mo.basis) for mo in m.models)
+# Base.length(m::SiteModels) = sum(length(mo.basis) for mo in m.models)
 
-struct OnSiteModels{TM} <:SiteModels
-    models::Dict{AtomicNumber, TM}
-    env::SphericalCutoff
-end
-OnSiteModels(models::Dict{AtomicNumber, TM}, rcut::T) where {T<:Real,TM} = 
-    OnSiteModels(models,SphericalCutoff(rcut))
+# struct OnSiteModels{TM} <:SiteModels
+#     models::Dict{AtomicNumber, TM}
+#     env::SphericalCutoff
+# end
+# OnSiteModels(models::Dict{AtomicNumber, TM}, rcut::T) where {T<:Real,TM} = 
+#     OnSiteModels(models,SphericalCutoff(rcut))
 
-struct OffSiteModels{TM} <:SiteModels
-    models::Dict{Tuple{AtomicNumber,AtomicNumber}, TM}
-    env
-end
+# struct OffSiteModels{TM} <:SiteModels
+#     models::Dict{Tuple{AtomicNumber,AtomicNumber}, TM}
+#     env
+# end
 
-OffSiteModels(models::Dict{Tuple{AtomicNumber, AtomicNumber},TM}, rcut::T) where {T<:Real,TM} = OffSiteModels(models,SphericalCutoff(rcut))
+# OffSiteModels(models::Dict{Tuple{AtomicNumber, AtomicNumber},TM}, rcut::T) where {T<:Real,TM} = OffSiteModels(models,SphericalCutoff(rcut))
 
-function OffSiteModels(models::Dict{Tuple{AtomicNumber, AtomicNumber},TM}, 
-    rcutbond::T, rcutenv::T, zcutenv::T) where {T<:Real,TM}
-    return OffSiteModels(models, EllipsoidCutoff(rcutbond, rcutenv, zcutenv))
-end
+# function OffSiteModels(models::Dict{Tuple{AtomicNumber, AtomicNumber},TM}, 
+#     rcutbond::T, rcutenv::T, zcutenv::T) where {T<:Real,TM}
+#     return OffSiteModels(models, EllipsoidCutoff(rcutbond, rcutenv, zcutenv))
+# end
 
 # ACEbonds.bonds(at::Atoms, offsite::OffSiteModels, filter) = ACEbonds.bonds( at, offsite.env.rcutbond, 
 # max(offsite.env.rcutbond*.5 + offsite.env.zcutenv, 
 #     sqrt((offsite.env.rcutbond*.5)^2+ offsite.env.rcutenv^2)),
 #             (r, z) -> env_filter(r, z, offsite.env), filter )
 
-struct SiteInds
-    onsite::Dict{AtomicNumber, UnitRange{Int}}
-    offsite::Dict{Tuple{AtomicNumber, AtomicNumber}, UnitRange{Int}}
-end
+# struct SiteInds
+#     onsite::Dict{AtomicNumber, UnitRange{Int}}
+#     offsite::Dict{Tuple{AtomicNumber, AtomicNumber}, UnitRange{Int}}
+# end
 
-function Base.length(inds::SiteInds)
-    return length(inds, :onsite) + length(inds, :offsite)
-end
+# function Base.length(inds::SiteInds)
+#     return length(inds, :onsite) + length(inds, :offsite)
+# end
 
-function Base.length(inds::SiteInds, site::Symbol)
-    return sum(length(irange) for irange in values(getfield(inds, site)))
-end
+# function Base.length(inds::SiteInds, site::Symbol)
+#     return sum(length(irange) for irange in values(getfield(inds, site)))
+# end
 
-function get_range(inds::SiteInds, z::AtomicNumber)
-    return inds.onsite[z]
-end
+# function get_range(inds::SiteInds, z::AtomicNumber)
+#     return inds.onsite[z]
+# end
 
-function get_range(inds::SiteInds, zz::Tuple{AtomicNumber, AtomicNumber})
-    return length(inds, :onsite) .+ inds.offsite[_sort(zz...)]
-end
+# function get_range(inds::SiteInds, zz::Tuple{AtomicNumber, AtomicNumber})
+#     return length(inds, :onsite) .+ inds.offsite[_sort(zz...)]
+# end
 
 
 
@@ -118,23 +118,23 @@ function ACE.scaling(mb::CovACEMatrixBasis, p::Int)
     return scale
 end
 
-#Base.length(m::ACEMatrixBasis) = sum(length, values(m.models.onsite)) + sum(length, values(m.models.offsite))
-Base.length(m::CovACEMatrixBasis,args...) = length(m.inds,args...)
-#sum(length(inds) for (_, inds) in m.inds.onsite) + sum(length(inds) for (_, inds) in m.inds.offsite)
-get_range(m::CovACEMatrixBasis,args...) = get_range(m.inds,args...)
+# #Base.length(m::ACEMatrixBasis) = sum(length, values(m.models.onsite)) + sum(length, values(m.models.offsite))
+# Base.length(m::CovACEMatrixBasis,args...) = length(m.inds,args...)
+# #sum(length(inds) for (_, inds) in m.inds.onsite) + sum(length(inds) for (_, inds) in m.inds.offsite)
+# get_range(m::CovACEMatrixBasis,args...) = get_range(m.inds,args...)
 
-function _get_basisinds(M::CovACEMatrixModel)
-    return SiteInds(_get_basisinds(M, :onsite), _get_basisinds(M, :offsite))
-end
+# function _get_basisinds(M::CovACEMatrixModel)
+#     return SiteInds(_get_basisinds(M, :onsite), _get_basisinds(M, :offsite))
+# end
 
-_get_basisinds(MB::CovACEMatrixBasis) = MB.inds
+# _get_basisinds(MB::CovACEMatrixBasis) = MB.inds
 
-# _get_inds(MB::CovACEMatrixBasis, z::AtomicNumber) = MB.inds.onsite[z]
-# _get_inds(MB::CovACEMatrixBasis, z1::AtomicNumber,z2::AtomicNumber) = MB.inds.offsite[_sort(z1,z2)]
+# # _get_inds(MB::CovACEMatrixBasis, z::AtomicNumber) = MB.inds.onsite[z]
+# # _get_inds(MB::CovACEMatrixBasis, z1::AtomicNumber,z2::AtomicNumber) = MB.inds.offsite[_sort(z1,z2)]
 
-CovACEMatrixCalc = Union{CovACEMatrixModel, CovACEMatrixBasis}
+# CovACEMatrixCalc = Union{CovACEMatrixModel, CovACEMatrixBasis}
 
-# cutoff(m::CovACEMatrixCalc) = m.cutoff
+# # cutoff(m::CovACEMatrixCalc) = m.cutoff
 
 
 

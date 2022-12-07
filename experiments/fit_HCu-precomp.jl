@@ -1,7 +1,7 @@
 
 using ProgressMeter: @showprogress
 using JLD
-using ACE, ACEatoms, JuLIP, ACEbase
+using ACE, JuLIP, ACEbase
 using StaticArrays
 using Random: seed!, MersenneTwister, shuffle!
 using LinearAlgebra
@@ -257,6 +257,7 @@ e_rel_error = matrix_entry_errors(fdata_test, mbfitR; mode=:rel, reg_epsilon=.1)
 #weights = Dict(:offdiag => 18,:subdiag => 12, :diag=>6 )
 
 #%%
+using PyPlot
 tentries = Dict("test" => Dict(), "test" => Dict(),
                 "train" => Dict(), "train" => Dict()
     )
@@ -271,7 +272,7 @@ for (mb,fit_info) in zip([mbfit,mbfitR,mbfitR2,mbfitR3], ["LSQR","RPLSQR","RPLSQ
 
     # using Plots
     # using StatsPlots
-    using PyPlot
+
 
 
     #fig,ax = PyPlot.subplots(1,3,figsize=(15,5),sharex=true, sharey=true)

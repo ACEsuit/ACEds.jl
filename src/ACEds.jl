@@ -9,7 +9,7 @@ end
 include("./utils.jl")
 include("./cutoffenvironments.jl")
 include("./matrixmodels2.jl")
-include("./covmatrixmodels.jl")
+#include("./covmatrixmodels.jl")
 # include("./futils.jl")
 include("./linsolvers.jl")
 # include("./onsitefit.jl")
