@@ -218,7 +218,7 @@ function Sigma!(M::CovACEMatrixCalc, at::Atoms, Σ, filter=(_,_)->true, filtermo
             sm = _get_model(M, at.Z[i])
             cfg = env_transform(Rs, Zs, M.onsite.env)
             #@show cfg
-            @show typeof(evaluate(sm, cfg))
+            #@show typeof(evaluate(sm, cfg))
             Σ_temp = evaluate(sm, cfg)
             for k=1:M.n_rep
                 Σ[k][i,i] += Σ_temp[k]
@@ -243,6 +243,10 @@ function Sigma!(M::CovACEMatrixCalc, at::Atoms, Σ, filter=(_,_)->true, filtermo
 
 end
 
+function Gamma(M::CovACEMatrixCalc, at::Atoms, sparse=:sparse, filter=(_,_)->true, T=Float64, filtermode=:new) 
+    Σ_vec = Sigma(M, at, sparse, filter, T, filtermode) 
+    return sum(Σ*transpose(Σ) for Σ in Σ_vec)
+end
 
 function allocate_B(M::CovACEMatrixBasis, at::Atoms, sparsity= :sparse, T=Float64)
     #N = sum(filter(i) for i in 1:length(at)) 
