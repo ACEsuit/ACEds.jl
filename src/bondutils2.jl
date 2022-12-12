@@ -64,22 +64,26 @@ function SymmetricBond_basis(ϕ::ACE.AbstractProperty, Bsel::ACE.SparseBasis; Rn
 
 
 
-BondSpeciesBasisSelector(Bsel::ACE.SparseBasis; 
+function BondSpeciesBasisSelector(Bsel::ACE.SparseBasis; 
                   isym=:mube, bond_weight = 1.0, env_weight = 1.0,  species =[:env], 
-                  species_minorder_dict = Dict{Symbol,Int64}(), species_maxorder_dict = Dict{Symbol,Int64}()) = 
-   ACE.CategorySparseBasis(isym, cat([:bond],species,dims=1);
+                  species_minorder_dict = Dict{Symbol,Int64}(), species_maxorder_dict = Dict{Symbol,Int64}(), weight_cat = Dict{Symbol,Float64}())
+    if isempty(weight_cat) 
+        weight_cat = merge(Dict(:bond => bond_weight), Dict( s => env_weight for s in species)) 
+    end
+    return ACE.CategorySparseBasis(isym, cat([:bond],species,dims=1);
             maxorder = ACE.maxorder(Bsel), 
             p = Bsel.p, 
             weight = Bsel.weight, 
             maxlevels = Bsel.maxlevels,
             minorder_dict = merge(Dict( :bond => 1), species_minorder_dict),
             maxorder_dict = merge(Dict( :bond => 1), species_maxorder_dict),
-            weight_cat = merge(Dict(:bond => bond_weight), Dict( s => env_weight for s in species)) 
+            weight_cat = weight_cat 
          )
+end
 
-function SymmetricBondSpecies_basis(ϕ::ACE.AbstractProperty, Bsel::ACE.SparseBasis; RnYlm = nothing, bondsymmetry=nothing, species = [:env], kwargs...)
+function SymmetricBondSpecies_basis(ϕ::ACE.AbstractProperty, Bsel::ACE.SparseBasis;  RnYlm = nothing, bondsymmetry=nothing, species = [:env], kwargs...)
     BondSelector =  BondSpeciesBasisSelector(Bsel; isym=:mube, species = species, kwargs...)
-    #@show BondSelector.maxorder_dict
+    @show BondSelector.maxorder_dict
 
     if RnYlm === nothing
         r0 = .4
@@ -165,4 +169,4 @@ end
 #     Bc = ACE.Categorical1pBasis(cat([:bond],species, dims=1); varsym = :be, idxsym = :be )
 #     B1p =  RnYlm * Bc
 #     return ACE.SymmetricBasis(ϕ, B1p, BondSelector; filterfun = filterfun)
-# end
+# endstatus

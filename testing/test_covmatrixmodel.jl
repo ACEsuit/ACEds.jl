@@ -178,8 +178,8 @@ mdata2 =  @showprogress [(friction_tensor=reinterpret(Matrix,d.friction_tensor),
 getobs(mdata3, 2:4)
 #%%
 using Flux
-using PyPlot
-
+#using PyPlot
+using Flux.MLUtils
 import ACEds.CovMatrixModels: Gamma, Sigma
 
 typeof(c)
@@ -214,14 +214,17 @@ sum(Gamma(d.B, c).- d.friction_tensor)
 d = mdata_raw[1]
 
 
-
-
-
 Gamma(d.B, c)
 mloss(c) = sum( sum(sum(Gamma(d.B, c)[d.friction_indices,d.friction_indices] .- d.friction_tensor)) for d in mdata_sparse)
 
 
 function Gamma2(B, c_vec) where {N}
+    Σ_vec = sum(B .*c for c in c_vec) 
+    return sum(Σ*transpose(Σ) for Σ in Σ_vec)
+end
+
+function Gamma2(B, c_vec::Matrix) where {N}
+    _,m = size()
     Σ_vec = sum(B .*c for c in c_vec) 
     return sum(Σ*transpose(Σ) for Σ in Σ_vec)
 end
@@ -247,7 +250,7 @@ mloss3(dd) = sum(Gamma(dd.B, c).- d.friction_tensor)
 
 gs = Flux.gradient(() -> sum(Gamma(d.B, c).- d.friction_tensor), Flux.params(c))
 
-using Flux.MLUtils
+
 x = (a = [1, 2, 3], b = rand(6, 3))
 numobs(x) == 3
 numobs(mdata)
@@ -297,22 +300,36 @@ c=reinterpret(SVector{Vector{Float64}},ct)
 c3 = [cc for cc in c]
 # predict(x) = W*x .+ b
 
-
+c4=Vector(c3)
 function mloss3(B,friction_tensor)
-  return sum((Gamma2(B, c3).- friction_tensor).^2)
+  return sum((Gamma2(B, c4).- friction_tensor).^2)
 end
+function mloss4(d)
+    return sum((Gamma2(d.B, c4).- d.friction_tensor).^2)
+  end
 
 B = mdata3.B[1]
 friction_tensor= mdata3.friction_tensor[1]
 
 #loss(x, y) # ~ 3
 mloss3(B,friction_tensor)
-gs = Flux.gradient(() -> mloss3(B,friction_tensor), Flux.params(c3))
-Main.c3
-gs[Main.c3]
+gs = Flux.gradient(() -> mloss3(B,friction_tensor), Flux.params(c4))
+gs[c4[1]]
+gs[c4[2]]
+gs[c4[3]]
+gs[c4[4]]
+gs[c4[5]]
+dloader = DataLoader(mdata3; batchsize=10)
+
+optim = Flux.Adam()
+for epoch in 1:10
+  Flux.train!(mloss4, Flux.params(c4), dloader, optim)
+end
+
 # gs2 = Flux.gradient(Flux.params(c3)) do
 #     mloss3(B,friction_tensor)
 # end
+c4[1]
 keys(gs.grads)
 
 fieldnames(typeof(gs))

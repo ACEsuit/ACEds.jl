@@ -1,29 +1,21 @@
 include("./test_setup_covmatrixmodels.jl")
 
+
+#%%
+# use c::SVector{N,Vector{Float64}}
+
 p = length(mb)
-# s = 200
-# R = randn(p,s)
-s = p
-R = I
+s = 200
+R = randn(p,s)
 mdata2 =  Dict(
-    "train" => [(friction_tensor=reinterpret(Matrix,d.friction_tensor), B = transpose(R) * [reinterpret(Matrix,Matrix(b[d.friction_indices,d.friction_indices])) for b in d.B] ) for d in mdata_sparse],
-    "test" => [(friction_tensor=reinterpret(Matrix,d.friction_tensor), B = transpose(R) * [reinterpret(Matrix,Matrix(b[d.friction_indices,d.friction_indices])) for b in d.B] ) for d in mdata_sparse_test]
+    "train" => [(friction_tensor=reinterpret(Matrix,d.friction_tensor), B =[reinterpret(Matrix,Matrix(b[d.friction_indices,d.friction_indices])) for b in d.B] ) for d in mdata_sparse],
+    "test" => [(friction_tensor=reinterpret(Matrix,d.friction_tensor), B = [reinterpret(Matrix,Matrix(b[d.friction_indices,d.friction_indices])) for b in d.B] ) for d in mdata_sparse_test]
 )
-
-# mdata2["train"][1].B[1]
-# for b in mdata2["train"][2].B
-#     println(b)
-# end
-
-# sum(norm(b)>0 for b in mdata2["train"][2].B)/length(mdata2["train"][2].B)
-# A = b * transpose(b)
-# using LinearAlgebra
-# eigen(A)
-
-
-function Gamma(B, c_matrix::Matrix)
-    N, N_basis = size(c_matrix)
-    Σ_vec = [sum(B .* c_matrix[i,:]) for i=1:N] 
+function Gamma(B, c_vec::Vector{Vector{T}}) where {T}
+    N = length(c_vec)
+    # @show size(c_vec[1])
+    # @show size(B)
+    Σ_vec = [sum(B .* c_vec[i]) for i=1:N] 
     return sum(Σ*transpose(Σ) for Σ in Σ_vec)
 end
 function Gamma(B, c_vec::Vector{Vector{T}}, R_vec::Vector{AbstractMatrix{T}}) where {T}
@@ -32,47 +24,81 @@ function Gamma(B, c_vec::Vector{Vector{T}}, R_vec::Vector{AbstractMatrix{T}}) wh
     return sum(Σ*transpose(Σ) for Σ in Σ_vec)
 end
 
+#%%
+
+struct FrictionModelR
+    c
+    R
+end
+FrictionModelR(n_rep::Integer, N_basis::Integer, s::Integer) = FrictionModelR([zeros(s) for _ = 1:n_rep], [randn(N_basis,s) for _ = 1:n_rep])
+
+(m::FrictionModelR)(B) = Gamma(B, m.R .* m.c)
+Flux.@functor FrictionModelR
+Flux.trainable(m::FrictionModelR) = (m.c,)
+
+# Like the above FrictionModelR but only trains the first model 
+struct FrictionModelRs
+    c
+    R
+end
+FrictionModelRs(n_rep::Integer, N_basis::Integer, s::Integer) = FrictionModelRs([zeros(s) for _ = 1:n_rep], [randn(N_basis,s) for _ = 1:n_rep])
+
+(m::FrictionModelRs)(B) = Gamma(B, m.R .* m.c)
+Flux.@functor FrictionModelRs
+Flux.trainable(m::FrictionModelRs) = (m.c[1],)
+
+FrictionModelRs(m::FrictionModelR) = FrictionModelRs(deepcopy(m.c),deepcopy(m.R))
+function FrictionModelRs(m::M, i::Int) where {M<: Union{FrictionModelR,FrictionModelRs}} 
+    perm = [j for j = 1:length(m.c)]
+    perm[1],perm[i] = i, 1 
+    return FrictionModelRs(deepcopy(m.c[perm]),deepcopy(m.R[perm]))
+end
+FrictionModelR(m::FrictionModelRs) = FrictionModelR(deepcopy(m.c),deepcopy(m.R))
+function FrictionModelR(m::M, i::Int) where {M<: Union{FrictionModelR,FrictionModelRs}} 
+    perm = [j for j = 1:length(m.c)]
+    perm[1],perm[i] = i, 1 
+    return FrictionModelR(deepcopy(m.c[perm]),deepcopy(m.R[perm]))
+end
 
 #%%
-struct FrictionModel
-    c
-end
-FrictionModel(n_rep::Integer, N_basis::Integer,σ=1E-8) = FrictionModel(σ .*randn(n_rep, N_basis) )
-(m::FrictionModel)(B) = Gamma(B, m.c)
-Flux.@functor FrictionModel
-Flux.trainable(m::FrictionModel) = (c=m.c,)
-#%%
-n_rep = 5
-m = CovACEMatrixModel( 
-    OnSiteModels(Dict( AtomicNumber(z) => ACE.LinearACEModel(onsite, rand(SVector{n_rep,Float64},length(onsite))) for z in species_fc), env_on), 
-    OffSiteModels(Dict( AtomicNumber.(zz) => ACE.LinearACEModel(offsite, rand(SVector{n_rep,Float64},length(offsite))) for zz in Base.Iterators.product(species_fc,species_fc)), env_off),
-    n_rep
-);
-mb = basis(m);
-ct= params(mb)
-c_matrix = reinterpret(Matrix{Float64},ct)
-c_matrix_r = zeros(size(c_matrix,1),s)
+
 
 mloss5(fm, data) = sum(sum((fm(d.B) .- d.friction_tensor).^2) for d in data)
 
-m_flux = FrictionModel(size(c_matrix_r,1),size(c_matrix_r,2))
+m_flux = FrictionModelR(n_rep,p,s)
 #%%
 
-
-opt = Flux.setup(Adam(0.001, (0.9, 0.999)), m_flux)
 dloader5 = DataLoader(mdata2["train"], batchsize=1, shuffle=true)
-nepochs = 10
-for epoch in 1:nepochs
-    for d in dloader5
-        ∂L∂m = Flux.gradient(mloss5, m_flux, d)[1]
-        Flux.update!(opt, m_flux, ∂L∂m)       # method for "explicit" gradient
+opt = Flux.setup(Adam(0.01, (0.8, 0.99)), m_flux)
+m_fluxs = FrictionModelRs(m_flux, 1)
+length(Flux.params(m_fluxs))
+opt = Flux.setup(Adam(0.001, (0.8, 0.99)), m_fluxs)
+
+epochf(cyc) = (cyc == 1 ? 30 : 10)
+ncycles = 5
+n_rep = length(m_flux.c)
+for cyc = 1:ncycles
+    @info "Cycle: $cyc"
+    nepochs = epochf(cyc)
+    for i = 1:n_rep
+        @info "Training component $i"
+        m_fluxs = FrictionModelRs(m_flux, i) # swap to-be-trained components to first index
+        opt = Flux.setup(Adam(0.001, (0.8, 0.99)), m_fluxs)
+        for epoch in 1:nepochs
+            for d in dloader5
+                ∂L∂m = Flux.gradient(mloss5, m_fluxs, d)[1]
+                Flux.update!(opt, m_fluxs, ∂L∂m)       # method for "explicit" gradient
+            end
+            @info "Epoch: $epoch, Training Loss: $(mloss5(m_fluxs,mdata2["train"])), Test Loss: $(mloss5(m_fluxs,mdata2["test"]))"
+        end
+        # swap component back
+        m_flux = FrictionModelR(m_fluxs, i) # swap trained components to original index
     end
-    println("Epoch: $epoch, Training Loss: $(mloss5(m_flux,mdata2["train"])), Test Loss: $(mloss5(m_flux,mdata2["test"]))")
 end
 
 using ACEds.Analytics: matrix_errors, matrix_entry_errors, friction_entries, friction_pairs
-mb = basis(m);
-ACE.set_params!(mb, reinterpret(Vector{SVector{Float64}},m_flux.c*transpose(R))) 
+c_matrix_new = SVector((m_flux.R .* m_flux.c)...)
+ACE.set_params!(mb, reinterpret(Vector{SVector{Float64}}, c_matrix_new)) 
 matrix_errors(fdata_train, mb; filter=(_,_)->true, weights=ones(length(fdata_train)), mode=:abs, reg_epsilon=0.0)
 matrix_entry_errors(fdata_train, mb; filter=(_,_)->true, weights=ones(length(fdata_train)), mode=:abs, reg_epsilon=0.0)
 matrix_errors(fdata_test, mb; filter=(_,_)->true, weights=ones(length(fdata_train)), mode=:abs, reg_epsilon=0.0)

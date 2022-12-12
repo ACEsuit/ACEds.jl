@@ -72,6 +72,26 @@ function reinterpret(::Type{Vector{SVector{N, T}}}, c_vec::Vector{T}) where {N,T
     return [ SVector{N}([c_vec[j+(i-1)*m] for i=1:N]) for j=1:m ]
 end
 
+
+function reinterpret(::Type{Matrix{T}}, c_vec::Vector{SVector{N, T}}) where {N,T}
+    """
+    input: c_vec each 
+    N_basis = length(c_vec)
+    N = numbero of channels
+    """
+    c_matrix = Array{T}(undef,N,length(c_vec))
+    for j in eachindex(c_vec)
+        c_matrix[:,j] = c_vec[j]
+    end
+    return c_matrix
+end
+
+function reinterpret(::Type{Vector{SVector{T}}}, c_matrix::Matrix{T}) where {T}
+    N, N_basis = size(c_matrix)
+    return [SVector{N,T}(c_matrix[:,j]) for j=1:N_basis ] 
+end
+
+
 # # tests
 # c_new = reinterpret(SVector{Vector{Float64}}, c_vec)
 # c_new2 = reinterpret(Vector{SVector{Float64}}, c_new)
@@ -80,16 +100,9 @@ end
 # c_new2 = reinterpret(Vector{SVector{5,Float64}}, c_new)
 # c_vec == c_new2
 
-function reinterpret(::Type{Matrix}, M::Matrix{SVector{3,T}}) where {T}
-    m,n = size(M)
-    M_new = zeros(3*m,n)
-    for i=1:m
-        for j=1:n
-            M_new[(1+3*(i-1)):(3*i),j] = M[i,j]
-        end
-    end 
-    return M_new
-end
+# c_matrix = reinterpret(Matrix{Float64},c_vec)
+# c_vec_rev = reinterpret(Vector{SVector{Float64}},c_matrix)
+# all(c_vec .== c_vec_rev)
 
 function reinterpret(::Type{Matrix}, M::Matrix{SVector{3,T}}) where {T}
     m,n = size(M)
@@ -101,6 +114,7 @@ function reinterpret(::Type{Matrix}, M::Matrix{SVector{3,T}}) where {T}
     end 
     return M_new
 end
+
 
 
 function array2svector(x::Array{T,2}) where {T}

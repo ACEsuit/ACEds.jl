@@ -10,7 +10,7 @@ using LinearAlgebra
 function friction_pairs(fdata, mb; filter=(_,_)->true)
     a = length(fdata)
     println("Conpute Friction tensors for $a configurations.")
-    fp = @showprogress [ (Γ_true =d.friction_tensor, Γ_fit = Matrix(Gamma(mb,d.atoms,filter)[d.friction_indices,d.friction_indices]))
+    fp = @showprogress [ (Γ_true =d.friction_tensor, Γ_fit = Matrix(Gamma(mb,d.atoms;filter=filter)[d.friction_indices,d.friction_indices]))
     for d in fdata]
     return fp
 end
@@ -20,7 +20,7 @@ end
 # end
 
 function residuals(fdata, mb; filter=(_,_)->true)
-    return @showprogress [reinterpret(Matrix, d.friction_tensor - Gamma(mb,d.atoms, filter)[d.friction_indices,d.friction_indices])
+    return @showprogress [reinterpret(Matrix, d.friction_tensor - Gamma(mb,d.atoms; filter=filter)[d.friction_indices,d.friction_indices])
     for d in fdata]
 end
 

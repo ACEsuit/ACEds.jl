@@ -21,7 +21,7 @@ using ACEds.CutoffEnv
 #ACE.scaling(m::SiteModel,p::Int) = ACE.scaling(m.model.basis,p)
 
 abstract type SiteModels end
- 
+# Todo: allow for easy exclusion of onsite and offsite models 
 Base.length(m::SiteModels) = sum(length(mo.basis) for mo in m.models)
 
 struct OnSiteModels{TM} <:SiteModels
@@ -73,6 +73,16 @@ end
 
 function get_range(inds::SiteInds, z::AtomicNumber)
     return inds.onsite[z]
+end
+
+function get_range(inds::SiteInds, site::Symbol)
+    if site == :onsite
+        return 1:length(inds, :onsite) 
+    elseif site == :offsite
+        return (length(inds, :onsite)+1):(length(inds, :onsite)+length(inds, :offsite))
+    else
+        @error "The value of the argument site::Symbol must be either :onsite or :offsite."
+    end
 end
 
 function get_range(inds::SiteInds, zz::Tuple{AtomicNumber, AtomicNumber})
