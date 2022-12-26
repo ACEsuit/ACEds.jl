@@ -4,7 +4,7 @@ using ProgressMeter: @showprogress
 using StatsBase
 using ACEds
 using ACEds: copy_sub
-using ACEds.MatrixModels: Gamma
+using ACEds.FrictionModels: Gamma
 using LinearAlgebra
 
 function friction_pairs(fdata, mb; filter=(_,_)->true)

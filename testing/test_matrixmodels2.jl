@@ -1,6 +1,6 @@
 
-using ACEds.MatrixModels
 using ACEds
+using ACEds.MatrixModels
 using JuLIP, ACE
 using ACEbonds: EllipsoidBondEnvelope #, cutoff_env
 using ACE: EuclideanMatrix, EuclideanVector

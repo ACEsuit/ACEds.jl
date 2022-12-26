@@ -126,7 +126,7 @@ offsite = SymmetricBondSpecies_basis(ACE.EuclideanVector(Float64), Bsel_off;
 show(stdout, "text/plain", ACE.get_spec(onsite))
 show(stdout, "text/plain", ACE.get_spec(offsite))
 @show length(onsite)
-@show length(onsite)
+@show length(offsite)
 n_rep = 3
 m = CovACEMatrixModel( 
     OnSiteModels(Dict( AtomicNumber(z) => ACE.LinearACEModel(onsite, rand(SVector{n_rep,Float64},length(onsite))) for z in species_fc), env_on), 

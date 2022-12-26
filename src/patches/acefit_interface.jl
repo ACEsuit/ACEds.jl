@@ -3,7 +3,7 @@ import JuLIP: Atoms, energy, forces, mat
 using PrettyTables
 using StaticArrays: SVector
 using ACEds.Utils: compress_matrix
-using ACEds.MatrixModels: ACEMatrixBasis, evaluate
+using ACEds.MatrixModels: ACEMatrixModel
 
 struct FrictionData <: ACEfit.AbstractData
     atoms::Atoms
@@ -40,14 +40,14 @@ function ACEfit.count_observations(d::FrictionData)
     return sum(count_observations(n_atoms, symb) for symb in [:diag, :subdiag, :offdiag])
 end
 
-function ACEfit.feature_matrix(d::FrictionData, basis::ACEMatrixBasis)
-    dm = zeros(ACEfit.count_observations(d), length(basis))
-    #dm = Array{Float64}(undef, ACEfit.count_observations(d), length(basis))
+function ACEfit.feature_matrix(d::FrictionData, m::ACEMatrixModel)
+    dm = zeros(ACEfit.count_observations(d), length(m))
+    #dm = Array{Float64}(undef, ACEfit.count_observations(d), length(m))
     #filter(i) = (i in d.friction_indices)
     filter(i, at) = (i in d.friction_indices)
-    B = evaluate(basis, d.atoms, :sparse, filter)
-    #B = map(x->compress_matrix(x,d.friction_indices), evaluate(basis, d.atoms, filter))
-    for i =1:length(basis)
+    B = basis(m, d.atoms, :sparse, filter)
+    #B = map(x->compress_matrix(x,d.friction_indices), basis(m, d.atoms, filter))
+    for i =1:length(m)
         Γ2y!(view(dm,:,i),compress_matrix(B[i], d.friction_indices))
     end
     return dm

@@ -1,9 +1,9 @@
 module MatrixModels
 
 
-export EllipsoidCutoff, SphericalCutoff, SiteModels, OnSiteModels, OffSiteModels, SiteInds,SiteModel
-export EqACEMatrixModel, EqACEMatrixBasis, CovACEMatrixModel, CovACEMatrixBasis, InvACEMatrixModel, InvACEMatrixBasis, matrix
-export evaluate, basis, params, nparams, set_params!
+export SiteModels, OnSiteModels, OffSiteModels, SiteInds, SiteModel
+export EqACEMatrixModel, CovACEMatrixModel, InvACEMatrixModel
+export matrix, basis, params, nparams, set_params!
 using JuLIP, ACE, ACEbonds
 using JuLIP: chemical_symbol
 using ACE: SymmetricBasis, LinearACEModel, evaluate
@@ -12,6 +12,7 @@ using ACEbonds: BondEnvelope, bonds #, env_cutoff
 using LinearAlgebra
 using StaticArrays
 using SparseArrays
+using ACEds.Utils: reinterpret
 import ACEbase: evaluate, evaluate!
 
 import ACE: scaling
@@ -55,10 +56,6 @@ ACEbonds.bonds(at::Atoms, offsite::OffSiteModels, site_filter) = ACEbonds.bonds(
     max(offsite.env.rcutbond*.5 + offsite.env.zcutenv, 
         sqrt((offsite.env.rcutbond*.5)^2+ offsite.env.rcutenv^2)),
                 (r, z) -> env_filter(r, z, offsite.env), site_filter )
-# ACEbonds.bonds(at::Atoms, offsite::OffSiteModels, filter) = ACEbonds.bonds( at, offsite.env.rcutbond, 
-# max(offsite.env.rcutbond*.5 + offsite.env.zcutenv, 
-#     sqrt((offsite.env.rcutbond*.5)^2+ offsite.env.rcutenv^2)),
-#             (r, z) -> env_filter(r, z, offsite.env), filter )
 
 struct SiteInds
     onsite::Dict{AtomicNumber, UnitRange{Int}}
@@ -105,12 +102,10 @@ function get_interaction(inds::SiteInds, index::Int)
 end
 
 abstract type ACEMatrixModel end
-abstract type ACEMatrixBasis end
 
-AbstractMatrixCalc = Union{ACEMatrixModel, ACEMatrixBasis}
 # ACE.scaling
 
-function ACE.scaling(mb::ACEMatrixBasis, p::Int) 
+function ACE.scaling(mb::ACEMatrixModel, p::Int) 
     scale = ones(length(mb))
     for site in [:onsite,:offsite]
         site = getfield(mb,site)
@@ -121,10 +116,10 @@ function ACE.scaling(mb::ACEMatrixBasis, p::Int)
     return scale
 end
 
-Base.length(m::ACEMatrixBasis,args...) = length(m.inds,args...)
+Base.length(m::ACEMatrixModel,args...) = length(m.inds,args...)
 
-get_range(m::EqACEMatrixBasis,args...) = get_range(m.inds,args...)
-get_interaction(m::EqACEMatrixBasis,args...) = get_interaction(m.inds,args...)
+get_range(m::ACEMatrixModel,args...) = get_range(m.inds,args...)
+get_interaction(m::ACEMatrixModel,args...) = get_interaction(m.inds,args...)
 
 
 
@@ -132,7 +127,7 @@ get_interaction(m::EqACEMatrixBasis,args...) = get_interaction(m.inds,args...)
 #     return SiteInds(_get_basisinds(M, :onsite), _get_basisinds(M, :offsite))
 # end
 
-# _get_basisinds(MB::CovACEMatrixBasis) = MB.inds
+# _get_basisinds(MB::CovACEMatrixModel) = MB.inds
 
 # function _get_basisinds(M::CovACEMatrixCalc, site::Symbol)
 #     if site == :onsite
@@ -153,7 +148,7 @@ get_interaction(m::EqACEMatrixBasis,args...) = get_interaction(m.inds,args...)
 #     return inds
 # end
 
-function _get_basisinds(onsitemodels::Dict{AtomicNumber, TM},offsitemodels::Dict{Tuple{AtomicNumber, AtomicNumber}, TM})
+function _get_basisinds(onsitemodels::Dict{AtomicNumber, TM1},offsitemodels::Dict{Tuple{AtomicNumber, AtomicNumber}, TM2}) where {TM1, TM2}
     return SiteInds(_get_basisinds(onsitemodels), _get_basisinds(offsitemodels))
 end
 
@@ -173,16 +168,14 @@ end
 # ALL 
 _sort(z1,z2) = (z1<=z2 ? (z1,z2) : (z2,z1))
 
-_get_model(calc::ACEMatrixCalc, zz::Tuple{AtomicNumber,AtomicNumber}) = calc.offsite.models[_sort(zz...)]
-_get_model(calc::ACEMatrixCalc, z::AtomicNumber) =  calc.onsite.models[z]
+_get_model(calc::ACEMatrixModel, zz::Tuple{AtomicNumber,AtomicNumber}) = calc.offsite.models[_sort(zz...)]
+_get_model(calc::ACEMatrixModel, z::AtomicNumber) =  calc.onsite.models[z]
 
-_get_model(calc::ACEMatrixCalc, zz::Tuple{AtomicNumber,AtomicNumber}) = calc.offsite.models[_sort(zz...)]
-_get_model(calc::ACEMatrixCalc, z::AtomicNumber) =  calc.onsite.models[z]
 
 
 # Get and setter functions for paramters in native format todo: these should be the same as for ACEMatrixCalc
 
-function ACE.params(mb::ACEMatrixCalc; flatten=false)
+function ACE.params(mb::ACEMatrixModel; format=:native) # :vector, :matrix
     θ = zeros(SVector{mb.n_rep,Float64}, nparams(mb))
     for z_list in [keys(mb.onsite.models),keys(mb.offsite.models)]
         for z in z_list
@@ -191,81 +184,140 @@ function ACE.params(mb::ACEMatrixCalc; flatten=false)
             θ[inds] = params(sm) 
         end
     end
-    return (flatten ? reinterpret(Vector{Float64}, θ) : θ)
+    return (format == :native ? θ :  _transform(θ,format))
 end
 
-function ACE.params(mb::ACEMatrixCalc, site::Symbol; flatten=false)
+function ACE.params(mb::ACEMatrixModel, site::Symbol; format=:native)
     θ = zeros(SVector{mb.n_rep,Float64}, nparams(mb, site))
     for z in keys(getfield(mb,site).models)
         sm = _get_model(mb, z)
         inds = get_range(mb, z)
         θ[inds] = params(sm) 
     end
-    return (flatten ? reinterpret(Vector{Float64}, θ) : θ)
+    return (fomrat == :native ? θ :  _transform(θ,format) : θ)
 end
 
-function ACE.params(calc::ACEMatrixCalc, zzz::Union{AtomicNumber,Tuple{AtomicNumber,AtomicNumber}})
+function _transform(θ,format, nrep=1)
+    if format == :vector
+        return reinterpret(Vector{Float64}, θ)
+    elseif format ==:matrix
+        return reinterpret(Matrix{Float64}, θ)
+    elseif format ==:native
+        return reinterpret(Vector{SVector{n_rep,Float64}}, θ)
+    else
+        @error "Non-valid paramater format provided"
+    end
+end
+
+function ACE.params(calc::ACEMatrixModel, zzz::Union{AtomicNumber,Tuple{AtomicNumber,AtomicNumber}})
     return params(_get_model(calc,zzz))
 end
 
-function ACE.nparams(mb::ACEMatrixCalc; flatten=false)
+function ACE.nparams(mb::ACEMatrixModel; flatten=false)
     return (flatten ? mb.n_rep * length(mb.inds) : length(mb.inds))
 end
 
-function ACE.nparams(mb::ACEMatrixCalc, site::Symbol; flatten=false)
+function ACE.nparams(mb::ACEMatrixModel, site::Symbol; flatten=false)
     return (flatten ? mb.n_rep * length(mb.inds, site) : length(mb.inds, site))
 end
 
-function ACE.nparams(calc::ACEMatrixCalc, zzz::Union{AtomicNumber,Tuple{AtomicNumber,AtomicNumber}}) # make zzz
+function ACE.nparams(calc::ACEMatrixModel, zzz::Union{AtomicNumber,Tuple{AtomicNumber,AtomicNumber}}) # make zzz
     return nparams(_get_model(calc,zzz))
 end
 
 
-function ACE.set_params!(mb::ACEMatrixCalc, θ)
+function ACE.set_params!(mb::ACEMatrixModel, θ)
     θt = reinterpret(Vector{SVector{mb.n_rep,Float64}}, θ)
-    set_params!(mb, :onsite, θt)
-    set_params!(mb, :offsite, θt)
+    ACE.set_params!(mb, :onsite, θt)
+    ACE.set_params!(mb, :offsite, θt)
 end
 
-function ACE.set_params!(mb::ACEMatrixCalc, site::Symbol, θ)
+function set_params!(mb::ACEMatrixModel, site::Symbol, θ)
     θt = reinterpret(Vector{SVector{mb.n_rep,Float64}}, θ)
     sitedict = getfield(mb, site).models
     for z in keys(sitedict)
-        # @show z
-        # @show get_range(mb.inds, z)
-        # @show typeof(_get_model(mb,z))
-        set_params!(_get_model(mb,z),θt[get_range(mb.inds, z)]) 
+        ACE.set_params!(_get_model(mb,z),θt[get_range(mb.inds, z)]) 
     end
 end
 
-function ACE.set_params(calc::ACEMatrixCalc, zzz::Union{AtomicNumber,Tuple{AtomicNumber,AtomicNumber}}, θ)
-    return set_params!(_get_model(calc,zzz),θ)
+function ACE.set_params!(calc::ACEMatrixModel, zzz::Union{AtomicNumber,Tuple{AtomicNumber,AtomicNumber}}, θ)
+    return ACE.set_params!(_get_model(calc,zzz),θ)
 end
 
-function matrix(M::ACEMatrixCalc, at::Atoms; sparse=:sparse, filter=(_,_)->true, T=Float64) 
+function set_zero!(mb::ACEMatrixModel)
+    θ = zeros(size(params(mb; format=:matrix)))
+    ACE.set_params!(mb, θ)
+end
+
+
+
+
+function matrix(M::ACEMatrixModel, at::Atoms; sparse=:sparse, filter=(_,_)->true, T=Float64) 
     A = allocate_matrix(M, at, sparse, T)
-    matrix!(M, at, A, filter, filtermode)
+    matrix!(M, at, A, filter)
     return A
 end
 
-function matrix(B, c::SVector{N,Vector{Float64}}) where {N}
-    return [matrix(B, c, i) for i=1:N]
+function allocate_matrix(M::ACEMatrixModel, at::Atoms, sparse=:sparse, T=Float64)
+    N = length(at)
+    if sparse == :sparse
+        # Γ = repeat([spzeros(_block_type(M,T),N,N)], M.n_rep)
+        Γ = [spzeros(_block_type(M,T),N,N) for _ = 1:M.n_rep]
+    else
+        # Γ = repeat([zeros(_block_type(M,T),N,N)], M.n_rep)
+        Γ = [zeros(_block_type(M,T),N,N) for _ = 1:M.n_rep]
+    end
+    return Γ
 end
-function matrix(B, c::SVector{N,Vector{Float64}}, i::Int) where {N}
-    return matrix(B,c[i])
-end
+
+
+# function matrix(B, c::Vector{SVector{N,Float64}}) where {N}
+
+#     return [matrix(B[i] c[i]) for i=1:N]
+# end
+# function matrix(B, c::Vector{SVector{N,Float64}}, i::Int) where {N}
+#     println("Hey Hey")
+#     return matrix(B,c[i])
+# end
 function matrix(B, c::Vector{Float64})
+    println("Hey Hey 2")
     return sum(B.*c)
 end
 
-function basis(M::ACEMatrixBasis, at::Atoms, sparsity= :sparse, filter=(_,_)->true, T=Float64, filtermode=:new) 
+# function matrix(B, c::SVector{N,Vector{Float64}}) where {N}
+#     return [matrix(B, c, i) for i=1:N]
+# end
+# function matrix(B, c::SVector{N,Vector{Float64}}, i::Int) where {N}
+#     println("Hey Hey")
+#     return matrix(B,c[i])
+# end
+# function matrix(B, c::Vector{Float64})
+#     println("Hey Hey 2")
+#     return sum(B.*c)
+# end
+
+function basis(M::ACEMatrixModel, at::Atoms, sparsity= :sparse, filter=(_,_)->true, T=Float64) 
     B = allocate_B(M, at, sparsity, T)
-    basis!(B, M, at, filter, filtermode)
+    basis!(B, M, at, filter)
     return B
 end
 
-### Specific for Equivariant EqACEMatrixBasis
-# function ACE.params(mb::EqACEMatrixBasis)
+function allocate_B(M::ACEMatrixModel, at::Atoms, sparsity= :sparse, T=Float64)
+    N = length(at)
+    B_onsite = [Diagonal( zeros(_block_type(M,T),N)) for _ = 1:length(M.inds,:onsite)]
+    @assert sparsity in [:sparse, :dense]
+    if sparsity == :sparse
+        B_offsite = [spzeros(_block_type(M,T),N,N) for _ =  1:length(M.inds,:offsite)]
+    else
+        B_offsite = [zeros(_block_type(M,T),N,N) for _ = 1:length(M.inds,:offsite)]
+    end
+    return cat(B_onsite,B_offsite,dims=1)
+end
+
+
+
+### Specific for Equivariant EqACEMatrixModel
+# function ACE.params(mb::EqACEMatrixModel)
 #     θ = zeros(nparams(mb))
 #     for z_list in [keys(mb.onsite.models),keys(mb.offsite.models)]
 #         for z in z_list
@@ -302,16 +354,6 @@ struct EqACEMatrixModel <: ACEMatrixModel
         return new(onsite,offsite, n_rep, _get_basisinds(onsite.models, offsite.models))
     end
 end
-# struct EqACEMatrixBasis <: ACEMatrixBasis
-#     onsite::OnSiteModels
-#     offsite::OffSiteModels
-#     n_rep::Int
-#     inds::SiteInds
-# end
-
-# EqACEMatrixCalc = Union{EqACEMatrixModel, EqACEMatrixBasis}
-
-
 
 function EqACEMatrixModel(onsitemodels::Dict{AtomicNumber, TM},offsitemodels::Dict{Tuple{AtomicNumber, AtomicNumber}, TM},
     rcut::T, rcutbond::T, rcutenv::T, zcutenv::T,n_rep::Int) where {TM, T<:Real}
@@ -320,33 +362,18 @@ function EqACEMatrixModel(onsitemodels::Dict{AtomicNumber, TM},offsitemodels::Di
     return EqACEMatrixModel(onsite, offsite, n_rep)
 end
 
-# function basis(M::EqACEMatrixModel)
-#     return EqACEMatrixBasis(deepcopy(M.onsite),  
-#             deepcopy(M.offsite), M.n_rep, _get_basisinds(M))
-#  end
+_block_type(::EqACEMatrixModel, T=Float64) = SMatrix{3, 3, T, 9}
 
-
-function allocate_matrix(M::EqACEMatrixCalc, at::Atoms, sparse=:sparse, T=Float64)
-    # N = sum( filter(i) for i in 1:length(at) ) 
-    N = length(at)
-    if sparse == :sparse
-        Γ = [spzeros(SMatrix{3, 3, T, 9},N,N) for _ in M.n_rep]
-    else
-        Γ = [zeros(SMatrix{3, 3, T, 9},N,N) for _ in M.n_rep]
-    end
-    return Γ
-end
-
-function matrix!(M::EqACEMatrixCalc, at::Atoms, Γ::AbstractMatrix{SMatrix{3,3,T,9}}, filter=(_,_)->true, filtermode=:new) where {T<:Number}
+function matrix!(M::EqACEMatrixModel, at::Atoms, A::AbstractMatrix{SMatrix{3,3,T,9}}, filter=(_,_)->true) where {T<:Number}
     site_filter(i,at) = (haskey(M.onsite.models, at.Z[i]) && filter(i, at))
     for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
         if site_filter(i, at)
             Zs = at.Z[neigs]
             sm = _get_model(M, at.Z[i])
             cfg = env_transform(Rs, Zs, M.onsite.env)
-            Γ_temp += evaluate(sm, cfg)
+            A_temp += evaluate(sm, cfg)
             for r=1:M.n_rep
-                Γ[r][i,i] += Γ_temp[r]
+                A[r][i,i] += A_temp[r]
             end
         end
     end
@@ -354,30 +381,15 @@ function matrix!(M::EqACEMatrixCalc, at::Atoms, Γ::AbstractMatrix{SMatrix{3,3,T
         sm = _get_model(M, (at.Z[i], at.Z[j]))
         # transform the ellipse to a sphere
         cfg = env_transform(rrij, at.Z[i], at.Z[j], Rs, Zs, M.offsite.env)
-        Γ_temp = evaluate(sm, cfg)
+        A_temp = evaluate(sm, cfg)
         for r=1:M.n_rep
-            Γ[r][i,j] += Γ_temp[r]
+            A[r][i,j] += A_temp[r]
         end
     end
-    return Γ
 end
-
-function allocate_B(M::EqACEMatrixBasis, at::Atoms, sparsity= :sparse, T=Float64)
-    N = length(at)
-    B_onsite = [Diagonal( zeros(SMatrix{3, 3, T, 9},N)) for _ in 1:length(M.inds,:onsite)]
-    @assert sparsity in [:sparse, :dense]
-    if sparsity == :sparse
-        B_offsite = [spzeros(SMatrix{3, 3, T, 9},N,N) for _ in 1:length(M.inds,:offsite)]
-    else
-        B_offsite = [zeros(SMatrix{3, 3, T, 9},N,N) for _ in 1:length(M.inds,:offsite)]
-    end
-    return cat(B_onsite,B_offsite,dims=1)
-end
-
-
 
 #Convention on basis! or here Gamma! (add values or first set to zeros and then add )
-function basis!(B, M::EqACEMatrixBasis, at::Atoms, filter=(_,_)->true, filtermode=:new )
+function basis!(B, M::EqACEMatrixModel, at::Atoms, filter=(_,_)->true )
     site_filter(i,at) = (haskey(M.onsite.models, at.Z[i]) && filter(i, at))
     for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
         if site_filter(i, at)
@@ -438,24 +450,24 @@ function CovACEMatrixModel(onsitemodels::Dict{AtomicNumber, TM},offsitemodels::D
     return CovACEMatrixModel(onsite, offsite,n_rep)
 end
 
+_block_type(::CovACEMatrixModel, T=Float64) = SVector{3,T}
 # function basis(M::CovACEMatrixModel)
 #     return CovACEMatrixBasis(deepcopy(M.onsite),  
 #             deepcopy(M.offsite), M.n_rep, _get_basisinds(M))
 #  end
 
-function allocate_matrix(M::CovACEMatrixCalc, at::Atoms, sparse=:sparse, T=Float64)
-    # N = sum( filter(i) for i in 1:length(at) ) 
-    N = length(at)
-    if sparse == :sparse
-        Σ_vec = [spzeros(SVector{3,T},N,N) for _ =1:M.n_rep] 
-    else
-        Σ_vec = [zeros(SVector{3,T},N,N) for _ =1:M.n_rep] 
-    end
-    return Σ_vec
-end
+# function allocate_matrix(M::CovACEMatrixModel, at::Atoms, sparse=:sparse, T=Float64)
+#     # N = sum( filter(i) for i in 1:length(at) ) 
+#     N = length(at)
+#     if sparse == :sparse
+#         Σ_vec = [spzeros(SVector{3,T},N,N) for _ =1:M.n_rep] 
+#     else
+#         Σ_vec = [zeros(SVector{3,T},N,N) for _ =1:M.n_rep] 
+#     end
+#     return Σ_vec
+# end
 
-function matrix!(M::CovACEMatrixCalc, at::Atoms, Σ, filter=(_,_)->true, filtermode=:new) where {T<:Number}
-    cfg = []
+function matrix!(M::CovACEMatrixModel, at::Atoms, Σ, filter=(_,_)->true) 
     site_filter(i,at) = (haskey(M.onsite.models, at.Z[i]) && filter(i, at))
     for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
         if site_filter(i, at)
@@ -466,8 +478,11 @@ function matrix!(M::CovACEMatrixCalc, at::Atoms, Σ, filter=(_,_)->true, filterm
             #@show cfg
             #@show typeof(evaluate(sm, cfg))
             Σ_temp = evaluate(sm, cfg)
-            for k=1:M.n_rep
-                Σ[k][i,i] += Σ_temp[k]
+            #@show cfg
+            # @show Σ_temp[1]
+            # @show params(sm)[1:10]
+            for r=1:M.n_rep
+                Σ[r][i,i] += Σ_temp[r]
             end
             # evaluate offsite model
             for (j_loc, j) in enumerate(neigs)
@@ -488,19 +503,7 @@ function matrix!(M::CovACEMatrixCalc, at::Atoms, Σ, filter=(_,_)->true, filterm
     end
 end
 
-function allocate_B(M::CovACEMatrixBasis, at::Atoms, sparsity= :sparse, T=Float64)
-    N = length(at)
-    B_onsite = [Diagonal( zeros(SVector{3,T},N)) for _ in 1:length(M.inds,:onsite)]
-    @assert sparsity in [:sparse, :dense]
-    if sparsity == :sparse
-        B_offsite = [spzeros(SVector{3,T},N,N) for _ in 1:length(M.inds,:offsite)]
-    else
-        B_offsite = [zeros(SVector{3,T},N,N) for _ in 1:length(M.inds,:offsite)]
-    end
-    return cat(B_onsite,B_offsite,dims=1)
-end
-
-function basis!(B, M::CovACEMatrixBasis, at::Atoms, filter=(_,_)->true, filtermode=:new )
+function basis!(B, M::CovACEMatrixModel, at::Atoms, filter=(_,_)->true )
     
     site_filter(i,at) = (haskey(M.onsite.models, at.Z[i]) && filter(i, at))
     for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
@@ -532,6 +535,39 @@ function basis!(B, M::CovACEMatrixBasis, at::Atoms, filter=(_,_)->true, filtermo
         end
     end
 end
+
+# function basis!(B, M::CovACEMatrixModel, at::Atoms, filter=(_,_)->true )
+    
+#     site_filter(i,at) = (haskey(M.onsite.models, at.Z[i]) && filter(i, at))
+#     for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
+#         if site_filter(i, at)
+#             Zs = at.Z[neigs]
+#             sm = _get_model(M, at.Z[i])
+#             inds = get_range(M, at.Z[i])
+#             cfg = env_transform(Rs, Zs, M.onsite.env)
+#             Bii = evaluate(sm.basis, cfg)
+#             for (k,b) in zip(inds,Bii)
+#                 B[k][i,i] += b.val
+#             end
+#             # for (j_loc, j) in enumerate(neigs)
+#             #     Zi, Zj = at.Z[i],at.Z[j]
+#             #     if haskey(M.offsite.models,(Zi,Zj))
+#             #         #@show (i,j)
+#             #         sm = _get_model(M, (Zi,Zj))
+#             #         inds = get_range(M, (Zi,Zj))
+#             #         cfg = env_transform(j_loc, Rs, Zs, M.offsite.env)
+#             #         #@show cfg
+#             #         #@show evaluate(sm, cfg)
+#             #         Bij =  evaluate(sm.basis, cfg)
+#             #         for (k,b) in zip(inds,Bij)
+#             #             B[k][j,i] += b.val
+#             #         end
+#             #     end
+#             # end
+
+#         end
+#     end
+# end
 
 
 
@@ -568,23 +604,22 @@ function InvACEMatrixModel(onsitemodels::Dict{AtomicNumber, TM},
     return InvACEMatrixModel(onsite, offsite,n_rep)
 end
 
+function InvACEMatrixModel(onsitemodels::Dict{AtomicNumber, TM},offsitemodels::Dict{Tuple{AtomicNumber, AtomicNumber}, TM},
+    rcut::T,n_rep::Int) where {TM, T<:Real}
+    onsite = OnSiteModels(onsitemodels, rcut)
+    offsite = OffSiteModels(offsitemodels, rcut)
+    return InvACEMatrixModel(onsite, offsite,n_rep)
+end
+
+_block_type(::InvACEMatrixModel, T) = SMatrix{3, 3, T, 9}
+
 # function basis(M::InvACEMatrixModel)
 #     return InvACEMatrixBasis(deepcopy(M.onsite),  
 #             deepcopy(M.offsite), M.n_rep, _get_basisinds(M))
 #  end
 
-function allocate_matrix(M::InvACEMatrixCalc, at::Atoms, sparse=:sparse, T=Float64)
-    # N = sum( filter(i) for i in 1:length(at) ) 
-    N = length(at)
-    if sparse == :sparse
-        Σ_vec = [spzeros(SMatrix{3, 3, T, 9},N,N) for _ =1:M.n_rep] 
-    else
-        Σ_vec = [zeros(SMatrix{3, 3, T, 9},N,N) for _ =1:M.n_rep] 
-    end
-    return Σ_vec
-end
 
-function matrix!(M::InvACEMatrixCalc, at::Atoms, Σ, filter=(_,_)->true, filtermode=:new) where {T<:Number}
+function matrix!(M::InvACEMatrixModel, at::Atoms, Σ, filter=(_,_)->true) 
     cfg = []
     site_filter(i,at) = (haskey(M.onsite.models, at.Z[i]) && filter(i, at))
     for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
@@ -597,38 +632,26 @@ function matrix!(M::InvACEMatrixCalc, at::Atoms, Σ, filter=(_,_)->true, filterm
             #@show typeof(evaluate(sm, cfg))
             Σ_temp = evaluate(sm, cfg)
             for k=1:M.n_rep
-                Σ[k][i,i] += Σ_temp[k] * I 
+                Σ[k][i,i] += Σ_temp[k].val * I 
             end
-            # # evaluate offsite model
-            # for (j_loc, j) in enumerate(neigs)
-            #     Zi, Zj = at.Z[i],at.Z[j]
-            #     if haskey(M.offsite.models,(Zi,Zj))
-            #         #@show (i,j)
-            #         sm = _get_model(M, (Zi,Zj))
-            #         cfg = env_transform(j_loc, Rs, Zs, M.offsite.env)
-            #         #@show cfg
-            #         #@show evaluate(sm, cfg)
-            #         Σ_temp = evaluate(sm, cfg)
-            #         for k=1:M.n_rep
-            #             Σ[k][j,i] += Σ_temp[k]
-            #         end
-            #     end
-            # end
+            # evaluate offsite model
+            for (j_loc, j) in enumerate(neigs)
+                Zi, Zj = at.Z[i],at.Z[j]
+                if haskey(M.offsite.models,(Zi,Zj))
+                    #@show (i,j)
+                    sm = _get_model(M, (Zi,Zj))
+                    cfg = env_transform(j_loc, Rs, Zs, M.offsite.env)
+                    #@show cfg
+                    #@show evaluate(sm, cfg)
+                    Σ_temp = evaluate(sm, cfg)
+                    for k=1:M.n_rep
+                        Σ[k][j,i] += Σ_temp[k]
+                    end
+                end
+            end
         end
     end
 
-end
-
-function allocate_B(M::InvACEMatrixBasis, at::Atoms, sparsity= :sparse, T=Float64)
-    N = length(at)
-    B_onsite = [Diagonal( zeros(SMatrix{3, 3, T, 9},N)) for _ in 1:length(M.inds,:onsite)]
-    @assert sparsity in [:sparse, :dense]
-    if sparsity == :sparse
-        B_offsite = [spzeros(SMatrix{3, 3, T, 9},N,N) for _ in 1:length(M.inds,:offsite)]
-    else
-        B_offsite = [zeros(SMatrix{3, 3, T, 9},N,N) for _ in 1:length(M.inds,:offsite)]
-    end
-    return cat(B_onsite,B_offsite,dims=1)
 end
 
 # Todo:  Need to reduce the amount of functions below
@@ -664,7 +687,7 @@ end
 #     return Gamma(Sigma(B, c))
 # end
 
-function basis!(B, M::InvACEMatrixBasis, at::Atoms, filter=(_,_)->true, filtermode=:new )
+function basis!(B, M::InvACEMatrixModel, at::Atoms, filter=(_,_)->true)
     
     site_filter(i,at) = (haskey(M.onsite.models, at.Z[i]) && filter(i, at))
     for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))

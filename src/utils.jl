@@ -91,6 +91,12 @@ function reinterpret(::Type{Vector{SVector{T}}}, c_matrix::Matrix{T}) where {T}
     return [SVector{N,T}(c_matrix[:,j]) for j=1:N_basis ] 
 end
 
+function reinterpret(::Type{Vector{SVector{N,T}}}, c_matrix::Matrix{T}) where {N,T}
+    @assert N == size(c_matrix,1)
+    N_basis = size(c_matrix,2)
+    return [SVector{N,T}(c_matrix[:,j]) for j=1:N_basis ] 
+end
+
 
 # # tests
 # c_new = reinterpret(SVector{Vector{Float64}}, c_vec)
