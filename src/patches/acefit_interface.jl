@@ -3,7 +3,7 @@ import JuLIP: Atoms, energy, forces, mat
 using PrettyTables
 using StaticArrays: SVector
 using ACEds.Utils: compress_matrix
-using ACEds.MatrixModels: ACEMatrixModel
+using ACEds.MatrixModels: MatrixModel
 
 struct FrictionData <: ACEfit.AbstractData
     atoms::Atoms
@@ -40,7 +40,7 @@ function ACEfit.count_observations(d::FrictionData)
     return sum(count_observations(n_atoms, symb) for symb in [:diag, :subdiag, :offdiag])
 end
 
-function ACEfit.feature_matrix(d::FrictionData, m::ACEMatrixModel)
+function ACEfit.feature_matrix(d::FrictionData, m::MatrixModel)
     dm = zeros(ACEfit.count_observations(d), length(m))
     #dm = Array{Float64}(undef, ACEfit.count_observations(d), length(m))
     #filter(i) = (i in d.friction_indices)

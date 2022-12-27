@@ -475,12 +475,7 @@ function matrix!(M::CovACEMatrixModel, at::Atoms, Σ, filter=(_,_)->true)
             Zs = at.Z[neigs]
             sm = _get_model(M, at.Z[i])
             cfg = env_transform(Rs, Zs, M.onsite.env)
-            #@show cfg
-            #@show typeof(evaluate(sm, cfg))
             Σ_temp = evaluate(sm, cfg)
-            #@show cfg
-            # @show Σ_temp[1]
-            # @show params(sm)[1:10]
             for r=1:M.n_rep
                 Σ[r][i,i] += Σ_temp[r]
             end
@@ -488,11 +483,8 @@ function matrix!(M::CovACEMatrixModel, at::Atoms, Σ, filter=(_,_)->true)
             for (j_loc, j) in enumerate(neigs)
                 Zi, Zj = at.Z[i],at.Z[j]
                 if haskey(M.offsite.models,(Zi,Zj))
-                    #@show (i,j)
                     sm = _get_model(M, (Zi,Zj))
                     cfg = env_transform(j_loc, Rs, Zs, M.offsite.env)
-                    #@show cfg
-                    #@show evaluate(sm, cfg)
                     Σ_temp = evaluate(sm, cfg)
                     for k=1:M.n_rep
                         Σ[k][j,i] += Σ_temp[k]
@@ -620,7 +612,6 @@ _block_type(::InvACEMatrixModel, T) = SMatrix{3, 3, T, 9}
 
 
 function matrix!(M::InvACEMatrixModel, at::Atoms, Σ, filter=(_,_)->true) 
-    cfg = []
     site_filter(i,at) = (haskey(M.onsite.models, at.Z[i]) && filter(i, at))
     for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
         if site_filter(i, at)
@@ -628,8 +619,6 @@ function matrix!(M::InvACEMatrixModel, at::Atoms, Σ, filter=(_,_)->true)
             Zs = at.Z[neigs]
             sm = _get_model(M, at.Z[i])
             cfg = env_transform(Rs, Zs, M.onsite.env)
-            #@show cfg
-            #@show typeof(evaluate(sm, cfg))
             Σ_temp = evaluate(sm, cfg)
             for k=1:M.n_rep
                 Σ[k][i,i] += Σ_temp[k].val * I 
@@ -638,11 +627,8 @@ function matrix!(M::InvACEMatrixModel, at::Atoms, Σ, filter=(_,_)->true)
             for (j_loc, j) in enumerate(neigs)
                 Zi, Zj = at.Z[i],at.Z[j]
                 if haskey(M.offsite.models,(Zi,Zj))
-                    #@show (i,j)
                     sm = _get_model(M, (Zi,Zj))
                     cfg = env_transform(j_loc, Rs, Zs, M.offsite.env)
-                    #@show cfg
-                    #@show evaluate(sm, cfg)
                     Σ_temp = evaluate(sm, cfg)
                     for k=1:M.n_rep
                         Σ[k][j,i] += Σ_temp[k]
@@ -651,8 +637,12 @@ function matrix!(M::InvACEMatrixModel, at::Atoms, Σ, filter=(_,_)->true)
             end
         end
     end
-
 end
+
+
+
+
+
 
 # Todo:  Need to reduce the amount of functions below
 

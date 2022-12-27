@@ -1,4 +1,4 @@
-include("./test_setup_newmatrixmodel.jl")
+include("./test_setup_newmatrixmodel3.jl")
 using ACEds.MatrixModels: get_range
 using LinearAlgebra
 import ACEds.FrictionModels: Gamma, Sigma, set_params!
@@ -16,6 +16,9 @@ mdata2 =  Dict(
 msymbs = (:cov,:inv)
 scale = scaling(mb, 2)
 scale[:inv][1]=1.0
+scale = Tuple(ones(size(scale[s])) for s in msymbs)
+scale = NamedTuple{msymbs}(scale)
+
 mdata3 =  Dict(
     "train" => [(friction_tensor=d.friction_tensor, B = Tuple(d.B[s]./scale[s] for s in msymbs ) ) for d in mdata2["train"]],
     "test" => [(friction_tensor=d.friction_tensor, B = Tuple(d.B[s]./scale[s] for s in msymbs )  ) for d in mdata2["test"]]
@@ -57,11 +60,18 @@ m_flux = FrictionModelFit(Tuple(c0))
 
 mloss5(fm, data) = sum(sum(((fm(d.B) .- d.friction_tensor)).^2) for d in data)
 
-# d  =mdata3["train"][1]
-# Gamma(d.B, m_flux.c)
-# Sigma(d.B, m_flux.c)
-# d2 = train_data[1]
+d  =mdata3["train"][1]
+Gamma(d.B, m_flux.c)
+#Sigma(d.B, m_flux.c)
+d2 = train_data[1]
 
+mbf = DFrictionModel(Dict(:cov=>m_cov, :inv=>m_inv));
+c_unscaled =  NamedTuple{msymbs}(m_flux.c)
+c_scaled = NamedTuple{msymbs}(c_unscaled[s] ./ transpose(repeat(scale[s],1,size(c_unscaled[s],1))) for s in msymbs)
+ACE.set_params!(mbf, c_scaled)
+using ACEds.Utils: reinterpret
+Gamma(mbf.matrixmodels[:cov], d2.at)[55:56,55:56]
+Gamma(d.B, m_flux.c)
 # Sigma(mbf, d2.at)
 # Sigma(Tuple(basis(mbf, d2.at)),m_flux.c)
 
@@ -105,7 +115,7 @@ mloss5(fm, data) = sum(sum(((fm(d.B) .- d.friction_tensor)).^2) for d in data)
 #%%
 opt = Flux.setup(Adam(1E-4, (0.8, 0.99)), m_flux)
 dloader5 = DataLoader(mdata3["train"], batchsize=10, shuffle=true)
-nepochs = 5
+nepochs = 10
 @time mloss5(m_flux, mdata3["train"])
 @time Flux.gradient(mloss5, m_flux, mdata3["train"][2:3])[1]
 @time Flux.gradient(mloss5, m_flux, mdata3["train"][10:15])[1][:c]
