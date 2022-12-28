@@ -47,8 +47,8 @@ rcut_on = 7.0
 rcut = 7.0
 # onsite parameters 
 pon = Dict(
-    "maxorder" => 3,
-    "maxdeg" => 6,
+    "maxorder" => 2,
+    "maxdeg" => 5,
     "rcut" => rcut_on,
     "rin" => 0.4,
     "pcut" => 2,
@@ -58,7 +58,7 @@ pon = Dict(
 
 # offsite parameters 
 poff = Dict(
-    "maxorder" =>3,
+    "maxorder" =>2,
     "maxdeg" =>5,
     "rcut" => rcut,
     "rin" => pon["rin"],
@@ -133,8 +133,8 @@ rcut_on = 7.0
 rcut = 7.0
 # onsite parameters 
 pon = Dict(
-    "maxorder" => 3,
-    "maxdeg" => 6,
+    "maxorder" => 2,
+    "maxdeg" => 5,
     "rcut" => rcut_on,
     "rin" => 0.4,
     "pcut" => 2,
@@ -144,8 +144,8 @@ pon = Dict(
 
 # offsite parameters 
 poff = Dict(
-    "maxorder" =>3,
-    "maxdeg" =>5,
+    "maxorder" =>2,
+    "maxdeg" => 5,
     "rcut" => rcut,
     "rin" => pon["rin"],
     "pcut" => pon["pcut"],
@@ -210,6 +210,89 @@ offsite_inv = SymmetricBondSpecies_basis(ACE.Invariant(Float64), Bsel_off;
 @show length(onsite_inv)
 @show length(offsite_inv)
 
+#%% Equivariant part of model 
+r0f = .4
+rcut_on = 7.0
+rcut = 7.0
+# onsite parameters 
+pon = Dict(
+    "maxorder" => 2,
+    "maxdeg" => 5,
+    "rcut" => rcut_on,
+    "rin" => 0.4,
+    "pcut" => 2,
+    "pin" => 2,
+    "r0" => r0f * rcut,
+)
+
+# offsite parameters 
+poff = Dict(
+    "maxorder" =>2,
+    "maxdeg" => 5,
+    "rcut" => rcut,
+    "rin" => pon["rin"],
+    "pcut" => pon["pcut"],
+    "pin" => pon["pin"],
+    "r0" =>  pon["r0"],
+)
+
+# rcut = 2.0 * rnn(:Cu)
+# r0 = .4 *rcut
+species_fc = [:H]
+species_env = [:Cu]
+species = vcat(species_fc,species_env)
+
+# Generate on-site basis
+env_on = SphericalCutoff(pon["rcut"])
+
+Bsel_on = ACE.SparseBasis(; maxorder=pon["maxorder"], p = 2, default_maxdeg = pon["maxdeg"] ) 
+RnYlm_on = ACE.Utils.RnYlm_1pbasis(;  r0 = pon["r0"], 
+                                rin = pon["rin"],
+                                trans = PolyTransform(2, pon["r0"]), 
+                                pcut = pon["pcut"],
+                                pin = pon["pin"], 
+                                Bsel = Bsel_on, 
+                                rcut=pon["rcut"],
+                                maxdeg=2 * pon["maxdeg"]
+                            );
+
+Zk = ACE.Categorical1pBasis(species; varsym = :mu, idxsym = :mu) #label = "Zk"
+
+Bselcat = ACE.CategorySparseBasis(:mu, species;
+            maxorder = ACE.maxorder(Bsel_on), 
+            p = Bsel_on.p, 
+            weight = Bsel_on.weight, 
+            maxlevels = Bsel_on.maxlevels,
+            maxorder_dict = Dict( :H => 1), 
+            weight_cat = Dict(:H => .75, :Cu=> 1.0)
+         )
+
+onsite_equ = ACE.SymmetricBasis(ACE.EuclideanMatrix(Float64), RnYlm_on * Zk, Bselcat;);
+@show length(onsite_equ)
+
+Bsel_off = ACE.SparseBasis(; maxorder=poff["maxorder"], p = 2, default_maxdeg = poff["maxdeg"] ) 
+RnYlm_off = ACE.Utils.RnYlm_1pbasis(;  r0 = poff["r0"], 
+                                rin = poff["rin"],
+                                trans = PolyTransform(2, poff["r0"]), 
+                                pcut = poff["pcut"],
+                                pin = poff["pin"], 
+                                Bsel = Bsel_off, 
+                                rcut=poff["rcut"],
+                                maxdeg=2*poff["maxdeg"]
+                            );
+
+env_off = ACEds.CutoffEnv.DSphericalCutoff(poff["rcut"])
+offsite_equ = SymmetricBondSpecies_basis(ACE.EuclideanMatrix(Float64), Bsel_off; 
+                RnYlm=RnYlm_off, species=species,
+                species_maxorder_dict = Dict( :H => 0),
+                weight_cat = Dict(:bond=> .5, :H => 1.0, :Cu=> 1.0)
+                #Dic(:H => .5, :Cu=> 1.0)
+                );
+# show(stdout, "text/plain", ACE.get_spec(onsite_equ))
+# show(stdout, "text/plain", ACE.get_spec(offsite_equ))
+@show length(onsite_equ)
+@show length(offsite_equ)
+
 #%%
 n_rep = 3
 m_cov = ACMatrixModel( 
@@ -227,7 +310,17 @@ m_inv = ACMatrixModel(
     n_rep, Invariant()
 );
 
-mb = DFrictionModel(Dict(:cov=>m_cov, :inv=>m_inv));
+n_rep = 2
+m_equ = ACMatrixModel( 
+    OnSiteModels(Dict( AtomicNumber(z) => ACE.LinearACEModel(onsite_equ, rand(SVector{n_rep,Float64},length(onsite_equ))) for z in species_fc), env_on), 
+    OffSiteModels(Dict( AtomicNumber.(zz) => ACE.LinearACEModel(offsite_equ, rand(SVector{n_rep,Float64},length(offsite_equ))) for zz in Base.Iterators.product(species_fc,species_fc)), env_off),
+    #OnSiteModels(Dict( AtomicNumber(z) => ACE.LinearACEModel(onsite, rand(SVector{n_rep,Float64},length(onsite))) for z in species_fc), env_on), 
+    #OffSiteModels(Dict( AtomicNumber.(zz) => ACE.LinearACEModel(offsite, rand(SVector{n_rep,Float64},length(offsite))) for zz in Base.Iterators.product(species_fc,species_fc)), env_off),
+    n_rep, Equivariant()
+);
+
+
+mb = DFrictionModel(Dict(:cov=>m_cov, :inv=>m_inv, :equ=> m_equ));
 
 using Flux
 using Flux.MLUtils
