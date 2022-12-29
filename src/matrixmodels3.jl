@@ -22,6 +22,32 @@ using ACEds.CutoffEnv
 
 
 #ACE.scaling(m::SiteModel,p::Int) = ACE.scaling(m.model.basis,p)
+abstract type Symmetry end 
+struct Invariant <: Symmetry end
+struct Covariant <: Symmetry end
+struct Equivariant <: Symmetry end
+
+_symmetry(::ACE.SymmetricBasis{PIB,<:ACE.Invariant}) where {PIB} = Invariant
+_symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanVector}) where {PIB} = Covariant
+_symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanMatrix}) where {PIB} = Equivariant
+_symmetry(m::ACE.LinearACEModel) = _symmetry(m.basis)
+
+NamedCollection = Union{AbstractDict,NamedTuple}
+function _symmetry(models::NamedCollection) 
+    if isempty(models)
+        return Symmetry
+    else
+        S = eltype([_symmetry(mo.basis)()  for mo in values(models)])
+        @assert ( S <: Symmetry && S != Symmetry) "Symmetries of model bases inconsistent. Symmetries must be of same type."
+        return S 
+    end
+end
+
+function _symmetry(onsitemodels::NamedCollection, offsitemodels::NamedCollection) 
+    S1, S2 = _symmetry(onsitemodels), _symmetry(offsitemodels)
+    @assert S1 <: S2 || S2 <: S1 "Symmetries of onsite and offsite models are inconsistent. These models must have symmetries of same type or one of the model dictionaries must be empty."
+    return (S1 <: S2 ? S1 : S2)
+end
 
 abstract type SiteModels end
 
@@ -102,12 +128,11 @@ function get_interaction(inds::SiteInds, index::Int)
     @error "index $index outside of permittable range"
 end
 
-abstract type Symmetry end 
-struct Invariant <: Symmetry end
-struct Covariant <: Symmetry end
-struct Equivariant <: Symmetry end
-
 abstract type MatrixModel{S} end
+
+_default_id(::Type{Invariant}) = :inv
+_default_id(::Type{Covariant}) = :cov
+_default_id(::Type{Equivariant}) = :equ 
 
 _block_type(::MatrixModel{Invariant},T=Float64) = SMatrix{3, 3, T, 9}
 _block_type(::MatrixModel{Covariant},T=Float64) =  SVector{3,T}
@@ -116,6 +141,7 @@ _block_type(::MatrixModel{Equivariant},T=Float64) = SMatrix{3, 3, T, 9}
 _val2block(::MatrixModel{Invariant}, val::T) where {T<:Number}= SMatrix{3,3,T,9}(Diagonal([val,val,val]))
 _val2block(::MatrixModel{Covariant}, val) = val
 _val2block(::MatrixModel{Equivariant}, val) = val
+
 # ACE.scaling
 
 function ACE.scaling(mb::MatrixModel, p::Int) 
