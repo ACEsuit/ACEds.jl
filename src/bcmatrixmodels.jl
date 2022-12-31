@@ -16,7 +16,7 @@ function BCMatrixModel(onsitemodels::Dict{AtomicNumber, TM},offsitemodels::Dict{
     return BCMatrixModel{S}(onsite, offsite, n_rep)
 end
 
-function matrix!(M::BCMatrixModel, at::Atoms, A, filter=(_,_)->true) where {T<:Number}
+function matrix!(M::BCMatrixModel, at::Atoms, A, filter=(_,_)->true)
     site_filter(i,at) = (haskey(M.onsite.models, at.Z[i]) && filter(i, at))
     if !isempty(M.onsite.models)
         for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))

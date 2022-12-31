@@ -60,7 +60,7 @@ m_flux = FrictionModel(size(c_matrix_r,1),size(c_matrix_r,2))
 
 
 opt = Flux.setup(Adam(0.001, (0.9, 0.999)), m_flux)
-dloader5 = DataLoader(mdata2["train"], batchsize=1, shuffle=true)
+dloader5 = DataLoader(mdata2["train"], batchsize=10, shuffle=true)
 nepochs = 10
 for epoch in 1:nepochs
     for d in dloader5

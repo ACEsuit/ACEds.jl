@@ -3,11 +3,21 @@ using ACEds.MatrixModels: get_range
 using LinearAlgebra
 import ACEds.FrictionModels: Gamma, Sigma, set_params!
 using ACE: scaling, params
+using ACEds.FrictionFit
+
+using Flux.MLUtils
 #p = length(mb)
 # s = 200
 # R = randn(p,s)
 #s = p
 #R = I
+mdata_sparse = Dict(tt => @showprogress [(at = d.at, 
+                        friction_tensor=d.friction_tensor, 
+                        friction_indices = d.friction_indices,
+                        B = basis(mb,d.at) ) for d in data[tt]]
+                        for tt = ["train", "test"]
+)
+
 mdata2 =  Dict(
     s => @showprogress [
         (friction_tensor=reinterpret(Matrix,d.friction_tensor), 
@@ -31,35 +41,6 @@ mdata3 =  Dict(
 );
 
 
-function Gamma(BB::Tuple, cc::Tuple)
-    Σ_vec_all = Sigma(BB, cc)
-    return sum(sum(Σ*transpose(Σ) for Σ in Σ_vec) for Σ_vec in Σ_vec_all )
-end
-
-function Sigma(BB::Tuple, cc::Tuple)
-    return [[sum(B .* c[i,:]) for i=1:size(c,1)] for (B,c) in zip(BB,cc)] 
-end
-
-struct FrictionModelFit
-    c::Tuple
-    modelnames::Tuple
-    #FrictionModelFit(c) = new(c,Tuple(map(Symbol,(s for s in keys(c)))))
-end
-
-(m::FrictionModelFit)(B) = Gamma(B, m.c)
-Flux.@functor FrictionModelFit (c,)
-Flux.trainable(m::FrictionModelFit) = (c=m.c,)
-
-FrictionModelFit(c::NamedTuple, modelnames::Tuple) = FrictionModelFit(Tuple(c[s] for s in modelnames),modelnames)
-FrictionModelFit(c::NamedTuple{modelnames}) where {modelnames}= FrictionModelFit(Tuple(c),modelnames)
-
-function reset(m::FrictionModelFit; sigma=1E-8)
-    n_reps = Tuple(size(c,1) for c in m.c)
-    c0 = [sigma .* randn((n_rep,size(c,2))) for (c,n_rep) in zip(m.c,n_reps)]
-    return FrictionModelFit(Tuple(c0), m.modelnames)
-end
-params(m::FrictionModelFit) = NamedTuple{m.modelnames}(m.c)
-
 
 # (m::FrictionModelFit)(B) = Gamma(B, m.c)
 # Flux.@functor FrictionModelFit
@@ -72,10 +53,10 @@ params(m::FrictionModelFit) = NamedTuple{m.modelnames}(m.c)
 # end
 # params(m::FrictionModelFit) = NamedTuple{m.modelnames}(m.c)
 
-l2_loss(fm, data) = sum(sum(((fm(d.B) .- d.friction_tensor)).^2) for d in data)
+
 typeof(msymbs)
 c = params(mb;format=:matrix)
-m_flux = FrictionModelFit(c,msymbs)
+m_flux = FluxFrictionModel(c,msymbs)
 m_flux = reset(m_flux ; sigma=1E-8)
 
 
@@ -84,9 +65,9 @@ n_train, n_test = length(mdata3["train"]), length(mdata3["test"])
 epoch = 0
 
 
-opt = Flux.setup(Adam(1E-4, (0.99, 0.9999)), m_flux)
+opt = Flux.setup(Adam(5E-5, (0.9999, 0.99999)), m_flux)
 dloader5 = DataLoader(mdata3["train"], batchsize=10, shuffle=true)
-nepochs = 100
+nepochs = 10
 @time l2_loss(m_flux, mdata3["train"])
 @time Flux.gradient(l2_loss, m_flux, mdata3["train"][2:3])[1]
 @time Flux.gradient(l2_loss, m_flux, mdata3["train"][10:15])[1][:c]

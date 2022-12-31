@@ -10,16 +10,19 @@ import ACEds.MatrixModels: set_zero!
 import ACE: scaling
 
 export params, nparams, set_params!
-export basis, matrix
+export basis, matrix, Gamma, Sigma
 export DFrictionModel
 
 abstract type FrictionModel end
 struct DFrictionModel <: FrictionModel
     matrixmodels # can be of the form ::Dict{Symbol,ACEMatrixModel} or similar NamedTuple
     names
-    DFrictionModel(matrixmodels) = new(matrixmodels,Tuple(map(Symbol,(s for s in keys(matrixmodels)))))
+    DFrictionModel(matrixmodels::Union{Dict{Symbol,<:MatrixModel},NamedTuple}) = new(matrixmodels,Tuple(map(Symbol,(s for s in keys(matrixmodels)))))
 end
-
+function DFrictionModel(matrixmodels)
+    names = Tuple(map(Symbol,(mo.id for mo in matrixmodels)))
+    DFrictionModel(NamedTuple{names}(matrixmodels))
+end
 function set_zero!(fm::DFrictionModel, model_names)
     for s in model_names
         set_zero!(fm. matrixmodels[s])
@@ -41,6 +44,10 @@ end
 
 function matrix(fm::DFrictionModel, at::Atoms; kvargs...) 
     return NamedTuple{fm.names}(matrix(mo, at; kvargs...) for mo in values(fm.matrixmodels))
+end
+
+function Base.length(fm::DFrictionModel, args...)
+    return sum(length(mo, args...) for mo in values(fm.matrixmodels))
 end
 
 # site_zzz = site::Symbol or zzz::Union{AtomicNumber,Tuple{AtomicNumber,AtomicNumber}}

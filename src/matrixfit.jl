@@ -3,7 +3,9 @@ module FrictionFit
 using Flux
 import ACE: params
 
-export params
+export params, FluxFrictionModel, l2_loss, reset_params
+
+
 
 function _Gamma(BB::Tuple, cc::Tuple)
     Σ_vec_all = _Sigma(BB, cc)
@@ -25,7 +27,7 @@ end
 
 FluxFrictionModel(c::NamedTuple, modelnames::Tuple) = FluxFrictionModel(Tuple(c[s] for s in modelnames),modelnames)
 FluxFrictionModel(c::NamedTuple{modelnames}) where {modelnames}= FluxFrictionModel(Tuple(c),modelnames)
-function reset(m::FluxFrictionModel; sigma=1E-8)
+function reset_params(m::FluxFrictionModel; sigma=1E-8)
     n_reps = Tuple(size(c,1) for c in m.c)
     c0 = [sigma .* randn((n_rep,size(c,2))) for (c,n_rep) in zip(m.c,n_reps)]
     return FluxFrictionModel(Tuple(c0), m.modelnames)

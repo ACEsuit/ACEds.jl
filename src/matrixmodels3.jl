@@ -5,6 +5,7 @@ export SiteModels, OnSiteModels, OffSiteModels, SiteInds, SiteModel
 export MatrixModel, ACMatrixModel, BCMatrixModel
 export Symmetry, Invariant, Covariant, Equivariant
 export matrix, basis, params, nparams, set_params!
+
 using JuLIP, ACE, ACEbonds
 using JuLIP: chemical_symbol
 using ACE: SymmetricBasis, LinearACEModel, evaluate
@@ -33,6 +34,7 @@ _symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanMatrix}) where {PIB} = Equivar
 _symmetry(m::ACE.LinearACEModel) = _symmetry(m.basis)
 
 NamedCollection = Union{AbstractDict,NamedTuple}
+
 function _symmetry(models::NamedCollection) 
     if isempty(models)
         return Symmetry
@@ -94,38 +96,26 @@ function Base.length(inds::SiteInds)
 end
 
 function Base.length(inds::SiteInds, site::Symbol)
-    return ( isempty(getfield(inds, site)) ? 0 : sum(length(irange) for irange in values(getfield(inds, site))))
+    return  (isempty(getfield(inds, site)) ? 0 : sum(length(irange) for irange in values(getfield(inds, site))))
 end
 
 function get_range(inds::SiteInds, z::AtomicNumber)
     return inds.onsite[z]
 end
 
-function get_range(inds::SiteInds, site::Symbol)
-    if site == :onsite
-        return 1:length(inds, :onsite) 
-    elseif site == :offsite
-        return (length(inds, :onsite)+1):(length(inds, :onsite)+length(inds, :offsite))
-    else
-        @error "The value of the argument site::Symbol must be either :onsite or :offsite."
-    end
-end
-
 function get_range(inds::SiteInds, zz::Tuple{AtomicNumber, AtomicNumber})
-    return length(inds, :onsite) .+ inds.offsite[_sort(zz...)]
+    return inds.offsite[_sort(zz...)]
 end
 
-function get_interaction(inds::SiteInds, index::Int)
-    for site in [:onsite,:offsite]
-        site_inds = getfield(inds, site)
-        for zzz in keys(site_inds)
-            zrange = get_range(inds, zzz)
-            if index in zrange
-                return site, zrange, zzz
-            end
+function model_key(site::Symbol, index::Int)
+    site_inds = getfield(inds, site)
+    for zzz in keys(site_inds)
+        zrange = get_range(inds, zzz)
+        if index in zrange
+            return zrange, zzz
         end
     end
-    @error "index $index outside of permittable range"
+    @error "Index $index outside of permittable range."
 end
 
 abstract type MatrixModel{S} end
@@ -145,11 +135,11 @@ _val2block(::MatrixModel{Equivariant}, val) = val
 # ACE.scaling
 
 function ACE.scaling(mb::MatrixModel, p::Int) 
-    scale = ones(length(mb))
+    scale = (onsite=ones(length(mb,:onsite)), offsite=ones(length(mb,:offsite)))
     for site in [:onsite,:offsite]
         site = getfield(mb,site)
         for (zz, mo) in site.models
-            scale[get_range(mb,zz)] = ACE.scaling(mo.basis,p)
+            scale[:onsite][get_range(mb,zz)] = ACE.scaling(mo.basis,p)
         end
     end
     return scale
@@ -183,17 +173,14 @@ _sort(z1,z2) = (z1<=z2 ? (z1,z2) : (z2,z1))
 _get_model(calc::MatrixModel, zz::Tuple{AtomicNumber,AtomicNumber}) = calc.offsite.models[_sort(zz...)]
 _get_model(calc::MatrixModel, z::AtomicNumber) =  calc.onsite.models[z]
 
-
-function ACE.params(mb::MatrixModel; format=:native) # :vector, :matrix
-    θ = zeros(SVector{mb.n_rep,Float64}, nparams(mb))
-    for z_list in [keys(mb.onsite.models),keys(mb.offsite.models)]
-        for z in z_list
-            sm = _get_model(mb, z)
-            inds = get_range(mb, z)
-            θ[inds] = params(sm) 
-        end
+function ACE.params(mb::MatrixModel; format=:native, joinsites=false) # :vector, :matrix
+    if joinsites  
+        return hcat( ACE.params(mb, :onsite; format=format), 
+                     ACE.params(mb, :offsite; format=format))
+    else 
+        return (onsite=ACE.params(mb, :onsite;  format=format),
+                offsite=ACE.params(mb, :offsite; format=format))
     end
-    return (format == :native ? θ :  _transform(θ,format))
 end
 
 function ACE.params(mb::MatrixModel, site::Symbol; format=:native)
@@ -203,49 +190,46 @@ function ACE.params(mb::MatrixModel, site::Symbol; format=:native)
         inds = get_range(mb, z)
         θ[inds] = params(sm) 
     end
-    return (fomrat == :native ? θ :  _transform(θ,format) : θ)
-end
-
-function _transform(θ,format, nrep=1)
-    if format == :vector
-        return reinterpret(Vector{Float64}, θ)
-    elseif format ==:matrix
-        return reinterpret(Matrix{Float64}, θ)
-    elseif format ==:native
-        return reinterpret(Vector{SVector{n_rep,Float64}}, θ)
-    else
-        @error "Non-valid paramater format provided"
-    end
+    return _transform(θ, Val(format), mb.n_rep)
 end
 
 function ACE.params(calc::MatrixModel, zzz::Union{AtomicNumber,Tuple{AtomicNumber,AtomicNumber}})
     return params(_get_model(calc,zzz))
 end
 
-function ACE.nparams(mb::MatrixModel; flatten=false)
-    return (flatten ? mb.n_rep * length(mb.inds) : length(mb.inds))
+
+function ACE.nparams(mb::MatrixModel)
+    return length(mb.inds, :onsite) + length(mb.inds, offsite)
 end
 
-function ACE.nparams(mb::MatrixModel, site::Symbol; flatten=false)
-    return (flatten ? mb.n_rep * length(mb.inds, site) : length(mb.inds, site))
+function ACE.nparams(mb::MatrixModel, site::Symbol)
+    return length(mb.inds, site)
 end
 
 function ACE.nparams(calc::MatrixModel, zzz::Union{AtomicNumber,Tuple{AtomicNumber,AtomicNumber}}) # make zzz
     return nparams(_get_model(calc,zzz))
 end
 
+# function ACE.set_params!(mb::MatrixModel, θ::Vector)
+#     ACE.set_params!(mb, :onsite,  θ.onsite)
+#     ACE.set_params!(mb, :offsite, θ.offsite)
+# end
 
 function ACE.set_params!(mb::MatrixModel, θ)
-    θt = reinterpret(Vector{SVector{mb.n_rep,Float64}}, θ)
-    ACE.set_params!(mb, :onsite, θt)
-    ACE.set_params!(mb, :offsite, θt)
+    θt = _split_sites(mb, θ) 
+    ACE.set_params!(mb::MatrixModel, θt)
+end
+
+function ACE.set_params!(mb::MatrixModel, θ::NamedTuple)
+    ACE.set_params!(mb, :onsite,  θ.onsite)
+    ACE.set_params!(mb, :offsite, θ.offsite)
 end
 
 function set_params!(mb::MatrixModel, site::Symbol, θ)
-    θt = reinterpret(Vector{SVector{mb.n_rep,Float64}}, θ)
+    θt = _rev_transform(θ, mb.n_rep)
     sitedict = getfield(mb, site).models
     for z in keys(sitedict)
-        ACE.set_params!(_get_model(mb,z),θt[get_range(mb.inds, z)]) 
+        ACE.set_params!(_get_model(mb,z),θt[get_range(mb,z)]) 
     end
 end
 
@@ -254,10 +238,60 @@ function ACE.set_params!(calc::MatrixModel, zzz::Union{AtomicNumber,Tuple{Atomic
 end
 
 function set_zero!(mb::MatrixModel)
-    θ = zeros(size(params(mb; format=:matrix)))
+    for site in [:onsite,:offsite]
+        ACE.set_zero!(mb, site)
+    end
+end
+
+function set_zero!(mb::MatrixModel, site::Symbol)
+    θ = zeros(size(params(mb, site; format=:matrix)))
     ACE.set_params!(mb, θ)
 end
 
+# Auxiliary functions to handle different formats of parameters (as NamedTuple vs one block & Matrix vs Vector{SVector{...}})  and basis (as NamedTuple vs one bloc 
+_join_sites(h1,h2) = vcat(h1,h2)
+
+function _split_sites(mb::MatrixModel, h::Vector) 
+    imax_onsite = length(mb,:onsite)
+    return (onsite=h[1:imax_onsite], offsite=h[(imax_onsite+1):end])
+end
+function _split_sites(mb::MatrixModel, H::Matrix) 
+    imax_onsite = length(mb,:onsite)
+    return (onsite=H[:,1:imax_onsite], offsite=H[:,(imax_onsite+1):end])
+end
+
+function _transform(θ, ::Val{:matrix}, n_rep)
+    return reinterpret(Matrix{Float64}, θ)
+end
+function _transform(θ, ::Val{:native}, n_rep)
+    return reinterpret(Vector{SVector{n_rep,Float64}}, θ)
+end
+function _rev_transform(θ, n_rep)
+    return reinterpret(Vector{SVector{n_rep,Float64}}, θ)
+end
+
+# function _transform(θ, ::Val{:vector}, n_rep)
+#     return reinterpret(Vector{Float64}, θ)
+# end
+
+
+# rev_transform(θ::NamedTuple, mb::MatrixModel) = (:onsite =_rev_transform(θ.onsite,mb.n_rep),
+#     :offsite =_rev_transform(θ.offsite,mb.n_rep) )
+
+# function rev_transform(θ::Vector{SVector{NREP,T}}, mb::MatrixModel) where {NREP,T}
+#     imax_onsite = length(mb,:onsite)
+#     return (:onsite = _rev_transform(θ[1:imax_onsite],mb.n_rep),:offsite=_transform(θ[(imax_onsite+1):end], mb.n_rep) )
+# end
+
+# function rev_transform(θ::Matrix, mb::MatrixModel)
+#     imax_onsite = length(mb,:onsite)
+#     return (:onsite = _rev_transform(θ[:,1:imax_onsite],mb.n_rep),:offsite=_transform(θ[:,(imax_onsite+1):end], mb.n_rep) )
+# end
+
+# function rev_transform(θ::Vector, mb::MatrixModel)
+#     imax_onsite = length(mb,:onsite) * mb.n_rep + 1
+#     return (:onsite = _rev_transform(θ[1:imax_onsite],mb.n_rep),:offsite = _rev_transform(θ[(imax_onsite+1):end], n_rep) )
+# end
 
 
 function matrix(M::MatrixModel, at::Atoms; sparse=:sparse, filter=(_,_)->true, T=Float64) 
@@ -270,18 +304,18 @@ function allocate_matrix(M::MatrixModel, at::Atoms, sparse=:sparse, T=Float64)
     N = length(at)
     if sparse == :sparse
         # Γ = repeat([spzeros(_block_type(M,T),N,N)], M.n_rep)
-        Γ = [spzeros(_block_type(M,T),N,N) for _ = 1:M.n_rep]
+        A = [spzeros(_block_type(M,T),N,N) for _ = 1:M.n_rep]
     else
         # Γ = repeat([zeros(_block_type(M,T),N,N)], M.n_rep)
-        Γ = [zeros(_block_type(M,T),N,N) for _ = 1:M.n_rep]
+        A = [zeros(_block_type(M,T),N,N) for _ = 1:M.n_rep]
     end
-    return Γ
+    return A
 end
 
-function basis(M::MatrixModel, at::Atoms, sparsity= :sparse, filter=(_,_)->true, T=Float64) 
+function basis(M::MatrixModel, at::Atoms; join_sites=false, sparsity= :sparse, filter=(_,_)->true, T=Float64) 
     B = allocate_B(M, at, sparsity, T)
     basis!(B, M, at, filter)
-    return B
+    return (join_sites ? _join_sites(B.onsite,B.offsite) : B)
 end
 
 function allocate_B(M::MatrixModel, at::Atoms, sparsity= :sparse, T=Float64)
@@ -293,7 +327,7 @@ function allocate_B(M::MatrixModel, at::Atoms, sparsity= :sparse, T=Float64)
     else
         B_offsite = [zeros(_block_type(M,T),N,N) for _ = 1:length(M.inds,:offsite)]
     end
-    return cat(B_onsite,B_offsite,dims=1)
+    return (onsite=B_onsite, offsite=B_offsite)
 end
 
 # Atom-centered matrix models: 

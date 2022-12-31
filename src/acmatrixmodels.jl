@@ -3,25 +3,39 @@ struct ACMatrixModel{S} <: MatrixModel{S}
     offsite::OffSiteModels
     n_rep::Int
     inds::SiteInds
-    function ACMatrixModel{S}(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int) where {S}
-        return new(onsite,offsite, n_rep, _get_basisinds(onsite.models, offsite.models))
+    id::Symbol
+    function ACMatrixModel{S}(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int, id::Symbol) where {S}
+        return new(onsite,offsite, n_rep, _get_basisinds(onsite.models, offsite.models), id)
     end
 end
-ACMatrixModel(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int, S::Type{<:Symmetry}) = ACMatrixModel{S}(onsite,offsite,n_rep)
-ACMatrixModel(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int, S::Symmetry) = ACMatrixModel{typeof(S)}(onsite,offsite,n_rep)
 
+# Basic constructor 
+function ACMatrixModel(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int; id = nothing) 
+    S = _symmetry(onsite.models, offsite.models)
+    id = (id === nothing ? _default_id(S) : id) 
+    return ACMatrixModel{S}(onsite,offsite,n_rep, id)
+end
+
+# Convenience constructors 
 function ACMatrixModel(onsitemodels::Dict{AtomicNumber, TM},offsitemodels::Dict{Tuple{AtomicNumber, AtomicNumber}, TM},
-    rcut::T, n_rep::Int, S) where {TM, T<:Real}
+    rcut::T, n_rep::Int; id = nothing) where {TM, T<:Real}
     onsite = OnSiteModels(onsitemodels, rcut)
     offsite = OffSiteModels(offsitemodels, rcut)
-    return ACMatrixModel(onsite, offsite, n_rep, S)
+    return ACMatrixModel(onsite, offsite, n_rep; id=id)
 end
 
 function ACMatrixModel(onsitemodels::Dict{AtomicNumber, TM},
-    rcut::T, n_rep::Int, S) where {TM, T<:Real}
+    rcut::T, n_rep::Int; id = nothing) where {TM, T<:Real}
     onsite = OnSiteModels(onsitemodels, rcut)
     offsite = OffSiteModels(Dict{Tuple{AtomicNumber, AtomicNumber},TM}(), rcut)
-    return ACMatrixModel(onsite, offsite, n_rep, S)
+    return ACMatrixModel(onsite, offsite, n_rep; id=id)
+end
+
+function ACMatrixModel(offsitemodels::Dict{Tuple{AtomicNumber, AtomicNumber}, TM},
+    rcut::T, n_rep::Int; id = nothing) where {TM, T<:Real}
+    onsite = OnSiteModels(Dict{AtomicNumber, TM}(), rcut)
+    offsite = OffSiteModels(offsitemodels, rcut)
+    return ACMatrixModel(onsite, offsite, n_rep; id=id)
 end
 
 function matrix!(M::ACMatrixModel, at::Atoms, Σ, filter=(_,_)->true) 
@@ -63,7 +77,7 @@ function basis!(B, M::ACMatrixModel, at::Atoms, filter=(_,_)->true )
             cfg = env_transform(Rs, Zs, M.onsite.env)
             Bii = evaluate(sm.basis, cfg)
             for (k,b) in zip(inds,Bii)
-                B[k][i,i] += _val2block(M, b.val)
+                B.onsite[k][i,i] += _val2block(M, b.val)
             end
             for (j_loc, j) in enumerate(neigs)
                 Zi, Zj = at.Z[i],at.Z[j]
@@ -73,7 +87,7 @@ function basis!(B, M::ACMatrixModel, at::Atoms, filter=(_,_)->true )
                     cfg = env_transform(j_loc, Rs, Zs, M.offsite.env)
                     Bij =  evaluate(sm.basis, cfg)
                     for (k,b) in zip(inds, Bij)
-                        B[k][j,i] += _val2block(M, b.val)
+                        B.offsite[k][j,i] += _val2block(M, b.val)
                     end
                 end
             end

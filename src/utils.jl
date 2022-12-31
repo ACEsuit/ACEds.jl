@@ -48,6 +48,8 @@ function reinterpret(::Type{Matrix}, mat::Matrix{SMatrix{3, 3, T, 9}}) where {T<
     return smat
 end
 
+reinterpret(::Type{Matrix{SMatrix{3,3,T,9}}}, mat::Matrix{SMatrix{3, 3, T, 9}}) where {T<:Number} = mat
+
 function reinterpret(::Type{Vector{SVector{N, T}}}, c_vec::Vector{SVector{N, T}}) where {N,T}
     return c_vec
 end

@@ -1,12 +1,18 @@
+using StaticArrays
+import ACE
+import ACE: filter
 import Base: *
+
 *(prop::ACE.EuclideanVector, c::SVector{N, Float64}) where {N} = SVector{N}(prop*c[i] for i=1:N)
 *(prop::ACE.EuclideanMatrix, c::SVector{N, Float64}) where {N} = SVector{N}(prop*c[i] for i=1:N)
 
 # Bugfix
 
-import ACE
+function filter(b::ACE.Onepb, Bsel::ACE.CategorySparseBasis, basis::ACE.OneParticleBasis) 
+    return true
+end
 
-function ACE.filter(bb, Bsel::ACE.CategorySparseBasis, basis::ACE.OneParticleBasis) 
+function filter(bb, Bsel::ACE.CategorySparseBasis, basis::ACE.OneParticleBasis) 
     # auxiliary function to count the number of 1pbasis functions in bb 
     # for which b.isym == s.
     num_b_is_(s) = sum([(getproperty(b, Bsel.isym) == s) for b in bb])

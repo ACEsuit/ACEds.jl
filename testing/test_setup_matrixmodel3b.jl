@@ -328,5 +328,5 @@ c_unscaled =  NamedTuple{msymbs}(m_flux.c)
 c_scaled = NamedTuple{msymbs}(c_unscaled[s] ./ transpose(repeat(scale[s],1,size(c_unscaled[s],1))) for s in msymbs)
 ACE.set_params!(mbf, c_scaled)
 using ACEds.Utils: reinterpret
-@show Gamma(mbf, d2.at)[55:56,55:56]
-@show Gamma(d.B, m_flux.c)
+Gamma(mbf, d2.at)[55:56,55:56]
+Gamma(d.B, m_flux.c)

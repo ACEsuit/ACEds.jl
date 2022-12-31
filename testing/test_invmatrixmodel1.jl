@@ -58,7 +58,7 @@ Flux.trainable(m::FrictionModel) = (c=m.c,)
 n_rep_main = 10
 n_rep_onsite = 0
 n_rep = n_rep_main + n_rep_onsite
-m = CovACEMatrixModel( 
+m = InvACEMatrixModel( 
     OnSiteModels(Dict( AtomicNumber(z) => ACE.LinearACEModel(onsite, rand(SVector{n_rep,Float64},length(onsite))) for z in species_fc), env_on), 
     OffSiteModels(Dict( AtomicNumber.(zz) => ACE.LinearACEModel(offsite, rand(SVector{n_rep,Float64},length(offsite))) for zz in Base.Iterators.product(species_fc,species_fc)), env_off),
     n_rep

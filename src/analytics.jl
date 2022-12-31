@@ -10,10 +10,10 @@ using PyPlot
 using Printf
 using DataFrames
 
-function friction_pairs(fdata, mb; filter=(_,_)->true)
+function friction_pairs(fdata, mb; filter=(_,_)->true, atoms_sym=:at)
     a = length(fdata)
     println("Conpute Friction tensors for $a configurations.")
-    fp = @showprogress [ (Γ_true =d.friction_tensor, Γ_fit = Matrix(Gamma(mb,d.atoms;filter=filter)[d.friction_indices,d.friction_indices]))
+    fp = @showprogress [ (Γ_true =d.friction_tensor, Γ_fit = Matrix(Gamma(mb,d[atoms_sym];filter=filter)[d.friction_indices,d.friction_indices]))
     for d in fdata]
     return fp
 end
@@ -22,14 +22,14 @@ end
 #     return [( Γ_true = copy_sub(d.Γ_true, symb), Γ_fit = copy_sub(d.Γ_fit, symb)) for d in fp]
 # end
 
-function residuals(fdata, mb; filter=(_,_)->true)
-    return @showprogress [reinterpret(Matrix, d.friction_tensor - Gamma(mb,d.atoms; filter=filter)[d.friction_indices,d.friction_indices])
+function residuals(fdata, mb; filter=(_,_)->true, atoms_sym=:at)
+    return @showprogress [reinterpret(Matrix, d.friction_tensor - Gamma(mb,d[atoms_sym]; filter=filter)[d.friction_indices,d.friction_indices])
     for d in fdata]
 end
 
-function matrix_errors(fdata, mb; filter=(_,_)->true, weights=ones(length(fdata)), mode=:abs, reg_epsilon=0.0)
+function matrix_errors(fdata, mb; filter=(_,_)->true, weights=ones(length(fdata)), mode=:abs, reg_epsilon=0.0, atoms_sym=:at)
     err = Dict()
-    g_res = residuals(fdata, mb; filter=filter)
+    g_res = residuals(fdata, mb; filter=filter, atoms_sym=atoms_sym)
     if mode==:abs
         p_abs_err(p) = sum(w*norm(g,p)^p for (g,w) in zip(g_res,weights))/sum(weights)
         err[:mse] = p_abs_err(2)
@@ -37,7 +37,7 @@ function matrix_errors(fdata, mb; filter=(_,_)->true, weights=ones(length(fdata)
         err[:mae] = p_abs_err(1)
         err[:frob] = sum(norm(g,2)*w for (g,w) in zip(g_res,weights))/sum(weights)
     elseif mode ==:rel
-        fp = friction_pairs(fdata, mb; filter=filter)
+        fp = friction_pairs(fdata, mb; filter=filter, atoms_sym=atoms_sym)
         p_rel_err(p) = sum(w*(norm(reinterpret(Matrix,f.Γ_true - f.Γ_fit),p)/(norm(f.Γ_true,p)+reg_epsilon))^p for (w,f) in zip(weights,fp))/sum(weights)
         err[:mse] = p_rel_err(2)
         err[:rmsd] = sqrt(err[:mse])
@@ -51,8 +51,8 @@ function matrix_errors(fdata, mb; filter=(_,_)->true, weights=ones(length(fdata)
     return err
 end
 
-function matrix_entry_errors(fdata, mb; filter=(_,_)->true, weights=ones(length(fdata)), entry_types = [:diag,:subdiag,:offdiag], mode=:abs,reg_epsilon=0.0)
-    friction = friction_entries(fdata, mb; filter=filter, entry_types = entry_types )
+function matrix_entry_errors(fdata, mb; filter=(_,_)->true, atoms_sym=:at, weights=ones(length(fdata)), entry_types = [:diag,:subdiag,:offdiag], mode=:abs,reg_epsilon=0.0)
+    friction = friction_entries(fdata, mb; filter=filter, atoms_sym=atoms_sym, entry_types = entry_types )
     fp = friction_pairs(fdata, mb; filter=filter)
     err = Dict(s=>Dict() for s in vcat(entry_types,:all))
     if mode==:abs
@@ -86,8 +86,8 @@ end
 Creates dictionary 
 
 """
-function friction_entries(fdata, mb; filter=(_,_)->true, entry_types = [:diag,:subdiag,:offdiag])
-    fp = friction_pairs(fdata, mb; filter=filter)
+function friction_entries(fdata, mb; filter=(_,_)->true, atoms_sym=:at, entry_types = [:diag,:subdiag,:offdiag])
+    fp = friction_pairs(fdata, mb; filter=filter, atoms_sym=atoms_sym)
     data = Dict(tf=> Dict(symb => Array{Float64}[] for symb in entry_types) for tf in [:true,:fit])
     for d in fp
         for s in entry_types
@@ -98,16 +98,16 @@ function friction_entries(fdata, mb; filter=(_,_)->true, entry_types = [:diag,:s
     return data
 end
 
-function error_stats(fdata, mbf; filter=(_,_)->true,reg_epsilon = 0.01)
+function error_stats(fdata, mbf; filter=(_,_)->true, atoms_sym=:at,reg_epsilon = 0.01)
     @info "Compute errors"
     merrors = Dict(
     tt => Dict("entries" =>  
-            Dict(:abs => matrix_entry_errors(fdata[tt], mbf; filter=filter, weights=ones(length(fdata[tt])), mode=:abs, reg_epsilon=0.0),
-            :rel => matrix_entry_errors(fdata[tt], mbf; filter=filter, weights=ones(length(fdata[tt])), mode=:rel, reg_epsilon=reg_epsilon)
+            Dict(:abs => matrix_entry_errors(fdata[tt], mbf; filter=filter, atoms_sym=atoms_sym, weights=ones(length(fdata[tt])), mode=:abs, reg_epsilon=0.0),
+            :rel => matrix_entry_errors(fdata[tt], mbf; filter=filter, atoms_sym=atoms_sym, weights=ones(length(fdata[tt])), mode=:rel, reg_epsilon=reg_epsilon)
             ),
             "matrix" =>  
-                Dict(:abs => matrix_errors(fdata[tt], mbf; filter=filter, weights=ones(length(fdata[tt])), mode=:abs, reg_epsilon=0.0),
-                :rel => matrix_errors(fdata[tt], mbf; filter=filter, weights=ones(length(fdata[tt])), mode=:rel, reg_epsilon=reg_epsilon)
+                Dict(:abs => matrix_errors(fdata[tt], mbf; filter=filter, atoms_sym=atoms_sym, weights=ones(length(fdata[tt])), mode=:abs, reg_epsilon=0.0),
+                :rel => matrix_errors(fdata[tt], mbf; filter=filter, atoms_sym=atoms_sym, weights=ones(length(fdata[tt])), mode=:rel, reg_epsilon=reg_epsilon)
             )
         )
     for tt in ["train", "test"]
@@ -142,13 +142,13 @@ end
 
 num2str(x, fm="%.5f" ) = Printf.format(Printf.Format(fm), x)
 
-function plot_error(fdata, mbf; merrors=nothing)
+function plot_error(fdata, mbf; merrors=nothing, kvargs...)
     fz = 15
     fig,ax = PyPlot.subplots(2,3,figsize=(16,10))
     tentries = Dict("test" => Dict(),"train" => Dict())
     for (mb,fit_info) in zip([mbf], ["CovFit"])
-        tentries["test"] = friction_entries(fdata["test"], mbf)
-        tentries["train"] = friction_entries(fdata["train"], mbf)
+        tentries["test"] = friction_entries(fdata["test"], mbf; kvargs...)
+        tentries["train"] = friction_entries(fdata["train"], mbf; kvargs...)
 
         for (k,tt) in enumerate(["train","test"])
             transl = Dict(:diag=>"Diagonal", :subdiag=>"Sub-Diagonal", :offdiag=>"Off-Diagonal" )
@@ -218,12 +218,12 @@ function plot_error(fdata, mbf; merrors=nothing)
 end
 
 
-function plot_error_all(fdata, mbf; merrors=nothing)
+function plot_error_all(fdata, mbf; merrors=nothing, kvargs...)
     fz = 15
     fig,ax = PyPlot.subplots(1,2,figsize=(10,5))
     tentries = Dict("test" => Dict(),"train" => Dict())
-    tentries["test"] = friction_entries(fdata["test"], mbf)
-    tentries["train"] = friction_entries(fdata["train"], mbf)
+    tentries["test"] = friction_entries(fdata["test"], mbf; kvargs...)
+    tentries["train"] = friction_entries(fdata["train"], mbf; kvargs...)
     for (k,tt) in enumerate(["train","test"])
         transl = Dict(:diag=>"Diagonal", :subdiag=>"Sub-Diagonal", :offdiag=>"Off-Diagonal" )
         for (i, symb) in enumerate([:diag, :subdiag, :offdiag])
