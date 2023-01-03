@@ -9,122 +9,79 @@ import ACE: params, nparams, set_params!
 import ACEds.MatrixModels: set_zero!
 import ACE: scaling
 
-export params, nparams, set_params!
-export basis, matrix
-export DFrictionMode
+export params, nparams, set_params!, get_ids
+export basis, matrix, Gamma, Sigma
+export FrictionModel
 
-abstract type FrictionModel end
-struct DFrictionModel <: FrictionModel
+abstract type AbstractFrictionModel end
+# TODO: field model_ids is renundant and my lead to inconsistencies. Remove or all model_ids to allow usage of subsets of models 
+struct FrictionModel <: AbstractFrictionModel
     matrixmodels # can be of the form ::Dict{Symbol,ACEMatrixModel} or similar NamedTuple
-    names
-    DFrictionModel(matrixmodels) = new(matrixmodels,Tuple(map(Symbol,(s for s in keys(matrixmodels)))))
+    model_ids
+    FrictionModel(matrixmodels::Union{Dict{Symbol,<:MatrixModel},NamedTuple}) = new(matrixmodels,Tuple(map(Symbol,(s for s in keys(matrixmodels)))))
 end
 
-function set_zero!(fm::DFrictionModel, model_names)
-    for s in model_names
-        set_zero!(fm. matrixmodels[s])
+function FrictionModel(matrixmodels)
+    model_ids = Tuple(map(Symbol,(get_id(mo) for mo in matrixmodels)))
+    FrictionModel(NamedTuple{model_ids}(matrixmodels))
+end
+
+function set_zero!(fm::FrictionModel, model_ids)
+    for s in model_ids
+        set_zero!(fm.matrixmodels[s])
     end
 end
-function Gamma(fm::DFrictionModel, at::Atoms; kvargs...) # kvargs = {sparse=:sparse, filter=(_,_)->true, T=Float64}
+function Gamma(fm::FrictionModel, at::Atoms; kvargs...) # kvargs = {sparse=:sparse, filter=(_,_)->true, T=Float64}
     return sum(Gamma(mo, at; kvargs... ) for mo in values(fm.matrixmodels))
     #+ Gamma(fm.inv, at; kvargs...)
 end
 
-function Sigma(fm::DFrictionModel, at::Atoms;kvargs...)  
-    return NamedTuple{fm.names}(Sigma(mo, at; kvargs...) for mo in values(fm.matrixmodels))
+function Sigma(fm::FrictionModel, at::Atoms;kvargs...)  
+    return NamedTuple{fm.model_ids}(Sigma(mo, at; kvargs...) for mo in values(fm.matrixmodels))
 end
 
-function basis(fm::DFrictionModel, at::Atoms; kvargs...)
-    return NamedTuple{fm.names}(basis(mo, at; kvargs...) for mo in values(fm.matrixmodels))
+function basis(fm::FrictionModel, at::Atoms; kvargs...)
+    return NamedTuple{fm.model_ids}(basis(mo, at; kvargs...) for mo in values(fm.matrixmodels))
     #return Dict(key => basis(mo, at; kvargs...) for (key,mo) in fm.matrixmodels)
 end
 
-function matrix(fm::DFrictionModel, at::Atoms; kvargs...) 
-    return NamedTuple{fm.names}(matrix(mo, at; kvargs...) for mo in values(fm.matrixmodels))
+function matrix(fm::FrictionModel, at::Atoms; kvargs...) 
+    return NamedTuple{fm.model_ids}(matrix(mo, at; kvargs...) for mo in values(fm.matrixmodels))
+end
+
+function Base.length(fm::FrictionModel, args...)
+    return sum(length(mo, args...) for mo in values(fm.matrixmodels))
 end
 
 # site_zzz = site::Symbol or zzz::Union{AtomicNumber,Tuple{AtomicNumber,AtomicNumber}}
-function ACE.params(fm::DFrictionModel; kvargs... ) 
-    #names = map(Symbol,(s for s in keys(fm.matrixmodels)))
-    return NamedTuple{fm.names}(params(mo; kvargs...) for mo in values(fm.matrixmodels))
+function ACE.params(fm::FrictionModel; model_ids=fm.model_ids, kvargs... ) 
+    #model_ids = map(Symbol,(s for s in keys(fm.matrixmodels)))
+    return NamedTuple{fm.model_ids}(params(fm.matrixmodels[s]; kvargs...) for s in model_ids)
 end
 
-function ACE.nparams(fm::DFrictionModel; kvargs... ) 
-    return sum(ACE.nparams(mo; kvargs...) for mo in values(fm.matrixmodels))
+function ACE.nparams(fm::FrictionModel; model_ids=fm.model_ids, kvargs... ) 
+    return sum(ACE.nparams(fm.matrixmodels[s]; kvargs...) for s in model_ids)
 end
 
-function ACE.set_params!(fm::DFrictionModel, θ::NamedTuple)
+function ACE.set_params!(fm::FrictionModel, θ::NamedTuple)
     for s in keys(θ) 
         ACE.set_params!(fm.matrixmodels[s], θ[s])
     end
 end
 
-function ACE.scaling(fm::DFrictionModel, p::Int)
-    return NamedTuple{fm.names}( ACE.scaling(mo,p) for mo in values(fm.matrixmodels))
+get_ids(fm::FrictionModel) = fm.model_ids
+
+function ACE.scaling(fm::FrictionModel, p::Int)
+    return NamedTuple{fm.model_ids}( ACE.scaling(mo,p) for mo in values(fm.matrixmodels))
 end
 
-
-function Gamma(M::EqACEMatrixModel, at::Atoms; kvargs...) 
-    return sum(matrix(fm.eq, at; kvargs...))
-end
-
-function Sigma(M::EqACEMatrixModel, at::Atoms; kvargs...) 
-    return cholesky(Gamma(M, at; kvargs...) ) 
-end
-
-function Gamma(M::CovACEMatrixModel, at::Atoms; kvargs...) 
+function Gamma(M::MatrixModel, at::Atoms; kvargs...) 
     Σ_vec = Sigma(M, at; kvargs...) 
     return sum(Σ*transpose(Σ) for Σ in Σ_vec)
 end
 
-function Sigma(M::CovACEMatrixModel, at::Atoms; kvargs...) 
+function Sigma(M::MatrixModel, at::Atoms; kvargs...) 
     return matrix(M, at; kvargs...) 
 end
-
-
-function Gamma(M::InvACEMatrixModel, at::Atoms; kvargs...) 
-    Σ_vec = Sigma(M, at; kvargs...) 
-    return sum(Σ*transpose(Σ) for Σ in Σ_vec)
-end
-
-function Sigma(M::InvACEMatrixModel, at::Atoms; kvargs...) 
-    return matrix(M, at; kvargs...) 
-end
-
-
-
-
-
-# function Gamma(M::CovACEMatrixCalc, at::Atoms; 
-#         sparse=:sparse, 
-#         filter=(_,_)->true, 
-#         T=Float64, 
-#         filtermode=:new) 
-#     return Gamma(Sigma(M, at; sparse=sparse, filter=filter, T=T, 
-#                             filtermode=filtermode)) 
-# end
-
-# function Gamma(Σ_vec::Vector{<:AbstractMatrix{SVector{3,T}}}) where {T}
-#     return sum(Σ*transpose(Σ) for Σ in Σ_vec)
-# end
-
-# function Sigma(B, c::SVector{N,Vector{Float64}}) where {N}
-#     return [Sigma(B, c, i) for i=1:N]
-# end
-# function Sigma(B, c::SVector{N,Vector{Float64}}, i::Int) where {N}
-#     return Sigma(B,c[i])
-# end
-# function Sigma(B, c::Vector{Float64})
-#     return sum(B.*c)
-# end
-
-# function Gamma(B, c::SVector{N,Vector{Float64}}) where {N}
-#     return Gamma(Sigma(B, c))
-# end
-
-# function Gamma(M::InvACEMatrixCalc, at::Atoms; sparse=:sparse, filter=(_,_)->true, T=Float64, filtermode=:new) 
-#     Σ_vec = Sigma(M, at; sparse=sparse, filter=filter, T=T, filtermode=filtermode) 
-#     return sum(Σ*transpose(Σ) for Σ in Σ_vec)
-# end
 
 end

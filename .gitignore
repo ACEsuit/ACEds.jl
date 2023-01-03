@@ -2,3 +2,4 @@ Manifest.toml
 *.json
 *.csv
 *.jld
+.ipynb_checkpoints

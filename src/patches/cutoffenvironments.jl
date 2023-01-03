@@ -1,4 +1,5 @@
 module CutoffEnv
+
 export AbstractCutoff, EllipsoidCutoff, SphericalCutoff, DSphericalCutoff
 export env_filter, env_transform, env_cutoff
 

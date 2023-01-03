@@ -1,18 +1,15 @@
 module ACEds
 
+# monkey patching to fix minor ACE bug:
 include("./patches/ACEfixes.jl")
-#include("./aspecies1_basis.jl")
-#include("./siteDiffusion.jl")
+# utility functions for conversion of arrays, manipulation of bases and generation of bases for bond environments
 include("./utils.jl")
+# utility functions for importing and internally storing data of friction tensors/matrices 
 include("./datautils.jl")
-include("./cutoffenvironments.jl")
-include("./matrixmodels3.jl")
-include("./frictionmodels3.jl")
-include("./frictionfit/frictionfit.jl")
-#include("./covmatrixmodels.jl")
-# include("./futils.jl")
-include("./linsolvers.jl")
-# include("./onsitefit.jl")
+include("./patches/cutoffenvironments.jl")
+include("./matrixmodels.jl")
+include("./frictionmodels.jl")
+include("./frictionfit.jl")
 include("./patches/ACEbonds_patches.jl")
 include("./patches/symmetrization.jl")
 include("./patches/symeuclideanmatrix.jl")
