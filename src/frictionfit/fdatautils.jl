@@ -1,7 +1,7 @@
 """
-Function to convert FrictionData to a format that can be used for training with ffm::FluxFrictionModel2 
+Function to convert FrictionData to a format that can be used for training with ffm::FluxFrictionModel 
 """
-function flux_assemble(data::Array{FrictionData}, fm::FrictionModel, ffm::FluxFrictionModel2; weighted=true, matrix_format=:dense_reduced)
+function flux_assemble(data::Array{FrictionData}, fm::FrictionModel, ffm::FluxFrictionModel; weighted=true, matrix_format=:dense_reduced)
     @assert keys(fm.matrixmodels) == ffm.model_ids
     transforms = get_transform(ffm)
     return flux_assemble(data, fm, transforms; matrix_format= matrix_format, weighted=weighted)

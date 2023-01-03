@@ -8,16 +8,16 @@ import ACEds.FrictionModels: get_ids
 using Flux
 import ACE: params, set_params!
 using Random: randn!
-include("./fluxmodels.jl")
+include("./frictionfit/fluxmodels.jl")
 
 using ACEds.DataUtils: FrictionData
 using ACEds.MatrixModels: basis
 using ProgressMeter
 
-include("./fdatautils.jl")
+include("./frictionfit/fdatautils.jl")
 
 using LinearAlgebra: I, transpose, UniformScaling, Diagonal
-include("./paramtransforms.jl")
+include("./frictionfit/paramtransforms.jl")
 
 
 end

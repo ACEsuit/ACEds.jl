@@ -1,5 +1,6 @@
 using SparseArrays
 using LinearAlgebra
+using StaticArrays
 import Base: reinterpret
 
 function  compress_matrix(Γ::AbstractMatrix{T}, friction_indices) where {T}

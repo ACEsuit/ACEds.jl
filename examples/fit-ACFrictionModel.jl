@@ -64,7 +64,7 @@ c = params(fm;format=:matrix, joinsites=true)
 
 
 
-ffm = FluxFrictionModel2(c)
+ffm = FluxFrictionModel(c)
 
 using ACEds.FrictionFit: set_params!
 set_params!(ffm; sigma=1E-8)
