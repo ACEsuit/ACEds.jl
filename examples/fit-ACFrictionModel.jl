@@ -10,8 +10,9 @@ using ACE
 using ACEds: ac_matrixmodel
 using Random
 using ACEds.Analytics
-path_to_data = "/Users/msachs2/Documents/Projects/data/friction_tensors/H2Cu"
-fname = "/h2cu_20220713_friction"
+using ACEds.FrictionFit
+path_to_data = # path to the ".json" file that was generated using the code in "tutorial/import_friction_data.ipynb"
+fname =  # name of  ".json" file 
 filename = string(path_to_data, fname,".json")
 rdata = ACEds.DataUtils.json2internal(filename; blockformat=true);
 
@@ -45,30 +46,26 @@ m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64);n_rep=2,
 
 fm= FrictionModel((m_cov, m_equ));
 model_ids = get_ids(fm)
-#mdata = Dict( tt => ACEds.DataUtils.build_feature_data(fm, data[tt]; matrix_format= :dense_reduced ) for tt in ["train", "test"] )
 
 #%%
-using ACEds.FrictionFit
-#model_ids = (:cov, :inv)
-fm= FrictionModel((m_cov,m_equ));
-#NamedTuple{model_ids}(LinDataTransformation() for id in model_ids)
 
-#TODO: decide on handling of matrix format 
+fm= FrictionModel((m_cov,m_equ));
+
+
 fdata =  Dict(
     tt => [FrictionData(d.at,
             d.friction_tensor, 
             d.friction_indices; 
             weights=Dict("diag" => 2.0, "sub_diag" => 1.0, "off_diag"=>1.0)) for d in data[tt]] for tt in ["test","train"]
 );
-#FrictionData(atoms::Atoms, friction_tensor, friction_indices;   weights=Dict("diag" => 1.0, "sub_diag" => 1.0, "off_diag"=>1.0), 
-#                                                                friction_tensor_ref=nothing)
+                                                              friction_tensor_ref=nothing)
 #%%
 c = params(fm;format=:matrix, joinsites=true)
 
 
 
 ffm = FluxFrictionModel2(c)
-#ffm = FluxFrictionModel(c)
+
 using ACEds.FrictionFit: set_params!
 set_params!(ffm; sigma=1E-8)
 
