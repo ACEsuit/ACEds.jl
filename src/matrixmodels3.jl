@@ -4,7 +4,7 @@ module MatrixModels
 export SiteModels, OnSiteModels, OffSiteModels, SiteInds, SiteModel
 export MatrixModel, ACMatrixModel, BCMatrixModel
 export Symmetry, Invariant, Covariant, Equivariant
-export matrix, basis, params, nparams, set_params!
+export matrix, basis, params, nparams, set_params!, get_id
 
 using JuLIP, ACE, ACEbonds
 using JuLIP: chemical_symbol
@@ -329,6 +329,8 @@ function allocate_B(M::MatrixModel, at::Atoms, sparsity= :sparse, T=Float64)
     end
     return (onsite=B_onsite, offsite=B_offsite)
 end
+
+get_id(M::MatrixModel) = M.id
 
 # Atom-centered matrix models: 
 include("./acmatrixmodels.jl")

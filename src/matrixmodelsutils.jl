@@ -2,6 +2,7 @@ using ACEds.CutoffEnv: SphericalCutoff, DSphericalCutoff
 using ACEds.Utils: SymmetricBondSpecies_basis
 using ACE
 using ACEds.MatrixModels
+
 function ac_matrixmodel( property; n_rep = 3, species_friction = [:H], species_env = [:Cu],
     maxorder_on=2, maxdeg_on=5,  rcut_on = 7.0, r0_on=.4*rcut_on, rin_on=.4, pcut_on=2, pin_on=2,
     p_sel_on = 2, 

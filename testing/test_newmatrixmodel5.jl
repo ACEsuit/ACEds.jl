@@ -41,62 +41,66 @@ m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64);n_rep=2,
         maxorder_dict_off = Dict( :H => 0), 
         weight_cat_off = Dict(:bond=> .5, :H => 1.0, :Cu=> 1.0)
     );
-mb = DFrictionModel((m_cov, m_inv, m_equ));
 
 
-mdata = Dict( tt => ACEds.DataUtils.build_feature_data(mb, data[tt]; matrix_format= :dense_reduced ) for tt in ["train", "test"] )
+fm= FrictionModel((m_cov, m_equ));
+model_ids = get_ids(fm)
+#mdata = Dict( tt => ACEds.DataUtils.build_feature_data(fm, data[tt]; matrix_format= :dense_reduced ) for tt in ["train", "test"] )
 
 #%%
 using ACEds.FrictionFit
-model_ids = (:cov, :equ)
+#model_ids = (:cov, :inv)
+fm= FrictionModel((m_cov,m_equ));
 #NamedTuple{model_ids}(LinDataTransformation() for id in model_ids)
 
-mdata3 =  Dict(
-    tt => ACEds.DataUtils.transform_data(mdata[tt]; model_ids=model_ids ) for tt in ["test","train"]
+#TODO: decide on handling of matrix format 
+fdata =  Dict(
+    tt => [FrictionData(d.at,
+            d.friction_tensor, 
+            d.friction_indices; 
+            weights=Dict("diag" => 2.0, "sub_diag" => 1.0, "off_diag"=>1.0)) for d in data[tt]] for tt in ["test","train"]
 );
-
-
+#FrictionData(atoms::Atoms, friction_tensor, friction_indices;   weights=Dict("diag" => 1.0, "sub_diag" => 1.0, "off_diag"=>1.0), 
+#                                                                friction_tensor_ref=nothing)
 #%%
-
-# for format in [:matrix,:native]
-#     for joinsite in [true, false]
-#         c = params(mb;format=:matrix, joinsites=true)
-#         set_params!(mb,c)
-#         c2 = params(mb;format=:matrix, joinsites=true)
-#         @show c == c2
-#     end
-# end
-
-c = params(mb;format=:matrix, joinsites=true)
+c = params(fm;format=:matrix, joinsites=true)
 
 
 
-m_flux = FluxFrictionModel(c,model_ids)
-#m_flux = FluxFrictionModel(c)
-m_flux = reset_params(m_flux ; sigma=1E-8)
+ffm = FluxFrictionModel2(c)
+#ffm = FluxFrictionModel(c)
+using ACEds.FrictionFit: set_params!
+set_params!(ffm; sigma=1E-8)
+
+
+flux_data = Dict( tt=> flux_assemble(fdata[tt], fm, ffm; weighted=true, matrix_format=:dense_reduced) for tt in ["train","test"]);
+
 
 
 loss_traj = Dict("train"=>Float64[], "test" => Float64[])
-n_train, n_test = length(mdata3["train"]), length(mdata3["test"])
+n_train, n_test = length(flux_data["train"]), length(flux_data["test"])
 epoch = 0
 
 
-#opt = Flux.setup(Adam(5E-5, (0.9999, 0.99999)), m_flux)
-opt = Flux.setup(Adam(1E-3, (0.99, 0.999)), m_flux)
-dloader5 = DataLoader(mdata3["train"], batchsize=10, shuffle=true)
+opt = Flux.setup(Adam(5E-5, (0.9999, 0.99999)),ffm)
+#opt = Flux.setup(Adam(1E-4, (0.99, 0.999)),ffm)
+dloader5 = DataLoader(flux_data["train"], batchsize=10, shuffle=true)
 nepochs = 10
-@time l2_loss(m_flux, mdata3["train"])
-@time Flux.gradient(l2_loss, m_flux, mdata3["train"][2:3])[1]
-@time Flux.gradient(l2_loss, m_flux, mdata3["train"][10:15])[1][:c]
+@time l2_loss(ffm, flux_data["train"])
+@time Flux.gradient(l2_loss,ffm, flux_data["train"][2:3])[1]
+@time Flux.gradient(l2_loss,ffm, flux_data["train"][10:15])[1][:c]
+typeof(ffm.c)
 
+
+using ACEds.FrictionFit: weighted_l2_loss
 for _ in 1:nepochs
     epoch+=1
-    for d in dloader5
-        ∂L∂m = Flux.gradient(l2_loss, m_flux, d)[1]
-        Flux.update!(opt, m_flux, ∂L∂m)       # method for "explicit" gradient
+    @time for d in dloader5
+        ∂L∂m = Flux.gradient(weighted_l2_loss,ffm, d)[1]
+        Flux.update!(opt,ffm, ∂L∂m)       # method for "explicit" gradient
     end
     for tt in ["test","train"]
-        push!(loss_traj[tt], l2_loss(m_flux,mdata3[tt]))
+        push!(loss_traj[tt], weighted_l2_loss(ffm,flux_data[tt]))
     end
     println("Epoch: $epoch, Abs Training Loss: $(loss_traj["train"][end]), Test Loss: $(loss_traj["test"][end])")
 end
@@ -104,10 +108,12 @@ println("Epoch: $epoch, Abs Training Loss: $(loss_traj["train"][end]), Test Loss
 println("Epoch: $epoch, Avg Training Loss: $(loss_traj["train"][end]/n_train), Test Loss: $(loss_traj["test"][end]/n_test)")
 
 
+c_fit = params(ffm)
+
 
 mbf = DFrictionModel((mb.matrixmodels[s] for s in model_ids));
 
-c_fit =  NamedTuple{model_ids}(m_flux.c)
+c_fit =  NamedTuple{model_ids}(ffm.c)
 
 ACE.set_params!(mbf, c_fit)
 

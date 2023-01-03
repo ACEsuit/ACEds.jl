@@ -3,15 +3,19 @@ import JuLIP: Atoms, energy, forces, mat
 using PrettyTables
 using StaticArrays: SVector
 using ACEds.Utils: compress_matrix
-using ACEds.MatrixModels: MatrixModel
+using ACEds.MatrixModels: BCMatrixModel
 
-struct FrictionData <: ACEfit.AbstractData
+# SymmetriMatrixData
+# MatrixData
+# FrictionData assumes non-linear fit
+
+struct SymmetriMatrixData <: ACEfit.AbstractData
     atoms::Atoms
-    friction_tensor #must be in compressed form
-    friction_indices
+    matrix_obs #must be in compressed form
+    matrix_indices
     weights
     vref
-    function FrictionData(atoms::Atoms, friction_tensor, friction_indices, 
+    function SymmetriMatrixData(atoms::Atoms, matrix_obs, matrix_indices, 
         weights, vref)
 
         # set energy, force, and virial keys for this configuration
@@ -22,7 +26,7 @@ struct FrictionData <: ACEfit.AbstractData
         else
             w = Dict("diag" => 1.0, "sub_diag" => 1.0, "off_diag"=>1.0)
         end
-        return new(atoms, friction_tensor, friction_indices, w, vref)
+        return new(atoms, matrix_obs, matrix_indices, w, vref)
     end
 end
 
@@ -35,27 +39,28 @@ function count_observations(n_atoms::Int, symb::Symbol)
         return 9 * Int((n_atoms^2-n_atoms)/2)
     end
 end
-function ACEfit.count_observations(d::FrictionData)
-    n_atoms = length(d.friction_indices)
+function ACEfit.count_observations(d::SymmetriMatrixData)
+    n_atoms = length(d.matrix_indices)
     return sum(count_observations(n_atoms, symb) for symb in [:diag, :subdiag, :offdiag])
 end
 
-function ACEfit.feature_matrix(d::FrictionData, m::MatrixModel)
+#TODO: update & adapt for FrictionModel 
+function ACEfit.feature_matrix(d::SymmetriMatrixData, m::BCMatrixModel)
     dm = zeros(ACEfit.count_observations(d), length(m))
     #dm = Array{Float64}(undef, ACEfit.count_observations(d), length(m))
-    #filter(i) = (i in d.friction_indices)
-    filter(i, at) = (i in d.friction_indices)
-    B = basis(m, d.atoms, :sparse, filter)
-    #B = map(x->compress_matrix(x,d.friction_indices), basis(m, d.atoms, filter))
+    #filter(i) = (i in d.matrix_indices)
+    filter(i, at) = (i in d.matrix_indices)
+    B = basis(m, d.atoms; sparsity =:sparse, filter=filter)
+    #B = map(x->compress_matrix(x,d.matrix_indices), basis(m, d.atoms, filter))
     for i =1:length(m)
-        Γ2y!(view(dm,:,i),compress_matrix(B[i], d.friction_indices))
+        Γ2y!(view(dm,:,i),compress_matrix(B[i], d.matrix_indices))
     end
     return dm
 end
 
-function ACEfit.target_vector(d::FrictionData)
+function ACEfit.target_vector(d::SymmetriMatrixData)
     y = Array{Float64}(undef, ACEfit.count_observations(d))
-    Γ2y!(y, d.friction_tensor)
+    Γ2y!(y, d.matrix_obs)
     return y
 end
 
@@ -120,9 +125,9 @@ function Γ2y!(y, Γ)
     copy_offdiag!(view(y,i:length(y)), Γ)
 end
 
-function ACEfit.weight_vector(d::FrictionData)
+function ACEfit.weight_vector(d::SymmetriMatrixData)
     w = Array{Float64}(undef, ACEfit.count_observations(d))
-    n_atoms = length(d.friction_indices) 
+    n_atoms = length(d.matrix_indices) 
     i = 1
     w[i:(i+3*n_atoms-1)] .= d.weights["diag"]
     i += 3*n_atoms
@@ -131,10 +136,6 @@ function ACEfit.weight_vector(d::FrictionData)
     w[i:end] .= 2.0 * d.weights["off_diag"]
     return w
 end
-
-#
-
-
 
 # function config_type(d::FrictionData)
 #     config_type = "default"
