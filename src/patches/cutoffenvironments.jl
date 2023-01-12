@@ -11,7 +11,8 @@ using ACEbase: evaluate, evaluate!
 
 abstract type AbstractCutoff end
 
-struct EllipsoidCutoff{T} <:AbstractCutoff
+abstract type BondCutoff <: AbstractCutoff end
+struct EllipsoidCutoff{T} <: BondCutoff
     rcutbond::T 
     rcutenv::T
     zcutenv::T
@@ -58,7 +59,7 @@ env_filter(r::StaticVector{3,T}, cutoff::SphericalCutoff) where {T<:Real} = (sum
 
 
 Warning: unlike in the case of EllipsoidCutoff the function env_transform with 
-SphericalCutoff does not map the configuraiton to a unit sphere. 
+SphericalCutoff does not map the configuraiton to the unit sphere. 
 """
 function env_transform(Rs::AbstractVector{<: SVector}, 
     Zs::AbstractVector{<: AtomicNumber}, 
@@ -71,7 +72,7 @@ function env_transform(Rs::AbstractVector{<: SVector},
     return cfg
 end
 
-struct DSphericalCutoff{T} <: AbstractCutoff
+struct DSphericalCutoff{T} <: BondCutoff
     rcut::T 
 end
 env_cutoff(sc::DSphericalCutoff) = sc.rcut

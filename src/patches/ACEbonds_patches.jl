@@ -12,10 +12,10 @@ import ACEbonds: bonds, _get_bond_env
 * rcutbond: include all bonds (i,j) such that rij <= rcutbond 
 * `rcutenv`: include all bond environment atoms k such that `|rk - mid| <= rcutenv` 
 * `env_filter` : `env_filter(X) == true` if particle `X` is to be included; `false` if to be discarded from the environment
-* `indsf` : can either be of type Array{<:Int} in which case the bond iterator iterates only over  bonds between atoms contained in indsf, or 
-   indsf can be of the form of a filter function filter(::Int,at::AbstractAtoms)::Bool, that returns `true` if bonds to the ith atom
-   in the configuration `at` should be considered, and `false`` otherwise. In the latter case the iterator only iterates over bonds between atom pairs
-   that both satisfy the filter criterion.
+* `indsf` : can either be of type Array{<:Int} in which case the bond iterator iterates only over  bonds between atom pairs where the indices of both atoms are contained in indsf. 
+Alternatively, indsf can also be of the form of a filter function filter(i::Int,at::AbstractAtoms)::Bool, that returns `true` if bonds to the ith atom
+   in the configuration `at` are to be included in the iterator, and `false`` otherwise. The iterator only iterates over bonds between atom pairs
+   where both atoms satisfy the filter criterion.
 """
 bonds(at::Atoms, rcutbond, rcutenv, env_filter, indsf) = FilteredBondsIterator(at, rcutbond, rcutenv, env_filter, indsf)
 

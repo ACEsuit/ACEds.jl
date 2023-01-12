@@ -1,6 +1,6 @@
 module FrictionFit
 
-export params, FluxFrictionModel, l2_loss, set_params!, FluxFrictionModel2
+export params, FluxFrictionModel, l2_loss, set_params!
 export flux_assemble
 
 using ACEds.FrictionModels: FrictionModel

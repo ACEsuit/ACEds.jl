@@ -48,20 +48,6 @@ function Base.show(io::IO, φ::E) where {E<:AntiSymmetricEuclideanMatrix}
        isrealB(::$E{T}) where {T} = (T == real(T))
        isrealAA(::$E) = false
  
- 
-       #fltype(::EuclideanMatrix{T}) where {T} = T
- 
-       # EuclideanMatrix{T}() where {T <: Number} = EuclideanMatrix{T}(zero(SMatrix{3, 3, T, 9}), :general,Val(:general))
-       # EuclideanMatrix(T::DataType=Float64) = EuclideanMatrix{T}()
-       # EuclideanMatrix(T::DataType, symmetry::Symbol) = EuclideanMatrix{T,Val{symmetry}}(zero(SMatrix{3, 3, T, 9}), symmetry, Val{symmetry})
-       # EuclideanMatrix(val::SMatrix{3, 3, T, 9}) where {T <: Number} = EuclideanMatrix(val, :general,Val(:general)) # should depend on symmetry of val
- 
-       # $E{T}() where {T <: Number} = $E{T}(zero(SMatrix{3, 3, T, 9}),:general)
-       # $E(T::DataType=Float64) = $E{T}()
-       # $E(T::DataType, symmetry::Symbol) = $E(zero(SMatrix{3, 3, T, 9}), symmetry)
-       # $E(val::SMatrix{3, 3, T, 9}) where {T <: Number} = $E(val, :general) # should depend on symmetry of val
-       # $E(val::SMatrix{3, 3, T, 9}, symmetry::Symbol) where {T <: Number} = $E{T}(val, symmetry)
- 
        $E{T}() where {T <: Number} = $E{T}(zero(SMatrix{3, 3, T, 9}))
        $E(T::DataType=Float64) = $E{T}()
  
@@ -81,41 +67,11 @@ function Base.show(io::IO, φ::E) where {E<:AntiSymmetricEuclideanMatrix}
        end
  
        rot3Dcoeffs(::$E,T=Float64) = Rot3DCoeffsEquiv{T,1}(Dict[], ClebschGordan(T))
-       
- 
-             # differentiation - cf #27
-             # *(φ::EuclideanMatrix, dAA::SVector) = φ.val * dAA'
- 
-             #coco_init(phi::EuclideanMatrix{CT}, l, m, μ, T, A) where {CT<:Real} = (
-             #      (l <= 2 && abs(m) <= l && abs(μ) <= l)
-             #         ? vec([EuclideanMatrix(conj.(transpose(mrmatrices[(m,μ,i,j)]))) for i=1:3 for j=1:3])
-             #         : coco_zeros(phi, l, m, μ, T, A)  )
- 
- 
+        
        end
     ) 
  end
  
-#  for (E,Val_E) in zip((:SymmetricEuclideanMatrix, :AntiSymmetricEuclideanMatrix) ,
-#                    (:(Val{:ACE_SymmetricEuclideanMatrix}),:(Val{:ACE_AntiSymmetricEuclideanMatrix})) )
-#     eval(
-#        quote
- 
-#        function read_dict(::$Val_E, D::Dict)
-#           T = read_dict(D["T"])
-#           valr = SMatrix{3, 3, T, 9}(read_dict(D["valr"]))
-#           vali = SMatrix{3, 3, T, 9}(read_dict(D["vali"]))
-#           return $E{T}(valr + im * vali)
-#        end
-            
-#     end
-#     ) 
-#  end
-#  function coco_init(phi::EuclideanMatrix{CT}, l, m, μ, T, A) where {CT<:Real}
-#        return ( (l <= 2 && abs(m) <= l && abs(μ) <= l)
-#              ? vec([EuclideanMatrix(conj.(mrmatrices[(l=l,m=-m,mu=-μ,i=i,j=j)])) for i=1:3 for j=1:3])
-#              : ACE.coco_zeros(phi, l, m, μ, T, A)  )
-#  end
  function coco_init(phi::SymmetricEuclideanMatrix{CT}, l, m, μ, T, A) where {CT<:Real}
        return ( ( (l == 2 && abs(m) <= 2 && abs(μ) <= 2) || (l == 0 && abs(m) == 0 && abs(μ) == 0) )
           ? vec([SymmetricEuclideanMatrix(conj.(mrmatrices[(l=l,m=-m,mu=-μ,i=i,j=j)])) for i=1:3 for j=1:3])
@@ -126,25 +82,15 @@ function Base.show(io::IO, φ::E) where {E<:AntiSymmetricEuclideanMatrix}
           ? vec([AntiSymmetricEuclideanMatrix(conj.(mrmatrices[(l=l,m=-m,mu=-μ,i=i,j=j)])) for i=1:3 for j=1:3])
           : coco_zeros(phi, l, m, μ, T, A)  )
  end
- #       @error "The value of field phi.symmetry of phi::EuclideanMatrix must be one of the following symbols :general, :symmetric, or :antisymmetric."
- #    end
- # end
  
  for E = (:SymmetricEuclideanMatrix, :AntiSymmetricEuclideanMatrix) 
     eval(
        quote
-       #coco_init(phi::EuclideanMatrix{CT}, l, m, μ, T, A) where {CT<:Real} = (
-       #   (l <= 2 && abs(m) <= l && abs(μ) <= l)
-       #      ? vec([EuclideanMatrix(conj.(mrmatrices[(l=l,m=-m,mu=-μ,i=i,j=j)])) for i=1:3 for j=1:3])
-       #      : coco_zeros(phi, l, m, μ, T, A)  )
- 
-       #coco_init(::EuclideanMatrix{CT}) where {CT<:Real} = [EuclideanMatrix(SMatrix{3,3,Complex{CT},9}([1.0,0,0,0,1.0,0,0,0,1.0]))]       
+    
        coco_type(φ::$E) = typeof(complex(φ))
        coco_type(::Type{$E{T}}) where {T} = $E{complex(T)}
  
-       # This is slightly different from implementation in EuclideanVector!
        coco_zeros(φ::$E, ll, mm, kk, T, A) =  zeros(typeof(complex(φ)), 9)
-       #EuclideanMatrix.(zeros(SMatrix{3, 3, Complex{T}, 9},9))
  
        coco_filter(::$E, ll, mm) =
                    iseven(sum(ll)) && (abs(sum(mm)) <= 2)
@@ -155,7 +101,6 @@ function Base.show(io::IO, φ::E) where {E<:AntiSymmetricEuclideanMatrix}
              iseven(sum(ll))
  
        coco_dot(u1::$E, u2::$E) = sum(transpose(conj.( u1.val)) * u2.val)
-       #dot(u1.val, u2.val)
  
        end
     )
