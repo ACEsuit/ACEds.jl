@@ -1,11 +1,11 @@
 
 
-using ACEds, Test, Printf, LinearAlgebra, StaticArrays, BenchmarkTools
+using ACEds, Test, Printf, LinearAlgebra, StaticArrays
 
 ##
 @testset "ACEds.jl" begin
     # ------------------------------------------
-    #@testset "E2MatrixModel" begin include("test_E2MatrixModel.jl") end
+    @testset "Basic test" begin include("test_model_evaluation.jl") end
 
 
 end

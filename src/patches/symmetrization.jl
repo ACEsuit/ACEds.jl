@@ -1,5 +1,4 @@
 using ACEbonds
-using ACEbonds: BondEnvelope, cutoff_env, cutoff_radialbasis, EllipsoidBondEnvelope, cutoff
 using ACE: EuclideanMatrix
 using ACE: coco_dot, SymmetricBasis
 using LinearAlgebra

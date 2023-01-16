@@ -20,7 +20,7 @@ end
 function _add_default_transforms(transforms::NamedTuple, model_ids)
     return Tuple( (haskey(transforms,s) ? transforms[s] : 
     begin
-        @warn "Transform for model with ID :$s missing. Using Identity transformation as default for this model. "
+        @info "Transform for model with ID :$s not provided. Using Identity transformation as default for this model. "
         IdentityTransform() 
     end
         ) for s in model_ids

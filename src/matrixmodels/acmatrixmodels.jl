@@ -41,7 +41,7 @@ end
 function matrix!(M::ACMatrixModel, at::Atoms, Σ, filter=(_,_)->true) 
     site_filter(i,at) = (haskey(M.onsite.models, at.Z[i]) && filter(i, at))
     for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
-        if site_filter(i, at)
+        if site_filter(i, at) && length(neigs) > 0
             # evaluate onsite model
             Zs = at.Z[neigs]
             sm = _get_model(M, at.Z[i])
@@ -70,7 +70,7 @@ function basis!(B, M::ACMatrixModel, at::Atoms, filter=(_,_)->true )
     
     site_filter(i,at) = (haskey(M.onsite.models, at.Z[i]) && filter(i, at))
     for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
-        if site_filter(i, at)
+        if site_filter(i, at) && length(neigs) > 0
             Zs = at.Z[neigs]
             sm = _get_model(M, at.Z[i])
             inds = get_range(M, at.Z[i])

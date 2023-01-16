@@ -28,8 +28,9 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 
 [compat]
-ACE = "= 0.12.40"
-JuLIP = "0.13.1"
+ACE = "0.12.45"
+ACEatoms = "0.0.14"
+JuLIP = "0.13.3"
 StaticArrays = "1.0"
 julia = "1.8"
 

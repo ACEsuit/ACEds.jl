@@ -1,5 +1,5 @@
 using ACE, StaticArrays,JuLIP
-using ACEbonds: BondEnvelope, cutoff_env, cutoff_radialbasis, EllipsoidBondEnvelope, cutoff
+#using ACEbonds:  cutoff_env, cutoff_radialbasis, cutoff
 
 using Random, Printf, Test, LinearAlgebra, ACE.Testing
 using ACE: evaluate, evaluate_d, SymmetricBasis, PIBasis, EuclideanMatrix

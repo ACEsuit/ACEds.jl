@@ -19,7 +19,7 @@ function flux_data(d::FrictionData,fm::FrictionModel, transforms::NamedTuple, ma
     else
         friction_tensor = _format_friction(Val(matrix_format), d.friction_tensor-d.friction_tensor_ref)
     end
-    B = basis(fm,d.atoms; join_sites=join_sites)  
+    B = basis(fm, d.atoms; join_sites=join_sites)  
     B = Tuple(map(b-> transform_basis(_format_basis(Val(matrix_format),b, d.friction_indices), transforms[s]), B[s] ) for s in keys(B))
     if weighted
         W = _format_friction(Val(matrix_format),weight_matrix(d, Val(matrix_format)))
@@ -30,7 +30,9 @@ end
 function flux_assemble(data::Array{FrictionData}, fm::FrictionModel, transforms::NamedTuple; matrix_format=:dense_reduced, weighted=true, join_sites=true)
     #model_ids = (isempty(model_ids) ? keys(fm.matrixmodels) : model_ids)
     #feature_data = Array{Float64}(undef, ACEfit.count_observations(d))
-    return @showprogress [(flux_data(d,fm, transforms, matrix_format, weighted, join_sites)) for d in data]
+    return @showprogress [  begin
+                            flux_data(d,fm, transforms, matrix_format, weighted, join_sites)
+                            end for (i,d) in enumerate(data)]
 end
 
 function weight_matrix(d::FrictionData, ::Val{:dense_reduced})

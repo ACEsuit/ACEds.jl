@@ -10,7 +10,7 @@ using JuLIP, ACE, ACEbonds
 using JuLIP: chemical_symbol
 using ACE: SymmetricBasis, LinearACEModel, evaluate
 import ACE: nparams, params, set_params!
-using ACEbonds: BondEnvelope, bonds #, env_cutoff
+using ACEbonds: bonds #, env_cutoff
 using LinearAlgebra
 using StaticArrays
 using SparseArrays
