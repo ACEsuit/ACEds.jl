@@ -1,6 +1,6 @@
 module MatrixModels
 
-
+using ACEds
 export SiteModels, OnSiteModels, OffSiteModels, SiteInds, SiteModel
 export MatrixModel, ACMatrixModel, BCMatrixModel
 export Symmetry, Invariant, Covariant, Equivariant
@@ -19,7 +19,7 @@ import ACEbase: evaluate, evaluate!
 
 import ACE: scaling
 
-using ACEds.CutoffEnv
+using ACEbonds.BondCutoffs
 
 
 #ACE.scaling(m::SiteModel,p::Int) = ACE.scaling(m.model.basis,p)
