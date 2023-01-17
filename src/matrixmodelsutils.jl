@@ -1,4 +1,4 @@
-using ACEds: SphericalCutoff, DSphericalCutoff
+using ACEds.AtomCutoffs: SphericalCutoff
 #using ACEds.Utils: SymmetricBondSpecies_basis
 using ACE
 using ACEds.MatrixModels
@@ -74,7 +74,7 @@ function ac_matrixmodel( property; n_rep = 3, species_friction = [:H], species_e
 
     @info "Generate offsite basis"
 
-    env_off = ACEds.DSphericalCutoff(rcut_off)
+    env_off = ACEds.SphericalCutoff(rcut_off)
     @time offsite = SymmetricEllipsoidBondBasis(property;
                 maxorder = maxorder_off, 
                 p = p_sel_off, 
