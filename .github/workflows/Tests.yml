@@ -35,6 +35,7 @@ jobs:
         using Pkg
         Pkg.pkg"update"
         Pkg.pkg"registry add https://github.com/JuliaMolSim/MolSim.git"
+        Pkg.pkg"registry add https://github.com/ACEsuit/ACEregistry"
         Pkg.activate(".")
         Pkg.test("ACEds")
       shell: bash -c "julia --color=yes {0}"
