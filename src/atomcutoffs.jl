@@ -11,7 +11,7 @@ struct SphericalCutoff{T}
     rcut::T
 end
 
-env_cutoff(sc::phericalCutoff) = sc.rcut
+env_cutoff(sc::SphericalCutoff) = sc.rcut
 env_filter(r::T, cutoff::SphericalCutoff) where {T<:Real} = (r <= cutoff.rcut)
 env_filter(r::StaticVector{3,T}, cutoff::SphericalCutoff) where {T<:Real} = (sum(r.^2) <= cutoff.rcut^2)
 
@@ -38,7 +38,7 @@ end
 function env_transform(j::Int, 
     Rs::AbstractVector{<: SVector}, 
     Zs::AbstractVector{<: AtomicNumber}, 
-    dse::DSphericalCutoff)
+    dse::SphericalCutoff)
     # Y0 = State( rr = rrij, mube = :bond) # Atomic species of bond atoms does not matter at this stage.
     # cfg = Vector{typeof(Y0)}(undef, length(Rs)+1)
     # cfg[1] = Y0
