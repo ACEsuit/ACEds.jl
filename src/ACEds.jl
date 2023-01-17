@@ -6,7 +6,7 @@ module ACEds
 include("./utils.jl")
 # utility functions for importing and internally storing data of friction tensors/matrices 
 include("./datautils.jl")
-include("./patches/cutoffenvironments.jl")
+include("./atomcutoffs.jl")
 include("./matrixmodels.jl")
 include("./frictionmodels.jl")
 include("./frictionfit.jl")

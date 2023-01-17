@@ -26,23 +26,26 @@ data = Dict("train" => rdata[1:n_train], "test"=> rdata[n_train+1:end]);
 
 
 m_inv = ac_matrixmodel(ACE.Invariant(); n_rep = 2,
-        maxorder_dict_on = Dict( :H => 1), 
-        weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
-        maxorder_dict_off = Dict( :H => 0), 
-        weight_cat_off = Dict(:bond=> .5, :H => 1.0, :Cu=> 1.0)
+        species_maxorder_dict_on = Dict( :H => 1), 
+        species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
+        species_maxorder_dict_off = Dict( :H => 0), 
+        species_weight_cat_off = Dict(:H => 1.0, :Cu=> 1.0),
+        bond_weight = .5
     );
 m_cov = ac_matrixmodel(ACE.EuclideanVector(Float64);n_rep=3,
-        maxorder_dict_on = Dict( :H => 1), 
-        weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
-        maxorder_dict_off = Dict( :H => 0), 
-        weight_cat_off = Dict(:bond=> .5, :H => 1.0, :Cu=> 1.0)
+        species_maxorder_dict_on = Dict( :H => 1), 
+        species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
+        species_maxorder_dict_off = Dict( :H => 0), 
+        species_weight_cat_off = Dict(:H => 1.0, :Cu=> 1.0),
+        bond_weight = .5
     );
 
 m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64);n_rep=2, 
-        maxorder_dict_on = Dict( :H => 1), 
-        weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
-        maxorder_dict_off = Dict( :H => 0), 
-        weight_cat_off = Dict(:bond=> .5, :H => 1.0, :Cu=> 1.0)
+        species_maxorder_dict_on = Dict( :H => 1), 
+        species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
+        species_maxorder_dict_off = Dict( :H => 0), 
+        species_weight_cat_off = Dict(:H => 1.0, :Cu=> 1.0),
+        bond_weight = .5
     );
 
 
@@ -79,8 +82,8 @@ n_train, n_test = length(flux_data["train"]), length(flux_data["test"])
 epoch = 0
 
 
-opt = Flux.setup(Adam(5E-5, (0.9999, 0.99999)),ffm)
-#opt = Flux.setup(Adam(1E-4, (0.99, 0.999)),ffm)
+#opt = Flux.setup(Adam(5E-5, (0.9999, 0.99999)),ffm)
+opt = Flux.setup(Adam(1E-4, (0.99, 0.999)),ffm)
 dloader5 = DataLoader(flux_data["train"], batchsize=10, shuffle=true)
 nepochs = 10
 @time l2_loss(ffm, flux_data["train"])

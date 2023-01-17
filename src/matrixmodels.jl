@@ -1,6 +1,5 @@
 module MatrixModels
 
-using ACEds
 export SiteModels, OnSiteModels, OffSiteModels, SiteInds, SiteModel
 export MatrixModel, ACMatrixModel, BCMatrixModel
 export Symmetry, Invariant, Covariant, Equivariant
@@ -15,6 +14,8 @@ using LinearAlgebra
 using StaticArrays
 using SparseArrays
 using ACEds.Utils: reinterpret
+using ACEds.AtomCutoffs
+
 import ACEbase: evaluate, evaluate!
 
 import ACE: scaling
