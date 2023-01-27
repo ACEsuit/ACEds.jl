@@ -4,6 +4,8 @@ using ACE
 using ACEds.MatrixModels
 import ACEbonds: SymmetricEllipsoidBondBasis
 using ACEds
+using JuLIP: AtomicNumber
+
 function ACEbonds.SymmetricEllipsoidBondBasis(ϕ::ACE.AbstractProperty; 
     maxorder::Integer = nothing, 
     p = 1, 

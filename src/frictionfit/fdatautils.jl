@@ -6,6 +6,7 @@ function flux_assemble(data::Array{FrictionData}, fm::FrictionModel, ffm::FluxFr
     transforms = get_transform(ffm)
     return flux_assemble(data, fm, transforms; matrix_format= matrix_format, weighted=weighted)
 end
+
 _format_friction(::Val{:dense_reduced},Γ::Matrix{T}) where {T <:Real}= Γ
 _format_friction(::Val{:dense_reduced},Γ) = reinterpret(Matrix,Γ)
 _format_friction(::Val{:block_reduced},Γ) = reinterpret(Matrix{SMatrix{3, 3, Float64, 9}},Γ)
