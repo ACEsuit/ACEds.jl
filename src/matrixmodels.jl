@@ -174,7 +174,7 @@ _sort(z1,z2) = (z1<=z2 ? (z1,z2) : (z2,z1))
 _get_model(calc::MatrixModel, zz::Tuple{AtomicNumber,AtomicNumber}) = calc.offsite.models[_sort(zz...)]
 _get_model(calc::MatrixModel, z::AtomicNumber) =  calc.onsite.models[z]
 
-function ACE.params(mb::MatrixModel; format=:native, joinsites=false) # :vector, :matrix
+function ACE.params(mb::MatrixModel; format=:native, joinsites=true) # :vector, :matrix
     if joinsites  
         return hcat( ACE.params(mb, :onsite; format=format), 
                      ACE.params(mb, :offsite; format=format))

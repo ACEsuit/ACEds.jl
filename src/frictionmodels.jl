@@ -16,7 +16,7 @@ export FrictionModel
 abstract type AbstractFrictionModel end
 # TODO: field model_ids is renundant and my lead to inconsistencies. Remove or all model_ids to allow usage of subsets of models 
 struct FrictionModel <: AbstractFrictionModel
-    matrixmodels # can be of the form ::Dict{Symbol,ACEMatrixModel} or similar NamedTuple
+    matrixmodels # can be of the form ::Dict{Symbol,MatrixModel} or similar NamedTuple
     model_ids
     FrictionModel(matrixmodels::Union{Dict{Symbol,<:MatrixModel},NamedTuple}) = new(matrixmodels,Tuple(map(Symbol,(s for s in keys(matrixmodels)))))
 end
@@ -80,8 +80,7 @@ function Gamma(M::MatrixModel, at::Atoms; kvargs...)
     return sum(Σ*transpose(Σ) for Σ in Σ_vec)
 end
 
-function Sigma(M::MatrixModel, at::Atoms; kvargs...) 
-    return matrix(M, at; kvargs...) 
-end
+Sigma(M::MatrixModel, at::Atoms; kvargs...) = matrix(M, at; kvargs...) 
+
 
 end

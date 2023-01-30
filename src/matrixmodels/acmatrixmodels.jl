@@ -66,7 +66,7 @@ function matrix!(M::ACMatrixModel, at::Atoms, Σ, filter=(_,_)->true)
     end
 end
 
-function basis!(B, M::ACMatrixModel, at::Atoms, filter=(_,_)->true )
+function basis!(B, M::ACMatrixModel, at::Atoms, filter=(_,_)->true ) # Todo change type of B to NamedTuple{(:onsite,:offsite)} 
     
     site_filter(i,at) = (haskey(M.onsite.models, at.Z[i]) && filter(i, at))
     for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))

@@ -30,14 +30,14 @@ end
 
 function ac_matrixmodel( property; n_rep = 3, species_friction = [:H], species_env = [:Cu],
     maxorder_on=2, maxdeg_on=5,  rcut_on = 7.0, r0_on=.4*rcut_on, rin_on=.04*rcut_on, pcut_on=2, pin_on=2,
-    trans_on= PolyTransform(2, r0_on/rcut_on),
+    trans_on= PolyTransform(2, r0_on/rcut_on), #warning: the polytransform acts on [0,1]
     p_sel_on = 2, 
     species_minorder_dict_on = Dict{Any, Float64}(),
     species_maxorder_dict_on = Dict{Any, Float64}(),
     weight_on = Dict(:l => 1.0, :n => 1.0), 
     species_weight_cat_on = Dict(c => 1.0 for c in hcat(species_friction,species_env)),
     maxorder_off=maxorder_on, maxdeg_off=maxdeg_on, rcut_off = rcut_on, r0_off=.4*rcut_off, rin_off=.04*rcut_off, pcut_off=2, pin_off=2, 
-    trans_off= PolyTransform(2, r0_off/rcut_off),
+    trans_off= PolyTransform(2, r0_off/rcut_off), #warning: the polytransform acts on [0,1]
     p_sel_off = 2,
     weight_off = Dict(:l => 1.0, :n => 1.0), 
     bond_weight = 1.0,
@@ -106,7 +106,7 @@ function ac_matrixmodel( property; n_rep = 3, species_friction = [:H], species_e
     @info "Size of offsite basis elements: $(length(offsite))"
 
     return ACMatrixModel( 
-    OnSiteModels(Dict( AtomicNumber(z) => ACE.LinearACEModel(onsite, rand(SVector{n_rep,Float64},length(onsite))) for z in species_friction), env_on), 
-    OffSiteModels(Dict( AtomicNumber.(zz) => ACE.LinearACEModel(offsite, rand(SVector{n_rep,Float64},length(offsite))) for zz in Base.Iterators.product(species_friction,species_friction)), env_off),
+        OnSiteModels(Dict( AtomicNumber(z) => ACE.LinearACEModel(onsite, rand(SVector{n_rep,Float64},length(onsite))) for z in species_friction), env_on), 
+        OffSiteModels(Dict( AtomicNumber.(zz) => ACE.LinearACEModel(offsite, rand(SVector{n_rep,Float64},length(offsite))) for zz in Base.Iterators.product(species_friction,species_friction)), env_off),
     n_rep)
 end

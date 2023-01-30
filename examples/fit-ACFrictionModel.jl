@@ -19,7 +19,7 @@ filename = string(path_to_data, fname,".json")
 rdata = ACEds.DataUtils.json2internal(filename; blockformat=true);
 
 # Partition data into train and test set 
-rng = MersenneTwister(1234)
+rng = MersenneTwister(12)
 shuffle!(rng, rdata)
 n_train = 1200
 data = Dict("train" => rdata[1:n_train], "test"=> rdata[n_train+1:end]);
@@ -49,7 +49,7 @@ m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64);n_rep=2,
     );
 
 
-fm= FrictionModel((m_cov, m_equ));
+fm= FrictionModel((m_cov,m_equ)); #fm= FrictionModel((cov=m_cov,equ=m_equ));
 model_ids = get_ids(fm)
 
 #%%
@@ -63,8 +63,6 @@ fdata =  Dict(
                                             
 #%%
 c = params(fm;format=:matrix, joinsites=true)
-
-
 
 ffm = FluxFrictionModel(c)
 
@@ -110,31 +108,28 @@ println("Epoch: $epoch, Avg Training Loss: $(loss_traj["train"][end]/n_train), T
 
 c_fit = params(ffm)
 
-
-mbf = DFrictionModel((mb.matrixmodels[s] for s in model_ids));
-
-c_fit =  NamedTuple{model_ids}(ffm.c)
-
-ACE.set_params!(mbf, c_fit)
-
+ACE.set_params!(fm, c_fit)
 
 using ACEds.Analytics: error_stats, plot_error, plot_error_all
-df_abs, df_rel, df_matrix, merrors =  error_stats(data, mbf; filter=(_,_)->true, atoms_sym=:at, reg_epsilon = 0.01)
+df_abs, df_rel, df_matrix, merrors =  error_stats(data, fm; filter=(_,_)->true, atoms_sym=:at, reg_epsilon = 0.01)
 
-fig1, ax1 = plot_error(data, mbf;merrors=merrors)
+fig1, ax1 = plot_error(data, fm;merrors=merrors)
 display(fig1)
 fig1.savefig("./scatter-detailed-equ-cov.pdf", bbox_inches="tight")
 
 
-fig2, ax2 = plot_error_all(data, mbf; merrors=merrors)
+fig2, ax2 = plot_error_all(data, fm; merrors=merrors)
 display(fig2)
 fig2.savefig("./scatter-equ-cov.pdf", bbox_inches="tight")
 #%%
 
-
-
-
-
+using PyPlot
+N_train, N_test = length(flux_data["train"]),length(flux_data["test"])
+fig, ax = PyPlot.subplots()
+ax.plot(loss_traj["train"]/N_train, label="train")
+ax.plot(loss_traj["test"]/N_test, label="test")
+ax.legend()
+display(fig)
 
 # using NeighbourLists
 # using ACEds.CutoffEnv: env_cutoff
