@@ -11,6 +11,10 @@ using ACEds: ac_matrixmodel
 using Random
 using ACEds.Analytics
 using ACEds.FrictionFit
+using CUDA
+
+cuda = CUDA.functional()
+
 path_to_data = # path to the ".json" file that was generated using the code in "tutorial/import_friction_data.ipynb"
 fname =  # name of  ".json" file 
 path_to_data = "/Users/msachs2/Documents/Projects/data/friction_tensors/H2Cu"
@@ -66,14 +70,66 @@ c = params(fm;format=:matrix, joinsites=true)
 
 ffm = FluxFrictionModel(c)
 
-using ACEds.FrictionFit: set_params!
+# import ACEds.FrictionFit: set_params!
+
+# function set_params!(m::FluxFrictionModel; sigma=1E-8, model_ids::Array{Symbol}=Symbol[])
+#     model_ids = (isempty(model_ids) ? get_ids(m) : model_ids)
+#     for (sc,s) in zip(m.c,m.model_ids)
+#         if s in model_ids
+#             for c in sc
+#                 randn!(c) 
+#                 c .*=sigma 
+#             end
+#         end
+#     end
+# end
+
 set_params!(ffm; sigma=1E-8)
-
-
+if cuda
+    ffm = fmap(cu, ffm)
+end
 
 flux_data = Dict( tt=> flux_assemble(fdata[tt], fm, ffm; weighted=true, matrix_format=:dense_reduced) for tt in ["train","test"]);
 
+typeof(ffm.c[1])
 
+using ACEds.FrictionFit: _Gamma
+import ACEds.FrictionFit: FluxFrictionModel
+import Flux
+
+# BB = flux_data["train"][1].B
+# typeof(BB)
+# typeof(ffm.c)
+# Γ = flux_data["train"][1].friction_tensor
+# d = flux_data["train"][1]
+# sc = ffm.c
+# _Gamma(BB,sc)-Γ
+# l2_loss(fm, data) = sum(sum(((fm(d.B) .- d.friction_tensor)).^2) for d in data)
+
+# # data = flux_data["train"][1:2]
+# sum(sum((_Gamma(d.B,sc)-d.friction_tensor).^2)  for d in data)
+
+# Flux.gradient(sc->sum(sum((_Gamma(d.B,sc)-d.friction_tensor).^2)  for d in data[1:2]), sc)[1]
+
+(m::FluxFrictionModel)(B) = _Gamma(B, m.c)
+l2_loss(fm, data) = sum(sum((fm(d.B)-d.friction_tensor).^2)  for d in data)
+
+Flux.@functor FluxFrictionModel (c,)
+
+# Flux.gradient(fm->sum(sum((fm(d.B)-d.friction_tensor).^2)  for d in data[1:2]), ffm)[1]
+
+
+g = Flux.gradient(l2_loss,ffm, flux_data["train"][1:2])[1]
+
+# typeof(g[1])
+# g[2][1].friction_tensor
+
+
+
+# typeof(data[1])
+# Flux.gradient(sum(sum((ffm(d.B)-d.friction_tensor).^2)  for d in data[1:2]), ffm.c)[1]
+
+# Flux.gradient(l2_loss,ffm, data)
 
 loss_traj = Dict("train"=>Float64[], "test" => Float64[])
 n_train, n_test = length(flux_data["train"]), length(flux_data["test"])
@@ -82,7 +138,7 @@ epoch = 0
 
 #opt = Flux.setup(Adam(5E-5, (0.9999, 0.99999)),ffm)
 opt = Flux.setup(Adam(1E-4, (0.99, 0.999)),ffm)
-dloader5 = DataLoader(flux_data["train"], batchsize=10, shuffle=true)
+dloader5 = cuda ? DataLoader(flux_data["train"] |> gpu, batchsize=10, shuffle=true) : DataLoader(flux_data["train"], batchsize=10, shuffle=true)
 nepochs = 10
 @time l2_loss(ffm, flux_data["train"])
 @time Flux.gradient(l2_loss,ffm, flux_data["train"][2:3])[1]

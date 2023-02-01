@@ -46,6 +46,10 @@ function reinterpret(::Type{SVector{Vector{T}}}, c_vec::Vector{SVector{N, T}}) w
     return SVector{N}([[c[i] for c in c_vec ] for i=1:N])
 end
 
+function reinterpret(::Type{SVector{Vector{T}}}, cc::Matrix{T}) where {T}#where {N<:Int,T<:Number}
+    return SVector{size(cc,1)}(cc[i,:] for i=1:size(cc,1))
+end
+
 function reinterpret(::Type{Vector{SVector{T}}}, c_vec::SVector{N,Vector{T}}) where {N,T}#where {N<:Int,T<:Number}
     m = length(c_vec[1])
     @assert all(length(c_vec[i]) == m for i=1:N)
