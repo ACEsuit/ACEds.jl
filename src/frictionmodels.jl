@@ -82,5 +82,4 @@ end
 
 Sigma(M::MatrixModel, at::Atoms; kvargs...) = matrix(M, at; kvargs...) 
 
-
 end

@@ -1,4 +1,6 @@
 using StaticArrays
+
+# Original version
 # function _Gamma(BB::Tuple, cc::Tuple)
 #     Σ_vec_all = _Sigma(BB, cc)
 #     return sum(sum(Σ*transpose(Σ) for Σ in Σ_vec) for Σ_vec in Σ_vec_all )
@@ -8,29 +10,58 @@ using StaticArrays
 #     return [ c * B for (B,c) in zip(BB,cc)] 
 # end
 
-function _Sigma(B::Vector{Matrix{T}}, sc::SVector{N,Vector{T}}) where {N,T}
-    return map(c->sum(B.*c), sc)
-end 
+# First optimization
+# function _Sigma(B::Vector{Matrix{T}}, sc::SVector{N,Vector{T}}) where {N,T}
+#     return map(c->sum(B.*c), sc)
+# end 
 
-function _Sigma(BB::Tuple, cc::Tuple) where {N,T}
-    return Tuple( _Sigma(B, c) for (B,c) in zip(BB,cc))
+# function _Sigma(BB::Tuple, cc::Tuple) where {N,T}
+#     return Tuple( _Sigma(B, c) for (B,c) in zip(BB,cc))
+# end
+
+# _square(Σ) = Σ*Σ'
+
+# function _Gamma(B::Vector{Matrix{T}}, sc::SVector{N,Vector{T}}) where {N,T}
+#     return sum(map(_square, map(c->sum(B.*c), sc)))
+# end 
+
+# function _Gamma(BB::Tuple, cc::Tuple) 
+#     return sum(_Gamma(b,c) for (b,c) in zip(BB,cc))
+# end
+
+# Second optimization
+
+# _square(Σ) = Σ*Σ'
+
+# function _Gamma(BB::Tuple, cc::Tuple) 
+#     return sum(_Gamma(b,c) for (b,c) in zip(BB,cc))
+# end
+
+# function _Gamma(B::Vector{Matrix{T}}, sc::SVector{N,Vector{T}}) where {N,T}
+#     return sum(map(_square, map(c->sum(B.*c), sc)))
+# end 
+
+# Third optimization 
+
+function _Sigma(BB::Tuple, cc::Tuple) # not tested 
+    return Tuple(_Sigma(b,c) for (b,c) in zip(BB,cc))
 end
 
-_square(Σ) = Σ*Σ'
-
-function _Gamma(B::Vector{Matrix{T}}, sc::SVector{N,Vector{T}}) where {N,T}
-    return sum(map(_square, map(c->sum(B.*c), sc)))
-end 
+function _Sigma(B::Array{T,3}, cc::Matrix{T}) where {T}
+    return @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
+end
 
 function _Gamma(BB::Tuple, cc::Tuple) 
     return sum(_Gamma(b,c) for (b,c) in zip(BB,cc))
 end
-# function _Gamma(BB::Tuple, cc::Tuple) # eval working but grad not 
-#     return sum(sum(_square.(c * B)) for (B,c) in zip(BB,cc))
-# end
-# function _Gamma(BB::Tuple, cc::Tuple)
-#     return sum(sum((c * B).*transpose.(c * B)) for (B,c) in zip(BB,cc))
-# end
+
+function _Gamma(B::Array{T,3}, cc::Matrix{T}) where {T}
+    @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
+    @tullio Γ[i,j] := Σ[i,k,r] * Σ[j,k,r]
+    return Γ
+end
+
+
 
 mutable struct FluxFrictionModel
     c::Tuple # model paramters 
@@ -53,28 +84,47 @@ function _add_default_transforms(transforms::NamedTuple, model_ids)
 end
 function FluxFrictionModel(c::NamedTuple{model_ids}; transforms::NamedTuple=NamedTuple()) where {model_ids}
     transform_filtered = _add_default_transforms(transforms, model_ids)
-    #FluxFrictionModel(transform_params(Tuple(c),transform_filtered), model_ids, transform_filtered)
-    return FluxFrictionModel( map(cc->reinterpret(SVector{Vector{Float64}}, cc), transform_params(Tuple(c),transform_filtered)), model_ids, transform_filtered)
+    #return FluxFrictionModel( map(cc->reinterpret(SVector{Vector{Float64}}, cc), transform_params(Tuple(c),transform_filtered)), model_ids, transform_filtered)
+    return FluxFrictionModel(transform_params(Tuple(c),transform_filtered), model_ids, transform_filtered)
 end
 
 function FluxFrictionModel(c::NamedTuple, model_ids::Tuple; transforms::NamedTuple=NamedTuple())
     transform_filtered = _add_default_transforms(transforms, model_ids)
     c_filtered = Tuple(c[s] for s in model_ids)
     return FluxFrictionModel(
-        map(cc->reinterpret(SVector{Vector{Float64}}, cc),transform_params(c_filtered, transform_filtered)),
+        #map(cc->reinterpret(SVector{Vector{Float64}}, cc),transform_params(c_filtered, transform_filtered)),
+        transform_params(c_filtered, transform_filtered),
         model_ids, 
         transform_filtered)
 end
 
 
+# function set_params!(m::FluxFrictionModel; sigma=1E-8, model_ids::Array{Symbol}=Symbol[])
+#     model_ids = (isempty(model_ids) ? get_ids(m) : model_ids)
+#     for (sc,s) in zip(m.c,m.model_ids)
+#         if s in model_ids
+#             for c in sc
+#                 randn!(c) 
+#                 c .*=sigma 
+#             end
+#         end
+#     end
+# end
+
+# function set_params!(m::FluxFrictionModel, c_new::NamedTuple)
+#     for (v,s) in zip(m.c, m.model_ids)
+#         if s in keys(c_new)
+#             deepcopy!(v,c_new[s])
+#         end
+#     end
+# end
+
 function set_params!(m::FluxFrictionModel; sigma=1E-8, model_ids::Array{Symbol}=Symbol[])
     model_ids = (isempty(model_ids) ? get_ids(m) : model_ids)
-    for (sc,s) in zip(m.c,m.model_ids)
+    for (v,s) in zip(m.c,m.model_ids)
         if s in model_ids
-            for c in sc
-                randn!(c) 
-                c .*=sigma 
-            end
+            randn!(v) 
+            v .*=sigma 
         end
     end
 end
@@ -82,7 +132,7 @@ end
 function set_params!(m::FluxFrictionModel, c_new::NamedTuple)
     for (v,s) in zip(m.c, m.model_ids)
         if s in keys(c_new)
-            deepcopy!(v,c_new[s])
+            copy!(v,c_new[s])
         end
     end
 end

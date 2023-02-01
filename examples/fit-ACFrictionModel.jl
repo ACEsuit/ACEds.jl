@@ -67,9 +67,7 @@ fdata =  Dict(
             weights=Dict("diag" => 2.0, "sub_diag" => 1.0, "off_diag"=>1.0)) for d in data[tt]] for tt in ["test","train"]
 );
                                             
-
 c = params(fm;format=:matrix, joinsites=true)
-
 ffm = FluxFrictionModel(c)
 
 # import ACEds.FrictionFit: set_params!
@@ -93,73 +91,74 @@ end
 
 flux_data = Dict( tt=> flux_assemble(fdata[tt], fm, ffm; weighted=true, matrix_format=:dense_reduced) for tt in ["train","test"]);
 
-typeof(ffm.c[1])
+# # typeof(ffm.c[1])
 
-import ACEds.FrictionFit: _Gamma, _square
-import ACEds.FrictionFit: FluxFrictionModel
-import Flux
-using StaticArrays
-using Flux.MLUtils: stack
+# # import ACEds.FrictionFit: _Gamma, _square
+# # import ACEds.FrictionFit: FluxFrictionModel
+# # import Flux
+# # using StaticArrays
+# # using Flux.MLUtils: stack
 
-function _Gamma(B::Vector{Matrix{T}}, sc::SVector{N,Vector{T}}) where {N,T}
-    return sum(map(_square, map(c->sum(B.*c), sc)))
-end 
+# # function _Gamma(B::Vector{Matrix{T}}, sc::SVector{N,Vector{T}}) where {N,T}
+# #     return sum(map(_square, map(c->sum(B.*c), sc)))
+# # end 
 
 
+# # function _Gamma(B::Array{T,3}, sc::SVector{N,Vector{T}}) where {N,T}
+# #     #return sum(map(_square, map(c->sum(B.*c), sc)))
+# #     return sum(map(_square, map(c->sum(B.*c), sc)))
+# # end
 # function _Gamma(B::Array{T,3}, sc::SVector{N,Vector{T}}) where {N,T}
 #     #return sum(map(_square, map(c->sum(B.*c), sc)))
-#     return sum(map(_square, map(c->sum(B.*c), sc)))
+#     return sum(map(_square, map(c->_Sigma(B,c), sc)))
 # end
-function _Gamma(B::Array{T,3}, sc::SVector{N,Vector{T}}) where {N,T}
-    #return sum(map(_square, map(c->sum(B.*c), sc)))
-    return sum(map(_square, map(c->_Sigma(B,c), sc)))
-end
 
-function _Gamma(B::Array{T,3}, cc::Matrix{T}) where {T}
-    #return sum(map(_square, map(c->sum(B.*c), sc)))
-    @tullio Σ[r,i,j] := B[k,i,j] * cc[r,k]
-    @tullio Γ[r,i,j] := Σ[r,i,k] * Σ[r,j,k]
-    return Γ
-end
+# function _Gamma(B::Array{T,3}, cc::Matrix{T}) where {T}
+#     #return sum(map(_square, map(c->sum(B.*c), sc)))
+#     @tullio Σ[r,i,j] := B[k,i,j] * cc[r,k]
+#     @tullio Γ[i,j] := Σ[r,i,k] * Σ[r,j,k]
+#     return Γ
+# end
 
-function _Gamma(BB::Tuple, cc::Tuple) 
-    return sum(_Gamma(b,c) for (b,c) in zip(BB,cc))
-end
+# function _Gamma(BB::Tuple, cc::Tuple) 
+#     return sum(_Gamma(b,c) for (b,c) in zip(BB,cc))
+# end
 
-using Tullio
+# using Tullio
 
-BB = flux_data["train"][3].B
-B1 = BB[1]
-cs = ffm.c[1]
-cc = reinterpret( Vector{SVector{Float64}},cs)
-cc = reinterpret( Matrix{Float64},cs)
-cct = copy(transpose(reinterpret( Matrix{Float64},cs)))
-B1s = stack(B1,dims=1);
-B1st = stack(B1,dims=3);
-function _Sigma(B::Array{T,3}, c::Vector{T}) where {T}
-    #return sum(map(_square, map(c->sum(B.*c), sc)))
-    #Σ = @tullio Bc[i,j] := B[k,i,j] * c[k]
-    return @tullio Bc[i,j] := B[k,i,j] * c[k]
-end
+# BB = flux_data["train"][3].B
+# B1 = BB[1]
+# cs = ffm.c[1]
+# cc = reinterpret( Vector{SVector{Float64}},cs)
+# cc = reinterpret( Matrix{Float64},cs)
+# cct = copy(transpose(reinterpret( Matrix{Float64},cs)))
+# B1s = Flux.stack(B1,dims=1);
+# B1st = stack(B1,dims=3);
+# function _Sigma(B::Array{T,3}, c::Vector{T}) where {T}
+#     #return sum(map(_square, map(c->sum(B.*c), sc)))
+#     #Σ = @tullio Bc[i,j] := B[k,i,j] * c[k]
+#     return @tullio Bc[i,j] := B[k,i,j] * c[k]
+# end
 
-function _Gammat(B::Array{T,3}, cc::Matrix{T}) where {T}
-    #return sum(map(_square, map(c->sum(B.*c), sc)))
-    @tullio Σ[i,j,r] := B[i,j,k] * cc[k,r]
-    @tullio Γ[i,j,r] := Σ[i,k,r] * Σ[j,k,r]
-    return Γ
-end
-@time _Gamma(B1,cs)
-@time _Gamma(B1s,cs)
-@time _Gammat(B1st,cct)
+# function _Gammat(B::Array{T,3}, cc::Matrix{T}) where {T}
+#     #return sum(map(_square, map(c->sum(B.*c), sc)))
+#     @tullio Σ[i,j,r] := B[i,j,k] * cc[k,r]
+#     @tullio Γ[i,j] := Σ[i,k,r] * Σ[j,k,r]
+#     return Γ
+# end
+# @time _Gamma(B1,cs)
+# @time _Gamma(B1s,cs)
+# @time _Gamma(B1s,cc)
+# @time _Gammat(B1st,cct)
 
-sum(map(_square, map( c-> @tullio Bc[i,j] := B1s[k,i,j] * c[k],cc))) 
+# sum(map(_square, map( c-> @tullio Bc[i,j] := B1s[k,i,j] * c[k],cc))) 
 
-xs = [[1, 2], [3, 4], [5, 6]]
-stack(xs, dims=1)
+# xs = [[1, 2], [3, 4], [5, 6]]
+# stack(xs, dims=1)
 
-size(B1s)
+# size(B1s)
 
-B1[1]
+# B1[1]
 # typeof(BB)
 # typeof(ffm.c)
 # Γ = flux_data["train"][1].friction_tensor
@@ -173,10 +172,7 @@ B1[1]
 
 # Flux.gradient(sc->sum(sum((_Gamma(d.B,sc)-d.friction_tensor).^2)  for d in data[1:2]), sc)[1]
 
-(m::FluxFrictionModel)(B) = _Gamma(B, m.c)
-l2_loss(fm, data) = sum(sum((fm(d.B)-d.friction_tensor).^2)  for d in data)
 
-Flux.@functor FluxFrictionModel (c,)
 
 # Flux.gradient(fm->sum(sum((fm(d.B)-d.friction_tensor).^2)  for d in data[1:2]), ffm)[1]
 
@@ -199,9 +195,10 @@ epoch = 0
 
 
 #opt = Flux.setup(Adam(5E-5, (0.9999, 0.99999)),ffm)
-opt = Flux.setup(Adam(1E-4, (0.99, 0.999)),ffm)
-dloader5 = cuda ? DataLoader(flux_data["train"] |> gpu, batchsize=10, shuffle=true) : DataLoader(flux_data["train"], batchsize=10, shuffle=true)
-nepochs = 10
+bsize = 10
+opt = Flux.setup(Adam(1E-5, (0.99, 0.999)),ffm)
+dloader5 = cuda ? DataLoader(flux_data["train"] |> gpu, batchsize=bsize, shuffle=true) : DataLoader(flux_data["train"], batchsize=bsize, shuffle=true)
+nepochs = 50
 @time l2_loss(ffm, flux_data["train"])
 @time Flux.gradient(l2_loss,ffm, flux_data["train"][2:3])[1]
 @time Flux.gradient(l2_loss,ffm, flux_data["train"][10:15])[1][:c]

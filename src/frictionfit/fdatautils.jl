@@ -1,6 +1,8 @@
 """
 Function to convert FrictionData to a format that can be used for training with ffm::FluxFrictionModel 
 """
+
+
 function flux_assemble(data::Array{FrictionData}, fm::FrictionModel, ffm::FluxFrictionModel; weighted=true, matrix_format=:dense_reduced)
     @assert keys(fm.matrixmodels) == ffm.model_ids
     transforms = get_transform(ffm)
@@ -13,7 +15,7 @@ _format_friction(::Val{:block_reduced},Γ) = reinterpret(Matrix{SMatrix{3, 3, Fl
 _format_basis(::Val{:dense_reduced},b,fi) = reinterpret(Matrix,(Matrix(b[fi,fi])))
 _format_basis(::Val{:block_reduced},b,fi) =  Matrix(b[fi,fi])
 
-function flux_data(d::FrictionData,fm::FrictionModel, transforms::NamedTuple, matrix_format::Symbol, weighted=true, join_sites=true)
+function flux_data(d::FrictionData,fm::FrictionModel, transforms::NamedTuple, matrix_format::Symbol, weighted=true, join_sites=true, stacked=true)
     # TODO: in-place data manipulations
     if d.friction_tensor_ref === nothing
         friction_tensor = _format_friction(Val(matrix_format), d.friction_tensor)
@@ -21,7 +23,11 @@ function flux_data(d::FrictionData,fm::FrictionModel, transforms::NamedTuple, ma
         friction_tensor = _format_friction(Val(matrix_format), d.friction_tensor-d.friction_tensor_ref)
     end
     B = basis(fm, d.atoms; join_sites=join_sites)  
-    B = Tuple(map(b-> transform_basis(_format_basis(Val(matrix_format),b, d.friction_indices), transforms[s]), B[s] ) for s in keys(B))
+    if stacked
+        B = Tuple(Flux.stack(map(b-> transform_basis(_format_basis(Val(matrix_format),b, d.friction_indices), transforms[s]), B[s] ); dims=1) for s in keys(B))
+    else
+        B = Tuple(map(b-> transform_basis(_format_basis(Val(matrix_format),b, d.friction_indices), transforms[s]), B[s] ) for s in keys(B))
+    end
     if weighted
         W = _format_friction(Val(matrix_format),weight_matrix(d, Val(matrix_format)))
     end

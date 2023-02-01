@@ -8,6 +8,7 @@ import ACEds.FrictionModels: get_ids
 using Flux
 import ACE: params, set_params!
 using Random: randn!
+using Tullio
 include("./frictionfit/fluxmodels.jl")
 
 using ACEds.DataUtils: FrictionData

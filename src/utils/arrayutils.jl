@@ -37,24 +37,6 @@ end
 
 reinterpret(::Type{Matrix{SMatrix{3,3,T,9}}}, mat::Matrix{SMatrix{3, 3, T, 9}}) where {T<:Number} = mat
 
-function reinterpret(::Type{Vector{SVector{N, T}}}, c_vec::Vector{SVector{N, T}}) where {N,T}
-    return c_vec
-end
-
-
-function reinterpret(::Type{SVector{Vector{T}}}, c_vec::Vector{SVector{N, T}}) where {N,T}#where {N<:Int,T<:Number}
-    return SVector{N}([[c[i] for c in c_vec ] for i=1:N])
-end
-
-function reinterpret(::Type{SVector{Vector{T}}}, cc::Matrix{T}) where {T}#where {N<:Int,T<:Number}
-    return SVector{size(cc,1)}(cc[i,:] for i=1:size(cc,1))
-end
-
-function reinterpret(::Type{Vector{SVector{T}}}, c_vec::SVector{N,Vector{T}}) where {N,T}#where {N<:Int,T<:Number}
-    m = length(c_vec[1])
-    @assert all(length(c_vec[i]) == m for i=1:N)
-    return [SVector{N}([c_vec[i][j] for i=1:N]) for j=1:m]
-end
 
 function reinterpret(::Type{Vector{T}}, c_vec::Vector{SVector{N, T}}) where {N,T}
     return [c[i] for i=1:N for c in c_vec]
@@ -64,42 +46,76 @@ function reinterpret(::Type{Vector{SVector{N, T}}}, c_vec::Vector{T}) where {N,T
     return [ SVector{N}([c_vec[j+(i-1)*m] for i=1:N]) for j=1:m ]
 end
 
+# :native <-> :native
+function reinterpret(::Type{Vector{SVector{N_rep, T}}}, c_vec::Vector{SVector{N_rep, T}}) where {N_rep,T<:Number}
+    return c_vec
+end
 
-function reinterpret(::Type{Matrix{T}}, c_vec::Vector{SVector{N, T}}) where {N,T}
+# :native <-> :svector
+
+function reinterpret(::Type{SVector{Vector{T}}}, c_vec::Vector{SVector{N_rep, T}}) where {N_rep,T<:Number}
+    return SVector{N_rep}([[c[i] for c in c_vec ] for i=1:N_rep])
+end
+
+function reinterpret(::Type{Vector{SVector{T}}}, c_vec::SVector{N_rep,Vector{T}}) where {N_rep,T<:Number}
+    m = length(c_vec[1])
+    @assert all(length(c_vec[i]) == m for i=1:N_rep)
+    return [SVector{N_rep}([c_vec[i][j] for i=1:N_rep]) for j=1:m]
+end
+
+# :native <-> :matrix
+function reinterpret(::Type{Matrix{T}}, c_vec::Vector{SVector{N_rep, T}}, transposed=false) where {N_rep,T<:Number}
     """
     input: c_vec each 
     N_basis = length(c_vec)
-    N = numbero of channels
+    N_rep = numbero of channels
     """
-    c_matrix = Array{T}(undef,N,length(c_vec))
+    c_matrix = Array{T}(undef,length(c_vec),N_rep)
     for j in eachindex(c_vec)
-        c_matrix[:,j] = c_vec[j]
+        c_matrix[j,:] = c_vec[j]
     end
-    return c_matrix
+    return (transposed ? copy(transpose(c_matrix)) : c_matrix)
 end
 
-function reinterpret(::Type{Matrix{T}}, c_vec::SVector{N,Vector{T}}) where {N,T}#where {N<:Int,T<:Number}
-    m = length(c_vec[1])
-    @assert all(length(c_vec[i]) == m for i=1:N)
-    c_matrix = Array{T}(undef,N,m)
-    for i=1:N
-        for j=1:m
-            c_matrix[i,j] = c_vec[i][j]
+function reinterpret(::Type{Vector{SVector{T}}}, c_matrix::Matrix{T}, transposed=false) where {T<:Number}
+    c_matrix = (transposed ? copy(transpose(c_matrix)) : c_matrix)
+    N_basis, N_rep = size(c_matrix)
+    return [SVector{N_rep,T}(c_matrix[j,:]) for j=1:N_basis ] 
+end
+
+function reinterpret(::Type{Vector{SVector{N_rep,T}}}, c_matrix::Matrix{T}, transposed=false) where {N_rep,T<:Number}
+    c_matrix = (transposed ? copy(transpose(c_matrix)) : c_matrix)
+    @assert N_rep == size(c_matrix,2)
+    N_basis = size(c_matrix,1)
+    return [SVector{N_rep,T}(c_matrix[j,:]) for j=1:N_basis ] 
+end
+
+# :matrix <-> :svector
+function reinterpret(::Type{SVector{N_rep,Vector{T}}}, c_matrix::Matrix{T}, transposed=false) where {N_rep,T<:Number}
+    c_matrix = (transposed ? copy(transpose(c_matrix)) : c_matrix)
+    @assert N_rep == size(c_matrix,2)
+    return SVector{N_rep}[c_matrix[:,r] for r=1:N_rep ] 
+end
+
+function reinterpret(::Type{Matrix{T}}, c_vec::SVector{N_rep,Vector{T}}, transposed=false) where {N_rep,T<:Number}
+    N_basis = length(c_vec[1])
+    @assert all(length(c_vec[i]) == N_basis for i=1:N_rep)
+    c_matrix = Array{T}(undef,N_basis, N_rep)
+    for i=1:N_basis
+        for r=1:N_rep
+            c_matrix[i,r] = c_vec[r][i]
         end
     end
-    return c_matrix
+    return (transposed ? copy(transpose(c_matrix)) : c_matrix)
 end
 
-function reinterpret(::Type{Vector{SVector{T}}}, c_matrix::Matrix{T}) where {T}
-    N, N_basis = size(c_matrix)
-    return [SVector{N,T}(c_matrix[:,j]) for j=1:N_basis ] 
-end
 
-function reinterpret(::Type{Vector{SVector{N,T}}}, c_matrix::Matrix{T}) where {N,T}
-    @assert N == size(c_matrix,1)
-    N_basis = size(c_matrix,2)
-    return [SVector{N,T}(c_matrix[:,j]) for j=1:N_basis ] 
-end
+########################
+
+
+# function reinterpret(::Type{SVector{Vector{T}}}, cc::Matrix{T}) where {T}#where {N<:Int,T<:Number}
+#     return SVector{size(cc,1)}(cc[i,:] for i=1:size(cc,1))
+# end
 
 
 function reinterpret(::Type{Matrix}, M::Matrix{SVector{3,T}}) where {T}
