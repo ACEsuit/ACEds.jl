@@ -56,7 +56,6 @@ function reinterpret(::Type{Vector{SVector{T}}}, c_vec::SVector{N,Vector{T}}) wh
     return [SVector{N}([c_vec[i][j] for i=1:N]) for j=1:m]
 end
 
-
 function reinterpret(::Type{Vector{T}}, c_vec::Vector{SVector{N, T}}) where {N,T}
     return [c[i] for i=1:N for c in c_vec]
 end
@@ -75,6 +74,18 @@ function reinterpret(::Type{Matrix{T}}, c_vec::Vector{SVector{N, T}}) where {N,T
     c_matrix = Array{T}(undef,N,length(c_vec))
     for j in eachindex(c_vec)
         c_matrix[:,j] = c_vec[j]
+    end
+    return c_matrix
+end
+
+function reinterpret(::Type{Matrix{T}}, c_vec::SVector{N,Vector{T}}) where {N,T}#where {N<:Int,T<:Number}
+    m = length(c_vec[1])
+    @assert all(length(c_vec[i]) == m for i=1:N)
+    c_matrix = Array{T}(undef,N,m)
+    for i=1:N
+        for j=1:m
+            c_matrix[i,j] = c_vec[i][j]
+        end
     end
     return c_matrix
 end
