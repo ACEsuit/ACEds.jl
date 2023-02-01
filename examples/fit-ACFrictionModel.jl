@@ -17,6 +17,8 @@ cuda = CUDA.functional()
 
 path_to_data = # path to the ".json" file that was generated using the code in "tutorial/import_friction_data.ipynb"
 fname =  # name of  ".json" file 
+fname = #"/h2cu_20220713_friction2"
+path_to_data = #"/home/msachs/data"
 path_to_data = "/Users/msachs2/Documents/Projects/data/friction_tensors/H2Cu"
 fname = "/h2cu_20220713_friction"
 filename = string(path_to_data, fname,".json")
@@ -65,7 +67,7 @@ fdata =  Dict(
             weights=Dict("diag" => 2.0, "sub_diag" => 1.0, "off_diag"=>1.0)) for d in data[tt]] for tt in ["test","train"]
 );
                                             
-#%%
+
 c = params(fm;format=:matrix, joinsites=true)
 
 ffm = FluxFrictionModel(c)
