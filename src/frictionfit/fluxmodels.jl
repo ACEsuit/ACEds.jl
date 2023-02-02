@@ -146,4 +146,4 @@ get_transform(m::FluxFrictionModel) = NamedTuple{m.model_ids}(m.transforms)
 
 l2_loss(fm, data) = sum(sum(((fm(d.B) .- d.friction_tensor)).^2) for d in data)
 
-weighted_l2_loss(fm, data) = sum(sum((d.W .* (fm(d.B) .- d.friction_tensor)).^2) for d in data)
+weighted_l2_loss(fm, data) = sum(sum( d.W .* ((fm(d.B) .- d.friction_tensor)).^2) for d in data)

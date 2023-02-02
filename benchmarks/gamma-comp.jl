@@ -68,8 +68,8 @@ fdata =  Dict(
 );
                                             
 
-c = params(fm;format=:native, joinsites=true)
-size(c[1])
+c = params(fm;format=:matrix, joinsites=true)
+
 
 ffm = FluxFrictionModel(c)
 
@@ -201,18 +201,21 @@ end
 
 i = 1
 BB = flux_data["train"][i].B;
-cs = deepcopy(ffm.c);
-cc = Tuple(reinterpret(  Matrix{Float64},c) for c in ffm.c)
+cc = deepcopy(ffm.c);
+#cc = Tuple(reinterpret(  Matrix{Float64},c) for c in ffm.c)
 cct = Tuple(copy(transpose(reinterpret(  Matrix{Float64},c))) for c in ffm.c)
 BBs = Tuple(stack(B,dims=1) for B in BB);
 BBst = Tuple(stack(B,dims=3) for B in BB);
 
-@time _Gamma(BB,cs);
-@time _Gamma(BBs,cct);
-@time _Gammat(BBst,cc);
 
-@time _Gamma_ein(BBs,cct);
-@time _Gammat_ein(BBst,cc);
+@time _Gamma(BB,cc);
+@time _Gamma_ein(BB,cc);
+@time _Gamma_tensor(BB,cc);
 
-@time _Gamma_tensor(BBs,cct);
-@time _Gammat_tensor(BBst,cc);
+
+@time Flux.gradient(c->norm(_Gamma(BB,c)),cc)[1]
+# @time Flux.gradient(c->norm(_Gamma_ein(BB,c)),cc)[1]
+# @time Flux.gradient(c->norm(_Gamma_tensor(BB,c)),cc)[1]
+
+@time Flux.gradient(l2_loss,ffm,flux_data["train"])[1]
+using 

@@ -24,9 +24,9 @@ function flux_data(d::FrictionData,fm::FrictionModel, transforms::NamedTuple, ma
     end
     B = basis(fm, d.atoms; join_sites=join_sites)  
     if stacked
-        B = Tuple(Flux.stack(map(b-> transform_basis(_format_basis(Val(matrix_format),b, d.friction_indices), transforms[s]), B[s] ); dims=1) for s in keys(B))
+        B = Tuple(Flux.stack(transform_basis(map(b->_format_basis(Val(matrix_format),b, d.friction_indices), B[s]), transforms[s]); dims=1) for s in keys(B))
     else
-        B = Tuple(map(b-> transform_basis(_format_basis(Val(matrix_format),b, d.friction_indices), transforms[s]), B[s] ) for s in keys(B))
+        B = Tuple(transform_basis(map(b->_format_basis(Val(matrix_format),b, d.friction_indices), B[s]), transforms[s]) for s in keys(B))
     end
     if weighted
         W = _format_friction(Val(matrix_format),weight_matrix(d, Val(matrix_format)))

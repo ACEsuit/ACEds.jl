@@ -56,7 +56,7 @@ function transform_params(θ, tr::RandomProjection)
     """"
     θt = (R R^T)^-1 R * θ
     """
-    return (tr.R * transpose(tr.R)) \ (R * θ)
+    return (tr.R * transpose(tr.R)) \ (tr.R * θ)
 end
 
 struct DiagonalPrecond <: ParameterTransformation
