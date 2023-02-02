@@ -47,19 +47,20 @@ function _Sigma(BB::Tuple, cc::Tuple) # not tested
     return Tuple(_Sigma(b,c) for (b,c) in zip(BB,cc))
 end
 
-function _Sigma(B::Array{T,3}, cc::Matrix{T}) where {T}
-    return @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
-end
-
 function _Gamma(BB::Tuple, cc::Tuple) 
     return sum(_Gamma(b,c) for (b,c) in zip(BB,cc))
 end
 
-function _Gamma(B::Array{T,3}, cc::Matrix{T}) where {T}
+function _Sigma(B::AbstractArray{T,3}, cc::AbstractArray{T,2}) where {T}
+    return @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
+end
+
+function _Gamma(B::AbstractArray{T,3}, cc::AbstractArray{T,2}) where {T}
     @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
     @tullio Γ[i,j] := Σ[i,k,r] * Σ[j,k,r]
     return Γ
 end
+
 
 # Fourth optimization Einsum
 # using Einsum

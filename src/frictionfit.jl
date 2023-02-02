@@ -9,6 +9,8 @@ using Flux
 import ACE: params, set_params!
 using Random: randn!
 using Tullio
+using KernelAbstractions, CUDAKernels, CUDA
+
 include("./frictionfit/fluxmodels.jl")
 
 using ACEds.DataUtils: FrictionData
