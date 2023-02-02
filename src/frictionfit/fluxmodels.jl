@@ -61,6 +61,48 @@ function _Gamma(B::Array{T,3}, cc::Matrix{T}) where {T}
     return Γ
 end
 
+# Fourth optimization Einsum
+# using Einsum
+
+# function _Sigma(BB::Tuple, cc::Tuple) # not tested 
+#     return Tuple(_Sigma(b,c) for (b,c) in zip(BB,cc))
+# end
+
+# function _Sigma(B::AbstractArray{T,3}, cc::AbstractMatrix{T}) where {T}
+#     return Einsum.@einsum Σ[i,j,r] := B[k,i,j] * cc[k,r]
+# end
+
+# function _Gamma(BB::Tuple, cc::Tuple) 
+#     return sum(_Gamma(b,c) for (b,c) in zip(BB,cc))
+# end
+
+# function _Gamma(B::AbstractArray{T,3}, cc::AbstractMatrix{T}) where {T}
+#     Einsum.@einsum Σ[i,j,r] := B[k,i,j] * cc[k,r]
+#     Einsum.@einsum Γ[i,j] := Σ[i,k,r] * Σ[j,k,r]
+#     return Γ
+# end
+
+# using TensorOperations
+
+# function _Sigma(BB::Tuple, cc::Tuple) # not tested 
+#     return Tuple(_Sigma(b,c) for (b,c) in zip(BB,cc))
+# end
+
+# function _Sigma(B::AbstractArray{T,3}, cc::AbstractMatrix{T}) where {T}
+#     return @tensor Σ[i,j,r] := B[k,i,j] * cc[k,r]
+# end
+
+# function _Gamma(BB::Tuple, cc::Tuple) 
+#     return sum(_Gamma(b,c) for (b,c) in zip(BB,cc))
+# end
+
+# function _Gamma(B::AbstractArray{T,3}, cc::AbstractMatrix{T}) where {T}
+#     @tensor begin
+#         Σ[i,j,r] := B[k,i,j] * cc[k,r]
+#         Γ[i,j] := Σ[i,k,r] * Σ[j,k,r]
+#     end
+#     return Γ
+# end
 
 
 mutable struct FluxFrictionModel
