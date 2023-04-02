@@ -22,7 +22,7 @@ path_to_data = #"/home/msachs/data"
 path_to_data = "/Users/msachs2/Documents/Projects/data/friction_tensors/H2Cu"
 fname = "/h2cu_20220713_friction"
 filename = string(path_to_data, fname,".json")
-rdata = ACEds.DataUtils.json2internal(filename; blockformat=true);
+rdata = ACEds.DataUtils.json2internal(filename);
 
 # Partition data into train and test set 
 rng = MersenneTwister(12)
@@ -30,15 +30,17 @@ shuffle!(rng, rdata)
 n_train = 1200
 data = Dict("train" => rdata[1:n_train], "test"=> rdata[n_train+1:end]);
 
-
-m_inv = ac_matrixmodel(ACE.Invariant(); n_rep = 2,
+species_friction = [:H]
+species_env = [:Cu]
+rcut = 8.0
+m_inv = ac_matrixmodel(ACE.Invariant(),species_friction,species_env; n_rep = 2, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         species_maxorder_dict_off = Dict( :H => 0), 
         species_weight_cat_off = Dict(:H => 1.0, :Cu=> 1.0),
         bond_weight = .5
     );
-m_cov = ac_matrixmodel(ACE.EuclideanVector(Float64);n_rep=3,
+m_cov = ac_matrixmodel(ACE.EuclideanVector(Float64),species_friction,species_env;n_rep=3, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         species_maxorder_dict_off = Dict( :H => 0), 
@@ -46,7 +48,7 @@ m_cov = ac_matrixmodel(ACE.EuclideanVector(Float64);n_rep=3,
         bond_weight = .5
     );
 
-m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64);n_rep=2, 
+m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_env;n_rep=2, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         species_maxorder_dict_off = Dict( :H => 0), 
@@ -68,7 +70,20 @@ fdata =  Dict(
 );
                                             
 c = params(fm;format=:matrix, joinsites=true)
+#transforms::NamedTuple=NamedTuple()
+# using ACEds.FrictionFit: RandomProjection
+# using BlockDiagonals
+# transforms = NamedTuple(Dict(
+#     k =>
+#     begin
+#         p = (onsite=length(fm.matrixmodels[k],:onsite), offsite=length(fm.matrixmodels[k],:offsite))
+#         ps = (onsite=Int(floor(p[:onsite]/2)), offsite=Int(floor(p[:offsite]/2)))
+#         RandomProjection(BlockDiagonal([randn(ps[:onsite],p[:onsite]),randn(ps[:offsite],p[:offsite])]))
+#     end
+#     for k in keys(fm.matrixmodels)))
+
 ffm = FluxFrictionModel(c)
+
 
 # import ACEds.FrictionFit: set_params!
 
@@ -84,12 +99,14 @@ ffm = FluxFrictionModel(c)
 #     end
 # end
 
+typeof(fdata["train"]) <: Array{T} where {T<:FrictionData}
+
+flux_data = Dict( tt=> flux_assemble(fdata[tt], fm, ffm; weighted=true, matrix_format=:dense_scalar) for tt in ["train","test"]);
+
 set_params!(ffm; sigma=1E-8)
 if cuda
     ffm = fmap(cu, ffm)
 end
-
-flux_data = Dict( tt=> flux_assemble(fdata[tt], fm, ffm; weighted=true, matrix_format=:dense_reduced) for tt in ["train","test"]);
 
 # # typeof(ffm.c[1])
 
@@ -196,13 +213,13 @@ epoch = 0
 
 #opt = Flux.setup(Adam(5E-5, (0.9999, 0.99999)),ffm)
 bsize = 10
-opt = Flux.setup(Adam(1E-5, (0.99, 0.999)),ffm)
-dloader5 = cuda ? DataLoader(flux_data["train"] |> gpu, batchsize=bsize, shuffle=true) : DataLoader(flux_data["train"], batchsize=bsize, shuffle=true)
-nepochs = 50
-@time l2_loss(ffm, flux_data["train"])
-@time Flux.gradient(l2_loss,ffm, flux_data["train"][2:3])[1]
-@time Flux.gradient(l2_loss,ffm, flux_data["train"][10:15])[1][:c]
-typeof(ffm.c)
+#opt = Flux.setup(Adam(1E-4, (0.99, 0.999)),ffm)
+opt = Flux.setup(Adam(1E-3, (0.99, 0.999)),ffm)
+# opt = Flux.setup(Adam(1E-9, (0.99, 0.999)),ffm)
+train = [(friction_tensor=d.friction_tensor,B=d.B, W=d.W) for d in flux_data["train"]]
+
+dloader5 = cuda ? DataLoader(train |> gpu, batchsize=bsize, shuffle=true) : DataLoader(train, batchsize=bsize, shuffle=true)
+nepochs = 20
 
 
 using ACEds.FrictionFit: weighted_l2_loss
@@ -215,18 +232,23 @@ for _ in 1:nepochs
     for tt in ["test","train"]
         push!(loss_traj[tt], weighted_l2_loss(ffm,flux_data[tt]))
     end
-    println("Epoch: $epoch, Abs Training Loss: $(loss_traj["train"][end]), Test Loss: $(loss_traj["test"][end])")
+    println("Epoch: $epoch, Abs avg Training Loss: $(loss_traj["train"][end]/n_train)), Test Loss: $(loss_traj["test"][end]/n_test))")
 end
 println("Epoch: $epoch, Abs Training Loss: $(loss_traj["train"][end]), Test Loss: $(loss_traj["test"][end])")
 println("Epoch: $epoch, Avg Training Loss: $(loss_traj["train"][end]/n_train), Test Loss: $(loss_traj["test"][end]/n_test)")
+
 
 
 c_fit = params(ffm)
 
 ACE.set_params!(fm, c_fit)
 
-using ACEds.Analytics: error_stats, plot_error, plot_error_all
-df_abs, df_rel, df_matrix, merrors =  error_stats(data, fm; filter=(_,_)->true, atoms_sym=:at, reg_epsilon = 0.01)
+
+using ACEds.Analytics: error_stats, plot_error, plot_error_all,friction_entries
+
+friction = friction_entries(data["train"], fm;  atoms_sym=:at)
+
+df_abs, df_rel, df_matrix, merrors =  error_stats(data, fm; atoms_sym=:at, reg_epsilon = 0.01)
 
 fig1, ax1 = plot_error(data, fm;merrors=merrors)
 display(fig1)
@@ -243,6 +265,7 @@ N_train, N_test = length(flux_data["train"]),length(flux_data["test"])
 fig, ax = PyPlot.subplots()
 ax.plot(loss_traj["train"]/N_train, label="train")
 ax.plot(loss_traj["test"]/N_test, label="test")
+ax.set_yscale(:log)
 ax.legend()
 display(fig)
 
