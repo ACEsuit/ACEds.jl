@@ -23,6 +23,7 @@ path_to_data = "/Users/msachs2/Documents/Projects/data/friction_tensors/H2Cu"
 fname = "/h2cu_20220713_friction"
 filename = string(path_to_data, fname,".json")
 rdata = ACEds.DataUtils.json2internal(filename);
+rdata = ACEds.DataUtils.json2internal(filename);
 
 # Partition data into train and test set 
 rng = MersenneTwister(12)
@@ -40,6 +41,7 @@ m_inv = ac_matrixmodel(ACE.Invariant(),species_friction,species_env; n_rep = 2, 
         species_weight_cat_off = Dict(:H => 1.0, :Cu=> 1.0),
         bond_weight = .5
     );
+m_cov = ac_matrixmodel(ACE.EuclideanVector(Float64),species_friction,species_env;n_rep=3, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
 m_cov = ac_matrixmodel(ACE.EuclideanVector(Float64),species_friction,species_env;n_rep=3, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
@@ -82,6 +84,18 @@ c = params(fm;format=:matrix, joinsites=true)
 #     end
 #     for k in keys(fm.matrixmodels)))
 
+#transforms::NamedTuple=NamedTuple()
+# using ACEds.FrictionFit: RandomProjection
+# using BlockDiagonals
+# transforms = NamedTuple(Dict(
+#     k =>
+#     begin
+#         p = (onsite=length(fm.matrixmodels[k],:onsite), offsite=length(fm.matrixmodels[k],:offsite))
+#         ps = (onsite=Int(floor(p[:onsite]/2)), offsite=Int(floor(p[:offsite]/2)))
+#         RandomProjection(BlockDiagonal([randn(ps[:onsite],p[:onsite]),randn(ps[:offsite],p[:offsite])]))
+#     end
+#     for k in keys(fm.matrixmodels)))
+
 ffm = FluxFrictionModel(c)
 
 
@@ -98,6 +112,10 @@ ffm = FluxFrictionModel(c)
 #         end
 #     end
 # end
+
+typeof(fdata["train"]) <: Array{T} where {T<:FrictionData}
+
+flux_data = Dict( tt=> flux_assemble(fdata[tt], fm, ffm; weighted=true, matrix_format=:dense_scalar) for tt in ["train","test"]);
 
 typeof(fdata["train"]) <: Array{T} where {T<:FrictionData}
 
@@ -215,43 +233,12 @@ epoch = 0
 bsize = 10
 #opt = Flux.setup(Adam(1E-4, (0.99, 0.999)),ffm)
 opt = Flux.setup(Adam(1E-3, (0.99, 0.999)),ffm)
-opt = Flux.setup(Adam(1E-4, (0.999, 0.9999)),ffm)
-opt = Flux.setup(Adam(1E-5, (0.9999, 0.99999)),ffm)
 # opt = Flux.setup(Adam(1E-9, (0.99, 0.999)),ffm)
-train = [(friction_tensor=d.friction_tensor,B=d.B, W=d.W + 98*I) for d in flux_data["train"]]
+train = [(friction_tensor=d.friction_tensor,B=d.B, W=d.W) for d in flux_data["train"]]
 
 dloader5 = cuda ? DataLoader(train |> gpu, batchsize=bsize, shuffle=true) : DataLoader(train, batchsize=bsize, shuffle=true)
 nepochs = 20
 
-import ACEds.FrictionFit: _Gamma
-function _Gamma(B::AbstractArray{SMatrix{3, 3, T, 9},3}, cc::AbstractArray{T,2}) where {T}
-    @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
-    println("I am new Gamma")
-    #@tullio Γ[i,j] := Σ[i,k,r] * Σ[j,k,r]
-    nk,nr = size(Σ,2), size(Σ,3)
-    return sum(Σ[:,k,r] * transpose(Σ[:,k,r]) for k=1:nk for r = 1:nr)
-end
-using Tullio
-function _Gamma(B::AbstractArray{T,3}, cc::AbstractArray{T,2}) where {T}
-    @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
-    #@tullio Γ[i,j] := Σ[i,k,r] * Σ[j,k,r]
-    #println("I am new Gamma 2")
-    nk,nr = size(Σ,2), size(Σ,3)
-    return sum(Σ[:,k,r] * transpose(Σ[:,k,r]) for k=1:nk for r = 1:nr)
-end
-
-@time l2_loss(ffm, flux_data["train"])
-
-_Gamma(train[1].B, ffm.c)
-d = train[1].B[2]
-
-size(train[1].B[2])
-typeof(ffm.c[1])
-_Gamma(train[1].B[2], ffm.c[2])
-
-
-@time Flux.gradient(l2_loss,ffm, flux_data["train"][2:3])[1]
-@time Flux.gradient(l2_loss,ffm, flux_data["train"][10:15])[1][:c]
 
 using ACEds.FrictionFit: weighted_l2_loss
 for _ in 1:nepochs
@@ -274,8 +261,12 @@ c_fit = params(ffm)
 
 ACE.set_params!(fm, c_fit)
 
-using ACEds.Analytics: error_stats, plot_error, plot_error_all
-df_abs, df_rel, df_matrix, merrors =  error_stats(data, fm; filter=(_,_)->true, atoms_sym=:at, reg_epsilon = 0.01)
+
+using ACEds.Analytics: error_stats, plot_error, plot_error_all,friction_entries
+
+friction = friction_entries(data["train"], fm;  atoms_sym=:at)
+
+df_abs, df_rel, df_matrix, merrors =  error_stats(data, fm; atoms_sym=:at, reg_epsilon = 0.01)
 
 fig1, ax1 = plot_error(data, fm;merrors=merrors)
 display(fig1)
