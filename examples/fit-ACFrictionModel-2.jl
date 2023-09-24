@@ -12,6 +12,7 @@ using Random
 using ACEds.Analytics
 using ACEds.FrictionFit
 using CUDA
+using ACEds.MatrixModels: ACMatrixModel
 
 cuda = CUDA.functional()
 
@@ -22,7 +23,7 @@ path_to_data = #"/home/msachs/data"
 path_to_data = "/Users/msachs2/Documents/Projects/data/friction_tensors/H2Cu"
 fname = "/h2cu_20220713_friction"
 filename = string(path_to_data, fname,".json")
-rdata = ACEds.DataUtils.json2internal(filename);
+rdata = ACEds.DataUtils.json2internal(filename; blockformat=true);
 
 # Partition data into train and test set 
 rng = MersenneTwister(12)
@@ -30,17 +31,9 @@ shuffle!(rng, rdata)
 n_train = 1200
 data = Dict("train" => rdata[1:n_train], "test"=> rdata[n_train+1:end]);
 
-species_friction = [:H]
-species_env = [:Cu]
-rcut = 8.0
-m_inv = ac_matrixmodel(ACE.Invariant(),species_friction,species_env; n_rep = 2, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
-        species_maxorder_dict_on = Dict( :H => 1), 
-        species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
-        species_maxorder_dict_off = Dict( :H => 0), 
-        species_weight_cat_off = Dict(:H => 1.0, :Cu=> 1.0),
-        bond_weight = .5
-    );
-m_cov = ac_matrixmodel(ACE.EuclideanVector(Float64),species_friction,species_env;n_rep=3, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
+
+rcut = 7.0
+m_inv = ac_matrixmodel(ACE.Invariant(); n_rep = 2, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         species_maxorder_dict_off = Dict( :H => 0), 
@@ -48,7 +41,25 @@ m_cov = ac_matrixmodel(ACE.EuclideanVector(Float64),species_friction,species_env
         bond_weight = .5
     );
 
-m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_env;n_rep=2, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
+m_inv0 = ac_matrixmodel(ACE.Invariant(); n_rep = 1, rcut_on = rcut, rcut_off = rcut, maxorder_on=3, maxdeg_on=6,
+        species_maxorder_dict_on = Dict( :H => 1), 
+        species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
+        species_maxorder_dict_off = Dict( :H => 0), 
+        species_weight_cat_off = Dict(:H => 1.0, :Cu=> 1.0),
+        bond_weight = .5
+    );
+m_inv0 = ACMatrixModel(m_inv0.onsite.models,
+    rcut, 1; id = :inv0)
+   
+m_cov = ac_matrixmodel(ACE.EuclideanVector(Float64);n_rep=3, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
+        species_maxorder_dict_on = Dict( :H => 1), 
+        species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
+        species_maxorder_dict_off = Dict( :H => 0), 
+        species_weight_cat_off = Dict(:H => 1.0, :Cu=> 1.0),
+        bond_weight = .5
+    );
+
+m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64);n_rep=2, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         species_maxorder_dict_off = Dict( :H => 0), 
@@ -71,19 +82,20 @@ fdata =  Dict(
                                             
 c = params(fm;format=:matrix, joinsites=true)
 #transforms::NamedTuple=NamedTuple()
-# using ACEds.FrictionFit: RandomProjection
-# using BlockDiagonals
-# transforms = NamedTuple(Dict(
-#     k =>
-#     begin
-#         p = (onsite=length(fm.matrixmodels[k],:onsite), offsite=length(fm.matrixmodels[k],:offsite))
-#         ps = (onsite=Int(floor(p[:onsite]/2)), offsite=Int(floor(p[:offsite]/2)))
-#         RandomProjection(BlockDiagonal([randn(ps[:onsite],p[:onsite]),randn(ps[:offsite],p[:offsite])]))
-#     end
-#     for k in keys(fm.matrixmodels)))
+using ACEds.FrictionFit: RandomProjection
+using BlockDiagonals
+transforms = NamedTuple(Dict(
+    k =>
+    begin
+        p = (onsite=length(fm.matrixmodels[k],:onsite), offsite=length(fm.matrixmodels[k],:offsite))
+        ps = (onsite=Int(floor(p[:onsite]/2)), offsite=Int(floor(p[:offsite]/2)))
+        RandomProjection(BlockDiagonal([randn(ps[:onsite],p[:onsite]),randn(ps[:offsite],p[:offsite])]))
+    end
+    for k in keys(fm.matrixmodels)))
 
 ffm = FluxFrictionModel(c)
 
+using BlockDiagonals
 
 # import ACEds.FrictionFit: set_params!
 
@@ -99,9 +111,9 @@ ffm = FluxFrictionModel(c)
 #     end
 # end
 
-typeof(fdata["train"]) <: Array{T} where {T<:FrictionData}
 
-flux_data = Dict( tt=> flux_assemble(fdata[tt], fm, ffm; weighted=true, matrix_format=:dense_scalar) for tt in ["train","test"]);
+
+flux_data = Dict( tt=> flux_assemble(fdata[tt], fm, ffm; weighted=true, matrix_format=:dense_reduced) for tt in ["train","test"]);
 
 set_params!(ffm; sigma=1E-8)
 if cuda
@@ -218,38 +230,11 @@ opt = Flux.setup(Adam(1E-3, (0.99, 0.999)),ffm)
 opt = Flux.setup(Adam(1E-4, (0.999, 0.9999)),ffm)
 opt = Flux.setup(Adam(1E-5, (0.9999, 0.99999)),ffm)
 # opt = Flux.setup(Adam(1E-9, (0.99, 0.999)),ffm)
-train = [(friction_tensor=d.friction_tensor,B=d.B, W=d.W + 98*I) for d in flux_data["train"]]
+train = [(friction_tensor=d.friction_tensor,B=d.B, W=d.W) for d in flux_data["train"]]
 
 dloader5 = cuda ? DataLoader(train |> gpu, batchsize=bsize, shuffle=true) : DataLoader(train, batchsize=bsize, shuffle=true)
 nepochs = 20
-
-import ACEds.FrictionFit: _Gamma
-function _Gamma(B::AbstractArray{SMatrix{3, 3, T, 9},3}, cc::AbstractArray{T,2}) where {T}
-    @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
-    println("I am new Gamma")
-    #@tullio Γ[i,j] := Σ[i,k,r] * Σ[j,k,r]
-    nk,nr = size(Σ,2), size(Σ,3)
-    return sum(Σ[:,k,r] * transpose(Σ[:,k,r]) for k=1:nk for r = 1:nr)
-end
-using Tullio
-function _Gamma(B::AbstractArray{T,3}, cc::AbstractArray{T,2}) where {T}
-    @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
-    #@tullio Γ[i,j] := Σ[i,k,r] * Σ[j,k,r]
-    #println("I am new Gamma 2")
-    nk,nr = size(Σ,2), size(Σ,3)
-    return sum(Σ[:,k,r] * transpose(Σ[:,k,r]) for k=1:nk for r = 1:nr)
-end
-
 @time l2_loss(ffm, flux_data["train"])
-
-_Gamma(train[1].B, ffm.c)
-d = train[1].B[2]
-
-size(train[1].B[2])
-typeof(ffm.c[1])
-_Gamma(train[1].B[2], ffm.c[2])
-
-
 @time Flux.gradient(l2_loss,ffm, flux_data["train"][2:3])[1]
 @time Flux.gradient(l2_loss,ffm, flux_data["train"][10:15])[1][:c]
 
@@ -271,6 +256,59 @@ println("Epoch: $epoch, Avg Training Loss: $(loss_traj["train"][end]/n_train), T
 
 
 c_fit = params(ffm)
+
+ACE.set_params!(fm, c_fit)
+
+fdata_res =  Dict(
+    tt => [FrictionData(d.at,
+            d.friction_tensor, 
+            d.friction_indices; 
+            weights=Dict("diag" => 2.0, "sub_diag" => 1.0, "off_diag"=>1.0),
+            friction_tensor_ref = Matrix(Gamma(fm,d.at)[d.friction_indices,d.friction_indices])) for d in data[tt]] for tt in ["test","train"]
+);
+
+fm_res= FrictionModel((m_inv0,));
+
+c_res = params(fm_res.matrixmodels.inv0,:onsite)
+c_res = params(fm_res;format=:matrix, joinsites=true)
+ffm_res = FluxFrictionModel(c_res)
+
+flux_data_res = Dict( tt=> flux_assemble(fdata_res[tt], fm_res, ffm_res; weighted=true, matrix_format=:dense_reduced) for tt in ["train","test"]);
+
+set_params!(ffm_res; sigma=1E-8)
+if cuda
+    ffm_res = fmap(cu, ffm_res)
+end
+
+opt = Flux.setup(Adam(1E-6, (0.999, 0.9999)),ffm_res)
+# opt = Flux.setup(Adam(1E-9, (0.99, 0.999)),ffm_res)
+train = [(friction_tensor=d.friction_tensor,B=d.B, W= Diagonal(ones(6)) ) for d in flux_data_res["train"]]
+
+dloader5 = cuda ? DataLoader(train |> gpu, batchsize=bsize, shuffle=true) : DataLoader(train, batchsize=bsize, shuffle=true)
+nepochs = 50
+@time l2_loss(ffm_res, train)/n_train
+@time weighted_l2_loss(ffm_res, train)/n_train
+@time Flux.gradient(l2_loss,ffm_res, flux_data_res["train"][2:3])[1]
+@time Flux.gradient(l2_loss,ffm_res, flux_data_res["train"][10:15])[1][:c]
+
+using ACEds.FrictionFit: weighted_l2_loss
+for _ in 1:nepochs
+    epoch+=1
+    @time for d in dloader5
+        ∂L∂m = Flux.gradient(weighted_l2_loss,ffm_res, d)[1]
+        Flux.update!(opt,ffm_res, ∂L∂m)       # method for "explicit" gradient
+    end
+    for tt in ["test","train"]
+        push!(loss_traj[tt], weighted_l2_loss(ffm_res,flux_data_res[tt]))
+    end
+    println("Epoch: $epoch, Abs avg Training Loss: $(loss_traj["train"][end]/n_train)), Test Loss: $(loss_traj["test"][end]/n_test))")
+end
+println("Epoch: $epoch, Abs Training Loss: $(loss_traj["train"][end]), Test Loss: $(loss_traj["test"][end])")
+println("Epoch: $epoch, Avg Training Loss: $(loss_traj["train"][end]/n_train), Test Loss: $(loss_traj["test"][end]/n_test)")
+
+c_fit_res = params(ffm_res)
+set_params!(m_inv0, :onsite, c_fit_res)
+
 
 ACE.set_params!(fm, c_fit)
 

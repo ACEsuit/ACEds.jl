@@ -28,7 +28,7 @@ function ACEbonds.SymmetricEllipsoidBondBasis(ϕ::ACE.AbstractProperty;
 end
 
 
-function ac_matrixmodel( property; n_rep = 3, species_friction = [:H], species_env = [:Cu],
+function ac_matrixmodel( property,species_friction,species_env; n_rep = 3, 
     maxorder_on=2, maxdeg_on=5,  rcut_on = 7.0, r0_on=.4*rcut_on, rin_on=.04*rcut_on, pcut_on=2, pin_on=2,
     trans_on= PolyTransform(2, r0_on/rcut_on), #warning: the polytransform acts on [0,1]
     p_sel_on = 2, 

@@ -31,12 +31,13 @@ function set_zero!(fm::FrictionModel, model_ids)
         set_zero!(fm.matrixmodels[s])
     end
 end
+
 function Gamma(fm::FrictionModel, at::Atoms; kvargs...) # kvargs = {sparse=:sparse, filter=(_,_)->true, T=Float64}
-    return sum(Gamma(mo, at; kvargs... ) for mo in values(fm.matrixmodels))
+    return sum(Gamma(mo, at; sparse=:sparse, kvargs... ) for mo in values(fm.matrixmodels))
     #+ Gamma(fm.inv, at; kvargs...)
 end
 
-function Sigma(fm::FrictionModel, at::Atoms;kvargs...)  
+function Sigma(fm::FrictionModel, at::Atoms; kvargs...)  
     return NamedTuple{fm.model_ids}(Sigma(mo, at; kvargs...) for mo in values(fm.matrixmodels))
 end
 
@@ -80,6 +81,13 @@ function Gamma(M::MatrixModel, at::Atoms; kvargs...)
     return sum(Σ*transpose(Σ) for Σ in Σ_vec)
 end
 
+# using Tullio
+# function Gamma(M::MatrixModel{Covariant}, at::Atoms; kvargs...) 
+#     Σ_vec = Sigma(M, at; kvargs...) 
+#     return sum(@tullio Γ[i,j] :=  Σ[i,k] * transpose(Σ[j,k]) for Σ in Σ_vec)
+# end
+
 Sigma(M::MatrixModel, at::Atoms; kvargs...) = matrix(M, at; kvargs...) 
+
 
 end

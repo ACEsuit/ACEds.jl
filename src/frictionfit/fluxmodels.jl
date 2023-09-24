@@ -61,6 +61,25 @@ function _Gamma(B::AbstractArray{T,3}, cc::AbstractArray{T,2}) where {T}
     return Γ
 end
 
+function _Sigma(B::AbstractArray{SMatrix{3, 3, T, 9},3}, cc::AbstractArray{T,2}) where {T}
+    return @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
+end
+
+function _Gamma(B::AbstractArray{SMatrix{3, 3, T, 9},3}, cc::AbstractArray{T,2}) where {T}
+    @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
+    @tullio Γ[i,j] := Σ[i,k,r] * Σ[j,k,r]
+    return Γ
+end
+
+function _Sigma(B::AbstractArray{SVector{3,T},3}, cc::AbstractArray{T,2}) where {T}
+    return @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
+end
+
+function _Gamma(B::AbstractArray{SVector{3,T},3}, cc::AbstractArray{T,2}) where {T}
+    @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
+    @tullio Γ[i,j] := Σ[i,k,r] * transpose(Σ[j,k,r])
+    return Γ
+end
 
 # Fourth optimization Einsum
 # using Einsum
@@ -187,6 +206,11 @@ Flux.trainable(m::FluxFrictionModel) = (c=m.c,)
 params(m::FluxFrictionModel; transformed=true) = NamedTuple{m.model_ids}(transformed ? rev_transform_params(m.c,m.transforms) : m.c )
 get_transform(m::FluxFrictionModel) = NamedTuple{m.model_ids}(m.transforms)
 
-l2_loss(fm, data) = sum(sum(((fm(d.B) .- d.friction_tensor)).^2) for d in data)
+_l2(Γ_fit::AbstractMatrix{SMatrix{3,3,T,9}},Γ_true::AbstractMatrix{SMatrix{3,3,T,9}}) where {T<:Number}= sum(sum((Γ_fit.- Γ_true).^2))
+_l2(Γ_fit::Matrix{T},Γ_true::Matrix{T}) where {T<:Number}= sum((Γ_fit.- Γ_true).^2)
+l2_loss(fm, data) = sum(_l2(fm(d.B), d.friction_tensor) for d in data)
 
-weighted_l2_loss(fm, data) = sum(sum( d.W .* ((fm(d.B) .- d.friction_tensor)).^2) for d in data)
+weighted_l2_loss(fm, data) = sum(_weighted_l2(fm(d.B), d.friction_tensor, d.W) for d in data)
+
+_weighted_l2(Γ_fit::AbstractMatrix{SMatrix{3,3,T,9}},Γ_true::AbstractMatrix{SMatrix{3,3,T,9}}, W::AbstractMatrix{SMatrix{3,3,T,9}}) where {T<:Number}= sum(sum(W.*(Γ_fit.- Γ_true).^2))
+_weighted_l2(Γ_fit::Matrix{T},Γ_true::Matrix{T},W::Matrix{T}) where {T<:Number}= sum(W .* (Γ_fit.- Γ_true).^2)
