@@ -7,7 +7,7 @@ using ACEds.DataUtils
 using Flux
 using Flux.MLUtils
 using ACE
-using ACEds: ac_matrixmodel
+using ACEds: nc_matrixmodel
 using Random
 using ACEds.Analytics
 using ACEds.FrictionFit
@@ -32,14 +32,14 @@ n_train = 1200
 data = Dict("train" => rdata[1:n_train], "test"=> rdata[n_train+1:end]);
 
 
-m_inv = ac_matrixmodel(ACE.Invariant(); n_rep = 2,
+m_inv = nc_matrixmodel(ACE.Invariant(); n_rep = 2,
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         species_maxorder_dict_off = Dict( :H => 0), 
         species_weight_cat_off = Dict(:H => 1.0, :Cu=> 1.0),
         bond_weight = .5
     );
-m_cov = ac_matrixmodel(ACE.EuclideanVector(Float64);n_rep=3,
+m_cov = nc_matrixmodel(ACE.EuclideanVector(Float64);n_rep=3,
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         species_maxorder_dict_off = Dict( :H => 0), 
@@ -47,7 +47,7 @@ m_cov = ac_matrixmodel(ACE.EuclideanVector(Float64);n_rep=3,
         bond_weight = .5
     );
 
-m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64);n_rep=2, 
+m_equ = nc_matrixmodel(ACE.EuclideanMatrix(Float64);n_rep=2, 
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         species_maxorder_dict_off = Dict( :H => 0), 

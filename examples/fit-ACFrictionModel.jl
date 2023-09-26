@@ -23,7 +23,6 @@ path_to_data = "/Users/msachs2/Documents/Projects/data/friction_tensors/H2Cu"
 fname = "/h2cu_20220713_friction"
 filename = string(path_to_data, fname,".json")
 rdata = ACEds.DataUtils.json2internal(filename);
-rdata = ACEds.DataUtils.json2internal(filename);
 
 # Partition data into train and test set 
 rng = MersenneTwister(12)
@@ -34,14 +33,15 @@ data = Dict("train" => rdata[1:n_train], "test"=> rdata[n_train+1:end]);
 species_friction = [:H]
 species_env = [:Cu]
 rcut = 8.0
-m_inv = ac_matrixmodel(ACE.Invariant(),species_friction,species_env; n_rep = 2, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
+acnc = :sc
+m_inv = ac_matrixmodel(ACE.Invariant(),species_friction,species_env, acnc; n_rep = 2, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         species_maxorder_dict_off = Dict( :H => 0), 
         species_weight_cat_off = Dict(:H => 1.0, :Cu=> 1.0),
         bond_weight = .5
     );
-m_cov = ac_matrixmodel(ACE.EuclideanVector(Float64),species_friction,species_env;n_rep=3, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
+m_cov = ac_matrixmodel(ACE.EuclideanVector(Float64),species_friction,species_env, acnc; n_rep=3, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         species_maxorder_dict_off = Dict( :H => 0), 
@@ -49,7 +49,7 @@ m_cov = ac_matrixmodel(ACE.EuclideanVector(Float64),species_friction,species_env
         bond_weight = .5
     );
 
-m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_env;n_rep=2, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
+m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_env, acnc; n_rep=2, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         species_maxorder_dict_off = Dict( :H => 0), 

@@ -7,7 +7,7 @@ using ACEds
 using JuLIP: AtomicNumber
 
 
-function ac_matrixmodel( property,species_friction,species_env; n_rep = 3, 
+function ac_matrixmodel( property,species_friction,species_env,acnc=:nc; n_rep = 3, 
     maxorder_on=2, maxdeg_on=5,  rcut_on = 7.0, r0_on=.4*rcut_on, rin_on=.04*rcut_on, pcut_on=2, pin_on=2,
     trans_on= PolyTransform(2, r0_on/rcut_on), #warning: the polytransform acts on [0,1]
     p_sel_on = 2, 
@@ -87,5 +87,5 @@ function ac_matrixmodel( property,species_friction,species_env; n_rep = 3,
     return ACMatrixModel( 
         OnSiteModels(Dict( AtomicNumber(z) => ACE.LinearACEModel(onsite, rand(SVector{n_rep,Float64},length(onsite))) for z in species_friction), env_on), 
         OffSiteModels(Dict( AtomicNumber.(zz) => ACE.LinearACEModel(offsite, rand(SVector{n_rep,Float64},length(offsite))) for zz in Base.Iterators.product(species_friction,species_friction)), env_off),
-    n_rep)
+    n_rep, acnc)
 end

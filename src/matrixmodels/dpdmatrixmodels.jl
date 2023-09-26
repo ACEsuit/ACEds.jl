@@ -1,5 +1,5 @@
 
-struct DPDBCMatrixModel{S} <: ACMatrixModel{S}
+struct DPDBCMatrixModel{S} <: NCMatrixModel{S}
     onsite::OnSiteModels
     offsite::OffSiteModels
     n_rep::Int
@@ -52,25 +52,25 @@ function basis!(B, M::BCMatrixModel, at::Atoms, filter=(_,_)->true )
     return B
 end
 
-struct DPDACMatrixModel{S} <: MatrixModel{S} 
+struct DPDNCMatrixModel{S} <: MatrixModel{S} 
     onsite::OnSiteModels
     offsite::OffSiteModels
     n_rep::Int
     inds::SiteInds
-    function DPDACMatrixModel{S}(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int)
+    function DPDNCMatrixModel{S}(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int)
         return new(onsite,offsite, n_rep, _get_basisinds(onsite.models, offsite.models))
     end
 end
-DPDACMatrixModel(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int, S::Symmetry) = DPDACMatrixModel{S}(onsite,offsite,n_rep)
+DPDNCMatrixModel(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int, S::Symmetry) = DPDNCMatrixModel{S}(onsite,offsite,n_rep)
 
-function DPDACMatrixModel(offsitemodels::Dict{Tuple{AtomicNumber, AtomicNumber}, TM},
+function DPDNCMatrixModel(offsitemodels::Dict{Tuple{AtomicNumber, AtomicNumber}, TM},
     rcut::T, n_rep::Int, S::Symmetry) where {TM, T<:Real}
     onsite = OnSiteModels(Dict{AtomicNumber,TM}(), SphericalCutoff(1.0))
     offsite = OffSiteModels(offsitemodels, rcut)
-    return ACMatrixModel(onsite, offsite,n_rep, S)
+    return NCMatrixModel(onsite, offsite,n_rep, S)
 end
 
-function matrix!(M::DPACMatrixModel, at::Atoms, Σ, filter=(_,_)->true) 
+function matrix!(M::DPNCMatrixModel, at::Atoms, Σ, filter=(_,_)->true) 
     site_filter(i,at) = (haskey(M.onsite.models, at.Z[i]) && filter(i, at))
     for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
         if site_filter(i, at)
@@ -91,7 +91,7 @@ function matrix!(M::DPACMatrixModel, at::Atoms, Σ, filter=(_,_)->true)
     end
 end
 
-function basis!(B, M::ACMatrixModel, at::Atoms, filter=(_,_)->true )
+function basis!(B, M::NCMatrixModel, at::Atoms, filter=(_,_)->true )
     
     site_filter(i,at) = (haskey(M.onsite.models, at.Z[i]) && filter(i, at))
     for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))

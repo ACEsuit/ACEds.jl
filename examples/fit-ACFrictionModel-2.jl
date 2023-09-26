@@ -7,7 +7,7 @@ using ACEds.DataUtils
 using Flux
 using Flux.MLUtils
 using ACE
-using ACEds: ac_matrixmodel
+using ACEds: nc_matrixmodel
 using Random
 using ACEds.Analytics
 using ACEds.FrictionFit
@@ -33,7 +33,7 @@ data = Dict("train" => rdata[1:n_train], "test"=> rdata[n_train+1:end]);
 
 
 rcut = 7.0
-m_inv = ac_matrixmodel(ACE.Invariant(); n_rep = 2, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
+m_inv = nc_matrixmodel(ACE.Invariant(); n_rep = 2, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         species_maxorder_dict_off = Dict( :H => 0), 
@@ -41,7 +41,7 @@ m_inv = ac_matrixmodel(ACE.Invariant(); n_rep = 2, rcut_on = rcut, rcut_off = rc
         bond_weight = .5
     );
 
-m_inv0 = ac_matrixmodel(ACE.Invariant(); n_rep = 1, rcut_on = rcut, rcut_off = rcut, maxorder_on=3, maxdeg_on=6,
+m_inv0 = nc_matrixmodel(ACE.Invariant(); n_rep = 1, rcut_on = rcut, rcut_off = rcut, maxorder_on=3, maxdeg_on=6,
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         species_maxorder_dict_off = Dict( :H => 0), 
@@ -51,7 +51,7 @@ m_inv0 = ac_matrixmodel(ACE.Invariant(); n_rep = 1, rcut_on = rcut, rcut_off = r
 m_inv0 = ACMatrixModel(m_inv0.onsite.models,
     rcut, 1; id = :inv0)
    
-m_cov = ac_matrixmodel(ACE.EuclideanVector(Float64);n_rep=3, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
+m_cov = nc_matrixmodel(ACE.EuclideanVector(Float64);n_rep=3, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         species_maxorder_dict_off = Dict( :H => 0), 
@@ -59,7 +59,7 @@ m_cov = ac_matrixmodel(ACE.EuclideanVector(Float64);n_rep=3, rcut_on = rcut, rcu
         bond_weight = .5
     );
 
-m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64);n_rep=2, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
+m_equ = nc_matrixmodel(ACE.EuclideanMatrix(Float64);n_rep=2, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         species_maxorder_dict_off = Dict( :H => 0), 

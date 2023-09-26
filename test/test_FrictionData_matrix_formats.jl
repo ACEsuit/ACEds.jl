@@ -7,7 +7,7 @@ using ACEds.DataUtils
 using Flux
 using Flux.MLUtils
 using ACE
-using ACEds: ac_matrixmodel
+using ACEds: nc_matrixmodel
 using Random
 using ACEds.Analytics
 using ACEds.FrictionFit
@@ -23,7 +23,7 @@ cuda = CUDA.functional()
 species_friction, species_env = [:H], [:Cu]
 
 rcut = 2.0*rnn(:Cu)
-m_inv = ac_matrixmodel(ACE.Invariant(), species_friction, species_env; rcut_on = rcut, n_rep = 2,
+m_inv = nc_matrixmodel(ACE.Invariant(), species_friction, species_env; rcut_on = rcut, n_rep = 2,
         #species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         #species_maxorder_dict_off = Dict( :H => 0), 
@@ -31,7 +31,7 @@ m_inv = ac_matrixmodel(ACE.Invariant(), species_friction, species_env; rcut_on =
         bond_weight = .5
     );
 
-m_cov = ac_matrixmodel(ACE.EuclideanVector(Float64), species_friction, species_env; rcut_on = rcut, n_rep=3,
+m_cov = nc_matrixmodel(ACE.EuclideanVector(Float64), species_friction, species_env; rcut_on = rcut, n_rep=3,
         #species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         #species_maxorder_dict_off = Dict( :H => 0), 
@@ -39,7 +39,7 @@ m_cov = ac_matrixmodel(ACE.EuclideanVector(Float64), species_friction, species_e
         bond_weight = .5
     );
 
-m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64), species_friction, species_env; rcut_on = rcut, n_rep=2, 
+m_equ = nc_matrixmodel(ACE.EuclideanMatrix(Float64), species_friction, species_env; rcut_on = rcut, n_rep=2, 
         #species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         #species_maxorder_dict_off = Dict( :H => 0), 
