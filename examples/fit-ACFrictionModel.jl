@@ -42,7 +42,6 @@ m_inv = ac_matrixmodel(ACE.Invariant(),species_friction,species_env; n_rep = 2, 
         bond_weight = .5
     );
 m_cov = ac_matrixmodel(ACE.EuclideanVector(Float64),species_friction,species_env;n_rep=3, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
-m_cov = ac_matrixmodel(ACE.EuclideanVector(Float64),species_friction,species_env;n_rep=3, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         species_maxorder_dict_off = Dict( :H => 0), 

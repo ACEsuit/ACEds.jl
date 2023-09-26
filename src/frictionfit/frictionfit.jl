@@ -11,16 +11,16 @@ using Random: randn!
 using Tullio
 using KernelAbstractions, CUDAKernels, CUDA
 
-include("./frictionfit/fluxmodels.jl")
+include("./fluxmodels.jl")
 
 using ACEds.DataUtils: FrictionData
 using ACEds.MatrixModels: basis
 using ProgressMeter
 using SparseArrays
-include("./frictionfit/fdatautils.jl")
+include("./fdatautils.jl")
 
 using LinearAlgebra: I, transpose, UniformScaling, Diagonal
-include("./frictionfit/paramtransforms.jl")
+include("./paramtransforms.jl")
 
 
 end

@@ -337,9 +337,9 @@ end
 get_id(M::MatrixModel) = M.id
 
 # Atom-centered matrix models: 
-include("./matrixmodels/acmatrixmodels.jl")
+include("./acmatrixmodels.jl")
 # Bond-centered matrix models:
-include("./matrixmodels/bcmatrixmodels.jl")
+include("./bcmatrixmodels.jl")
 # Atom and Bond-centered matrix models for Dissipative Particle Dynamics models:
 #include("./dpdmatrixmodels.jl")
 
