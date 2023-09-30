@@ -2,7 +2,7 @@ module MatrixModels
 
 export SiteModels, OnSiteModels, OffSiteModels, SiteInds, SiteModel
 export MatrixModel, ACMatrixModel, BCMatrixModel
-export Symmetry, Invariant, Covariant, Equivariant
+export O3Symmetry, Invariant, Covariant, Equivariant
 export matrix, basis, params, nparams, set_params!, get_id
 
 using JuLIP, ACE, ACEbonds
@@ -24,30 +24,39 @@ using ACEbonds.BondCutoffs
 
 
 #ACE.scaling(m::SiteModel,p::Int) = ACE.scaling(m.model.basis,p)
-abstract type Symmetry end 
-struct Invariant <: Symmetry end
-struct Covariant <: Symmetry end
-struct Equivariant <: Symmetry end
+abstract type O3Symmetry end 
+struct Invariant <: O3Symmetry end
+struct Covariant <: O3Symmetry end
+struct Equivariant <: O3Symmetry end
 
-_symmetry(::ACE.SymmetricBasis{PIB,<:ACE.Invariant}) where {PIB} = Invariant
-_symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanVector}) where {PIB} = Covariant
-_symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanMatrix}) where {PIB} = Equivariant
-_symmetry(m::ACE.LinearACEModel) = _symmetry(m.basis)
+abstract type Z2Symmetry end 
+
+struct Odd <: Z2Symmetry end
+struct Even <: Z2Symmetry end
+
+
+_o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.Invariant}) where {PIB} = Invariant
+_o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanVector}) where {PIB} = Covariant
+_o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanMatrix}) where {PIB} = Equivariant
+_o3symmetry(m::ACE.LinearACEModel) = _o3symmetry(m.basis)
+
+
+
 
 NamedCollection = Union{AbstractDict,NamedTuple}
 
-function _symmetry(models::NamedCollection) 
+function _o3symmetry(models::NamedCollection) 
     if isempty(models)
-        return Symmetry
+        return O3Symmetry
     else
-        S = eltype([_symmetry(mo.basis)()  for mo in values(models)])
-        @assert ( S <: Symmetry && S != Symmetry) "Symmetries of model bases inconsistent. Symmetries must be of same type."
+        S = eltype([_o3symmetry(mo.basis)()  for mo in values(models)])
+        @assert ( S <: O3Symmetry && S != O3Symmetry) "Symmetries of model bases inconsistent. Symmetries must be of same type."
         return S 
     end
 end
 
-function _symmetry(onsitemodels::NamedCollection, offsitemodels::NamedCollection) 
-    S1, S2 = _symmetry(onsitemodels), _symmetry(offsitemodels)
+function _o3symmetry(onsitemodels::NamedCollection, offsitemodels::NamedCollection) 
+    S1, S2 = _o3symmetry(onsitemodels), _o3symmetry(offsitemodels)
     @assert S1 <: S2 || S2 <: S1 "Symmetries of onsite and offsite models are inconsistent. These models must have symmetries of same type or one of the model dictionaries must be empty."
     return (S1 <: S2 ? S1 : S2)
 end

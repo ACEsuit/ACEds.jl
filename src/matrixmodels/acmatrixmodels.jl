@@ -5,13 +5,14 @@ struct ACMatrixModel{S,ACNC} <: MatrixModel{S}
     inds::SiteInds
     id::Symbol
     function ACMatrixModel{S}(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int, id::Symbol, acnc::Symbol) where {S}
+        @assert acnc in [:sc,:nc]
         return new{S,acnc}(onsite,offsite, n_rep, _get_basisinds(onsite.models, offsite.models), id)
     end
 end
 
 # Basic constructor 
 function ACMatrixModel(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int, acnc::Symbol=:nc; id = nothing) 
-    S = _symmetry(onsite.models, offsite.models)
+    S = _o3symmetry(onsite.models, offsite.models)
     id = (id === nothing ? _default_id(S) : id) 
     return ACMatrixModel{S}(onsite,offsite,n_rep, id, acnc)
 end

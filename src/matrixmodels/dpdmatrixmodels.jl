@@ -1,5 +1,5 @@
 
-struct DPDBCMatrixModel{S} <: NCMatrixModel{S}
+struct DPDBCMatrixModel{S} <: ACMatrixModel{S}
     onsite::OnSiteModels
     offsite::OffSiteModels
     n_rep::Int
@@ -8,10 +8,10 @@ struct DPDBCMatrixModel{S} <: NCMatrixModel{S}
         return new(onsite,offsite, n_rep, _get_basisinds(onsite.models, offsite.models))
     end
 end
-DPDBCMatrixModel(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int, S::Symmetry) = DPDBCMatrixModel{S}(onsite,offsite,n_rep)
+DPDBCMatrixModel(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int, S::O3Symmetry) = DPDBCMatrixModel{S}(onsite,offsite,n_rep)
 
 function BCMatrixModel(offsitemodels::Dict{Tuple{AtomicNumber, AtomicNumber}, TM},
-    rcutbond::T, rcutenv::T, zcutenv::T,n_rep::Int, S::Symmetry) where {TM, T<:Real}
+    rcutbond::T, rcutenv::T, zcutenv::T,n_rep::Int, S::O3Symmetry) where {TM, T<:Real}
     onsite = OnSiteModels(Dict{AtomicNumber,TM}(), SphericalCutoff(1.0))
     offsite = OffSiteModels(offsitemodels, rcutbond, rcutenv, zcutenv) 
     return BCMatrixModel{S}(onsite, offsite, n_rep)
@@ -52,25 +52,25 @@ function basis!(B, M::BCMatrixModel, at::Atoms, filter=(_,_)->true )
     return B
 end
 
-struct DPDNCMatrixModel{S} <: MatrixModel{S} 
+struct DPDACMatrixModel{S} <: MatrixModel{S} 
     onsite::OnSiteModels
     offsite::OffSiteModels
     n_rep::Int
     inds::SiteInds
-    function DPDNCMatrixModel{S}(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int)
+    function DPDACMatrixModel{S}(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int)
         return new(onsite,offsite, n_rep, _get_basisinds(onsite.models, offsite.models))
     end
 end
-DPDNCMatrixModel(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int, S::Symmetry) = DPDNCMatrixModel{S}(onsite,offsite,n_rep)
+DPDACMatrixModel(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int, S::O3Symmetry) = DPDACMatrixModel{S}(onsite,offsite,n_rep)
 
-function DPDNCMatrixModel(offsitemodels::Dict{Tuple{AtomicNumber, AtomicNumber}, TM},
-    rcut::T, n_rep::Int, S::Symmetry) where {TM, T<:Real}
+function DPDACMatrixModel(offsitemodels::Dict{Tuple{AtomicNumber, AtomicNumber}, TM},
+    rcut::T, n_rep::Int, S::O3Symmetry) where {TM, T<:Real}
     onsite = OnSiteModels(Dict{AtomicNumber,TM}(), SphericalCutoff(1.0))
     offsite = OffSiteModels(offsitemodels, rcut)
-    return NCMatrixModel(onsite, offsite,n_rep, S)
+    return ACMatrixModel(onsite, offsite,n_rep, S)
 end
 
-function matrix!(M::DPNCMatrixModel, at::Atoms, Σ, filter=(_,_)->true) 
+function matrix!(M::DPACMatrixModel, at::Atoms, Σ, filter=(_,_)->true) 
     site_filter(i,at) = (haskey(M.onsite.models, at.Z[i]) && filter(i, at))
     for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
         if site_filter(i, at)
@@ -91,7 +91,7 @@ function matrix!(M::DPNCMatrixModel, at::Atoms, Σ, filter=(_,_)->true)
     end
 end
 
-function basis!(B, M::NCMatrixModel, at::Atoms, filter=(_,_)->true )
+function basis!(B, M::ACMatrixModel, at::Atoms, filter=(_,_)->true )
     
     site_filter(i,at) = (haskey(M.onsite.models, at.Z[i]) && filter(i, at))
     for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))

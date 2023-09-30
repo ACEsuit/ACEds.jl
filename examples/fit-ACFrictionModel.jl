@@ -33,7 +33,7 @@ data = Dict("train" => rdata[1:n_train], "test"=> rdata[n_train+1:end]);
 species_friction = [:H]
 species_env = [:Cu]
 rcut = 8.0
-acnc = :sc
+acnc = :nc
 m_inv = ac_matrixmodel(ACE.Invariant(),species_friction,species_env, acnc; n_rep = 2, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
@@ -111,10 +111,6 @@ ffm = FluxFrictionModel(c)
 #         end
 #     end
 # end
-
-typeof(fdata["train"]) <: Array{T} where {T<:FrictionData}
-
-flux_data = Dict( tt=> flux_assemble(fdata[tt], fm, ffm; weighted=true, matrix_format=:dense_scalar) for tt in ["train","test"]);
 
 typeof(fdata["train"]) <: Array{T} where {T<:FrictionData}
 

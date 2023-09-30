@@ -28,7 +28,7 @@ using ACEds
 ACEds.SymmetricEuclideanMatrix(Float64)
 
 for symmetry in [:general, :symmetric] #test fails for ACE.AntiSymmetricEuclideanMatrix
-   @info("Symmetry type: ", symmetry )
+   @info("O3Symmetry type: ", symmetry )
    if symmetry == :general
       φ = ACE.EuclideanMatrix(Float64)
    elseif symmetry == :symmetric 

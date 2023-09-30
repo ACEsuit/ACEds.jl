@@ -3,14 +3,14 @@ struct BCMatrixModel{S} <: MatrixModel{S}
     offsite::OffSiteModels
     n_rep::Int
     inds::SiteInds
-    function BCMatrixModel{S}(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int) where {S<:Symmetry}
+    function BCMatrixModel{S}(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int) where {S<:O3Symmetry}
         return new(onsite,offsite, n_rep, _get_basisinds(onsite.models, offsite.models))
     end
 end
-BCMatrixModel(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int, S::Symmetry) = BCMatrixModel{S}(onsite,offsite,n_rep)
+BCMatrixModel(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int, S::O3Symmetry) = BCMatrixModel{S}(onsite,offsite,n_rep)
 
 function BCMatrixModel(onsitemodels::Dict{AtomicNumber, TM},offsitemodels::Dict{Tuple{AtomicNumber, AtomicNumber}, TM},
-    rcut::T, rcutbond::T, rcutenv::T, zcutenv::T,n_rep::Int, S::Symmetry) where {TM, T<:Real}
+    rcut::T, rcutbond::T, rcutenv::T, zcutenv::T,n_rep::Int, S::O3Symmetry) where {TM, T<:Real}
     onsite = OnSiteModels(onsitemodels, rcut)
     offsite = OffSiteModels(offsitemodels, rcutbond, rcutenv, zcutenv) 
     return BCMatrixModel{S}(onsite, offsite, n_rep)
