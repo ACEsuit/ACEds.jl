@@ -1,6 +1,8 @@
 module AtomCutoffs
 
-export SphericalCutoff
+import ACEbonds.BondCutoffs: EllipsoidCutoff
+
+export SphericalCutoff, AbstractCutoff
 export env_filter, env_transform, env_cutoff
 
 using StaticArrays
@@ -10,6 +12,8 @@ using ACE
 struct SphericalCutoff{T}
     rcut::T
 end
+
+const AbstractCutoff = Union{SphericalCutoff,EllipsoidCutoff}
 
 env_cutoff(sc::SphericalCutoff) = sc.rcut
 env_filter(r::T, cutoff::SphericalCutoff) where {T<:Real} = (r <= cutoff.rcut)

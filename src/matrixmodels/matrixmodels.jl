@@ -20,8 +20,8 @@ import ACEbase: evaluate, evaluate!
 
 import ACE: scaling
 
-using ACEbonds.BondCutoffs
-
+using ACEbonds.BondCutoffs 
+using ACEbonds.BondCutoffs: AbstractBondCutoff
 
 #ACE.scaling(m::SiteModel,p::Int) = ACE.scaling(m.model.basis,p)
 abstract type O3Symmetry end 
@@ -33,7 +33,18 @@ abstract type Z2Symmetry end
 
 struct Odd <: Z2Symmetry end
 struct Even <: Z2Symmetry end
+struct NoZ2Sym <: Z2Symmetry end
 
+abstract type SpeciesCoupling end 
+
+struct SpeciesCoupled <: SpeciesCoupling end
+struct SpeciesUnCoupled <: SpeciesCoupling end
+
+abstract type NoiseCoupling end
+
+struct PairCoupling <: NoiseCoupling end
+struct RowCoupling <: NoiseCoupling end
+struct ColumnCoupling <: NoiseCoupling end
 
 _o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.Invariant}) where {PIB} = Invariant
 _o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanVector}) where {PIB} = Covariant
@@ -41,7 +52,7 @@ _o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanMatrix}) where {PIB} = Equiv
 _o3symmetry(m::ACE.LinearACEModel) = _o3symmetry(m.basis)
 
 
-
+_msort(z1,z2) = (z1<=z2 ? (z1,z2) : (z2,z1))
 
 NamedCollection = Union{AbstractDict,NamedTuple}
 
@@ -49,9 +60,9 @@ function _o3symmetry(models::NamedCollection)
     if isempty(models)
         return O3Symmetry
     else
-        S = eltype([_o3symmetry(mo.basis)()  for mo in values(models)])
-        @assert ( S <: O3Symmetry && S != O3Symmetry) "Symmetries of model bases inconsistent. Symmetries must be of same type."
-        return S 
+        O3S = eltype([_o3symmetry(mo.basis)()  for mo in values(models)])
+        @assert ( O3S <: O3Symmetry && O3S != O3Symmetry) "Symmetries of model bases inconsistent. Symmetries must be of same type."
+        return O3S 
     end
 end
 
@@ -66,23 +77,35 @@ abstract type SiteModels end
 # Todo: allow for easy exclusion of onsite and offsite models 
 Base.length(m::SiteModels) = sum(length(mo.basis) for mo in m.models)
 
-struct OnSiteModels{TM} <:SiteModels
+struct OnSiteModels{O3S,TM} <: SiteModels
     models::Dict{AtomicNumber, TM}
     env::SphericalCutoff
+    function OnSiteModels(models::Dict{AtomicNumber, TM}, env::SphericalCutoff) where {TM}
+        return new{_o3symmetry(models),TM}(models, env) 
+    end
 end
-OnSiteModels(models::Dict{AtomicNumber, TM}, rcut::T) where {T<:Real,TM} = 
-    OnSiteModels(models,SphericalCutoff(rcut))
 
-struct OffSiteModels{TM} <:SiteModels
+
+struct OffSiteModels{O3S,SPSYM,Z2S,CUTOFF,TM} <: SiteModels # where {O3S<:O3Symmetry, CUTOFF<:AbstractCutoff, Z2S<:Z2Symmetry, SPSYM<:SpeciesCoupling}
     models::Dict{Tuple{AtomicNumber,AtomicNumber}, TM}
-    env
+    env::CUTOFF
+    function OffSiteModels(models::Dict{Tuple{AtomicNumber,AtomicNumber}, TM}, env::CUTOFF, ::SPSYM, ::Z2S) where {TM, CUTOFF, Z2S, SPSYM} # this is a bit of hack. We directly provide the bond symmetry here as we can't infere it because it's built into the symmetric basis.
+        if SPSYM<:SpeciesCoupled
+            @assert all(_msort(zz...) == zz for zz in keys(models))
+        elseif SPSYM<:SpeciesUnCoupled
+            @assert all((z2,z1) in keys(models) for (z1,z2) in keys(models))
+        end
+        return new{_o3symmetry(models),SPSYM,Z2S,CUTOFF,TM}(models, env) 
+    end
 end
 
-OffSiteModels(models::Dict{Tuple{AtomicNumber, AtomicNumber},TM}, rcut::T) where {T<:Real,TM} = OffSiteModels(models,SphericalCutoff(rcut))
+function OffSiteModels(models::Dict{Tuple{AtomicNumber, AtomicNumber},TM}, rcut::T, spsym=SpeciesUnCoupled()) where {T<:Real,TM} 
+    return OffSiteModels(models,SphericalCutoff(rcut), NoZ2Sym(), spsym)
+end
 
 function OffSiteModels(models::Dict{Tuple{AtomicNumber, AtomicNumber},TM}, 
-    rcutbond::T, rcutenv::T, zcutenv::T) where {T<:Real,TM}
-    return OffSiteModels(models, EllipsoidCutoff(rcutbond, rcutenv, zcutenv))
+    rcutbond::T, rcutenv::T, zcutenv::T, z2sym=NoZ2Sym(), spsym=SpeciesUnCoupled()) where {T<:Real,TM}
+    return OffSiteModels(models, EllipsoidCutoff(rcutbond, rcutenv, zcutenv), z2sym, spsym)
 end
 
 
@@ -96,9 +119,12 @@ ACEbonds.bonds(at::Atoms, offsite::OffSiteModels, site_filter) = ACEbonds.bonds(
         sqrt((offsite.env.rcutbond*.5)^2+ offsite.env.rcutenv^2)),
                 (r, z) -> env_filter(r, z, offsite.env), site_filter )
 
-struct SiteInds
+struct SiteInds{SPSYM}
     onsite::Dict{AtomicNumber, UnitRange{Int}}
     offsite::Dict{Tuple{AtomicNumber, AtomicNumber}, UnitRange{Int}}
+    function SiteInds(onsite::Dict{AtomicNumber, UnitRange{Int}}, offsite::Dict{Tuple{AtomicNumber, AtomicNumber}, UnitRange{Int}})
+
+    end
 end
 
 function Base.length(inds::SiteInds)
@@ -351,6 +377,6 @@ include("./ACMatrixmodels.jl")
 include("./bcmatrixmodels.jl")
 # Atom and Bond-centered matrix models for Dissipative Particle Dynamics models:
 #include("./dpdmatrixmodels.jl")
-
+include("./newmatrixmdels.jl")
 
 end

@@ -1,6 +1,6 @@
 struct ACMatrixModel{S,ACNC} <: MatrixModel{S}
-    onsite::OnSiteModels
-    offsite::OffSiteModels
+    onsite::OnSiteModels{S}
+    offsite::OffSiteModels{S}
     n_rep::Int
     inds::SiteInds
     id::Symbol
