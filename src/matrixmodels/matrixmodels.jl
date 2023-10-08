@@ -1,15 +1,20 @@
 module MatrixModels
 
-export SiteModels, OnSiteModels, OffSiteModels, SiteInds, SiteModel
+export SiteModel, OnSiteModel, OffSiteModel,  OnSiteModels, OffSiteModels, SiteInds
+export onsite_linbasis, offsite_linbasis
 export MatrixModel, ACMatrixModel, BCMatrixModel
 export O3Symmetry, Invariant, Covariant, Equivariant
+export Odd, Even, NoZ2Sym
+export SpeciesCoupled, SpeciesUnCoupled
+export PairCoupling, RowCoupling, ColumnCoupling
 export matrix, basis, params, nparams, set_params!, get_id
 
 using JuLIP, ACE, ACEbonds
 using JuLIP: chemical_symbol
 using ACE: SymmetricBasis, LinearACEModel, evaluate
 import ACE: nparams, params, set_params!
-using ACEbonds: bonds #, env_cutoff
+using ACEbonds: bonds, env_cutoff
+using ACEbonds.BondCutoffs: EllipsoidCutoff
 using LinearAlgebra
 using StaticArrays
 using SparseArrays
@@ -46,6 +51,13 @@ struct PairCoupling <: NoiseCoupling end
 struct RowCoupling <: NoiseCoupling end
 struct ColumnCoupling <: NoiseCoupling end
 
+function _assert_offsite_keys(offsite_dict, ::SpeciesCoupled)
+    return @assert all([(z2,z1)==_msort(z1,z2) for (z1,z2) in keys(offsite_dict)])
+end
+function _assert_offsite_keys(offsite_dict, ::SpeciesUnCoupled)
+    return @assert all([(z2,z1) in keys(offsite_dict)  for (z1,z2) in keys(offsite_dict)])
+end
+
 _o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.Invariant}) where {PIB} = Invariant
 _o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanVector}) where {PIB} = Covariant
 _o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanMatrix}) where {PIB} = Equivariant
@@ -72,41 +84,122 @@ function _o3symmetry(onsitemodels::NamedCollection, offsitemodels::NamedCollecti
     return (S1 <: S2 ? S1 : S2)
 end
 
-abstract type SiteModels end
+struct BondBasis{TM,Z2SYM}
+    linbasis::TM
+    BondBasis(linbasis::TM,::Z2SYM) where {TM, Z2SYM<:Z2Symmetry}= new{TM,Z2SYM}(linbasis)
+end
 
+Base.length(bb::BondBasis) = length(bb.linbasis)
+abstract type SiteModel end
 # Todo: allow for easy exclusion of onsite and offsite models 
-Base.length(m::SiteModels) = sum(length(mo.basis) for mo in m.models)
-
-struct OnSiteModels{O3S,TM} <: SiteModels
-    models::Dict{AtomicNumber, TM}
-    env::SphericalCutoff
-    function OnSiteModels(models::Dict{AtomicNumber, TM}, env::SphericalCutoff) where {TM}
-        return new{_o3symmetry(models),TM}(models, env) 
+_n_rep(model::SiteModel) = model.n_rep
+struct OnSiteModel{O3S,TM} <: SiteModel
+    linmodel::TM
+    cutoff::SphericalCutoff
+    n_rep
+    function OnSiteModel(linbasis::TM, cutoff::SphericalCutoff, n_rep::T) where {TM,T<:Int}
+        linmodel = ACE.LinearACEModel(linbasis, rand(SVector{n_rep,Float64},length(linbasis)))
+        return new{_o3symmetry(linbasis),typeof(linmodel)}(linmodel, cutoff,n_rep)
+    end
+end
+OnSiteModel(linbasis::TM,r_cut::T, n_rep::IT) where {TM,T<:Real,IT<:Int} = OnSiteModel(linbasis,SphericalCutoff(r_cut),n_rep)
+struct OffSiteModel{O3S,TM,Z2S,CUTOFF} <: SiteModel # where {O3S<:O3Symmetry, CUTOFF<:AbstractCutoff, Z2S<:Z2Symmetry, SPSYM<:SpeciesCoupling}
+    linmodel::TM
+    cutoff::CUTOFF
+    n_rep
+    function OffSiteModel(bb::BondBasis{TM,Z2S},  cutoff::CUTOFF, n_rep::T) where { T<:Int, TM, CUTOFF<:AbstractCutoff, Z2S<:Z2Symmetry}
+        linmodel = ACE.LinearACEModel(bb.linbasis,rand(SVector{n_rep,Float64},length(bb.linbasis)))
+        return new{_o3symmetry(bb.linbasis),typeof(linmodel),Z2S,CUTOFF}(linmodel, cutoff,n_rep)
     end
 end
 
 
-struct OffSiteModels{O3S,SPSYM,Z2S,CUTOFF,TM} <: SiteModels # where {O3S<:O3Symmetry, CUTOFF<:AbstractCutoff, Z2S<:Z2Symmetry, SPSYM<:SpeciesCoupling}
-    models::Dict{Tuple{AtomicNumber,AtomicNumber}, TM}
-    env::CUTOFF
-    function OffSiteModels(models::Dict{Tuple{AtomicNumber,AtomicNumber}, TM}, env::CUTOFF, ::SPSYM, ::Z2S) where {TM, CUTOFF, Z2S, SPSYM} # this is a bit of hack. We directly provide the bond symmetry here as we can't infere it because it's built into the symmetric basis.
-        if SPSYM<:SpeciesCoupled
-            @assert all(_msort(zz...) == zz for zz in keys(models))
-        elseif SPSYM<:SpeciesUnCoupled
-            @assert all((z2,z1) in keys(models) for (z1,z2) in keys(models))
-        end
-        return new{_o3symmetry(models),SPSYM,Z2S,CUTOFF,TM}(models, env) 
-    end
-end
 
-function OffSiteModels(models::Dict{Tuple{AtomicNumber, AtomicNumber},TM}, rcut::T, spsym=SpeciesUnCoupled()) where {T<:Real,TM} 
-    return OffSiteModels(models,SphericalCutoff(rcut), NoZ2Sym(), spsym)
-end
+OffSiteModel(bb::BondBasis{TM,Z2S},r_cut::T, n_rep::IT) where {TM,Z2S,T<:Real,IT<:Int} = OffSiteModel(bb, SphericalCutoff(r_cut), n_rep)
+OffSiteModel(bb::BondBasis{TM,Z2S}, rcutbond::T, rcutenv::T, zcutenv::T, n_rep::IT) where {TM,Z2S,T<:Real,IT<:Int} = OffSiteModel(bb, EllipsoidCutoff(rcutbond,rcutenv,zcutenv), n_rep)
 
-function OffSiteModels(models::Dict{Tuple{AtomicNumber, AtomicNumber},TM}, 
-    rcutbond::T, rcutenv::T, zcutenv::T, z2sym=NoZ2Sym(), spsym=SpeciesUnCoupled()) where {T<:Real,TM}
-    return OffSiteModels(models, EllipsoidCutoff(rcutbond, rcutenv, zcutenv), z2sym, spsym)
+
+const OnSiteModels{O3S,TM} = Dict{AtomicNumber,OnSiteModel{O3S,TM}}
+linmodel_size(models::OnSiteModels) = sum(length(mo.linmodel.basis) for mo in values(models))
+
+const OffSiteModels{O3S,TM,Z2S,CUTOFF} = Dict{Tuple{AtomicNumber, AtomicNumber},OffSiteModel{O3S,TM,Z2S,CUTOFF}}
+linmodel_size(models::OffSiteModels) = sum(length(mo.linmodel.basis) for mo in values(models))
+
+const SiteModels = Union{OnSiteModels,OffSiteModels}
+
+function _n_rep(models::SiteModels)
+    n_reps = _n_rep.(values(models))
+    @assert length(unique(n_reps)) == 1
+    return n_reps[1]
 end
+# struct PWCoupledMatrixModel{O3S,TM,SPSYM,Z2S,CUTOFF} 
+#     onsite::Dict{AtomicNumber,OnSiteModel{O3S,TM}}
+#     offsite::Dict{Tuple{AtomicNumber,AtomicNumber},OffSiteModel{O3S,TM,SPSYM,Z2S,CUTOFF}}
+#     n_rep::Int
+#     inds::SiteInds
+#     id::Symbol
+# end
+
+
+
+
+    # function OffSiteModels(models::Dict{Tuple{AtomicNumber,AtomicNumber}, TM}, env::CUTOFF, ::SPSYM, ::Z2S) where {TM, CUTOFF, Z2S, SPSYM} # this is a bit of hack. We directly provide the bond symmetry here as we can't infere it because it's built into the symmetric basis.
+    #     if SPSYM<:SpeciesCoupled
+    #         @assert all(_msort(zz...) == zz for zz in keys(models))
+    #     elseif SPSYM<:SpeciesUnCoupled
+    #         @assert all((z2,z1) in keys(models) for (z1,z2) in keys(models))
+    #     end
+    #     return new{_o3symmetry(models),SPSYM,Z2S,CUTOFF,TM}(models, env) 
+    # end
+
+
+# function OffSiteBasis(species;
+#     z2symmetry = NoZ2Sym(), 
+#     maxorder = 2,
+#     maxdeg = 5,
+#     r0_ratio=.4,
+#     rin_ratio=.04, 
+#     pcut=2, 
+#     pin=2, 
+#     trans= PolyTransform(2, r0_ratio), 
+#     isym=:mube, 
+#     weight = Dict(:l => 1.0, :n => 1.0),
+#     p_sel = 2,
+#     bond_weight = 1.0,
+#     species_minorder_dict = Dict{Any, Float64}(),
+#     species_maxorder_dict = Dict{Any, Float64}(),
+#     species_weight_cat = Dict(c => 1.0 for c in species),
+#     )
+#     @time offsite = SymmetricEllipsoidBondBasis(property; 
+#                 r0 = r0_ratio, 
+#                 rin = rin_ratio, 
+#                 pcut = pcut, 
+#                 pin = pin, 
+#                 trans = trans, #warning: the polytransform acts on [0,1]
+#                 p = p_sel, 
+#                 weight = weight, 
+#                 maxorder = maxorder,
+#                 default_maxdeg = maxdeg,
+#                 species_minorder_dict = species_minorder_dict,
+#                 species_maxorder_dict = species_maxorder_dict,
+#                 species_weight_cat = species_weight_cat,
+#                 bondsymmetry=_z2couplingToString(z2symmetry),
+#                 species=species, 
+#                 isym=isym, 
+#                 bond_weight = bond_weight,  
+#     )
+#     return offsite
+# end
+
+
+# function OffSiteModels(models::Dict{Tuple{AtomicNumber, AtomicNumber},TM}, rcut::T, spsym=SpeciesUnCoupled()) where {T<:Real,TM} 
+#     return OffSiteModels(models,SphericalCutoff(rcut), NoZ2Sym(), spsym)
+# end
+
+# function OffSiteModels(models::Dict{Tuple{AtomicNumber, AtomicNumber},TM}, 
+#     rcutbond::T, rcutenv::T, zcutenv::T, z2sym=NoZ2Sym(), spsym=SpeciesUnCoupled()) where {T<:Real,TM}
+#     return OffSiteModels(models, EllipsoidCutoff(rcutbond, rcutenv, zcutenv), z2sym, spsym)
+# end
 
 
 ACEbonds.bonds(at::Atoms, offsite::OffSiteModels) = ACEbonds.bonds( at, offsite.env.rcutbond, 
@@ -119,13 +212,16 @@ ACEbonds.bonds(at::Atoms, offsite::OffSiteModels, site_filter) = ACEbonds.bonds(
         sqrt((offsite.env.rcutbond*.5)^2+ offsite.env.rcutenv^2)),
                 (r, z) -> env_filter(r, z, offsite.env), site_filter )
 
-struct SiteInds{SPSYM}
+struct SiteInds
     onsite::Dict{AtomicNumber, UnitRange{Int}}
     offsite::Dict{Tuple{AtomicNumber, AtomicNumber}, UnitRange{Int}}
-    function SiteInds(onsite::Dict{AtomicNumber, UnitRange{Int}}, offsite::Dict{Tuple{AtomicNumber, AtomicNumber}, UnitRange{Int}})
-
-    end
 end
+SiteInds(onsite::Dict{AtomicNumber, UnitRange{Int}}) = SiteInds(onsite, Dict{Tuple{AtomicNumber, AtomicNumber}, UnitRange{Int}}())
+SiteInds(offsite::Dict{Tuple{AtomicNumber, AtomicNumber}, UnitRange{Int}}) = SiteInds(Dict{AtomicNumber, UnitRange{Int}}(), offsite)
+# function SiteInds(onsite::Dict{AtomicNumber, UnitRange{Int}}, offsite::Dict{Tuple{AtomicNumber, AtomicNumber}, UnitRange{Int}}, speciescoupling::SPSYM )
+#     _assert_offsite_keys(offsite,speciescoupling)
+#     new{SPSYM}(onsite, offsite)
+# end
 
 function Base.length(inds::SiteInds)
     return length(inds, :onsite) + length(inds, :offsite)
@@ -140,7 +236,7 @@ function get_range(inds::SiteInds, z::AtomicNumber)
 end
 
 function get_range(inds::SiteInds, zz::Tuple{AtomicNumber, AtomicNumber})
-    return inds.offsite[_sort(zz...)]
+    return inds.offsite[zz]
 end
 
 function model_key(site::Symbol, index::Int)
@@ -187,16 +283,16 @@ get_range(m::MatrixModel,args...) = get_range(m.inds,args...)
 get_interaction(m::MatrixModel,args...) = get_interaction(m.inds,args...)
 
 
-function _get_basisinds(onsitemodels::Dict{AtomicNumber, TM1},offsitemodels::Dict{Tuple{AtomicNumber, AtomicNumber}, TM2}) where {TM1, TM2}
-    return SiteInds(_get_basisinds(onsitemodels), _get_basisinds(offsitemodels))
-end
+# function _get_basisinds(onsitemodels::Dict{AtomicNumber, TM1},offsitemodels::Dict{Tuple{AtomicNumber, AtomicNumber}, TM2}) where {TM1, TM2}
+#     return SiteInds(_get_basisinds(onsitemodels), _get_basisinds(offsitemodels))
+# end
 
 function _get_basisinds(models::Dict{Z, TM}) where {Z,TM}
     inds = Dict{Z, UnitRange{Int}}()
     i0 = 1
     for (zz, mo) in models
-        @assert typeof(mo) <: ACE.LinearACEModel
-        len = nparams(mo)
+        @assert typeof(mo.linmodel) <: ACE.LinearACEModel
+        len = nparams(mo.linmodel)
         inds[zz] = i0:(i0+len-1)
         i0 += len
     end
@@ -204,9 +300,7 @@ function _get_basisinds(models::Dict{Z, TM}) where {Z,TM}
 end
 
 
-_sort(z1,z2) = (z1<=z2 ? (z1,z2) : (z2,z1))
-
-_get_model(calc::MatrixModel, zz::Tuple{AtomicNumber,AtomicNumber}) = calc.offsite.models[_sort(zz...)]
+_get_model(calc::MatrixModel, zz::Tuple{AtomicNumber,AtomicNumber}) = calc.offsite.models[zz]
 _get_model(calc::MatrixModel, z::AtomicNumber) =  calc.onsite.models[z]
 
 

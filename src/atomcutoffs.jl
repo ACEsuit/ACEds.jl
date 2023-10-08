@@ -1,6 +1,6 @@
 module AtomCutoffs
 
-import ACEbonds.BondCutoffs: EllipsoidCutoff
+import ACEbonds.BondCutoffs: EllipsoidCutoff, env_cutoff, env_filter, env_transform
 
 export SphericalCutoff, AbstractCutoff
 export env_filter, env_transform, env_cutoff

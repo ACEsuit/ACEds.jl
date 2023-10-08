@@ -26,6 +26,7 @@ raw_data =JLD.load(filename)["data"]
 
 
 rng = MersenneTwister(1234)
+
 shuffle!(rng, raw_data)
 data = @showprogress [ 
     begin 
