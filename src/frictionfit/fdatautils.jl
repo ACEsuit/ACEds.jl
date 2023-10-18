@@ -21,6 +21,7 @@ _format_tensor(::Val{:dense_block},b,fi) =  Matrix(b[fi,fi])
 #_format_tensor(::Val{:sparse_single},b,fi)  =  todo: implement this 
 _format_tensor(::Val{:sparse_block},b,fi) =  b[fi,fi]
 
+
 function flux_data(d::FrictionData,fm::FrictionModel, transforms::NamedTuple, matrix_format::Symbol, weighted=true, join_sites=true, stacked=true)
     # TODO: in-place data manipulations
     if d.friction_tensor_ref === nothing
@@ -34,10 +35,11 @@ function flux_data(d::FrictionData,fm::FrictionModel, transforms::NamedTuple, ma
     else
         B = Tuple(transform_basis(map(b->_format_tensor(Val(matrix_format),b, d.friction_indices), B[s]), transforms[s]) for s in keys(B))
     end
+    Tfm = Tuple(typeof(mo) for mo in values(fm.matrixmodels))
     if weighted
         W = weight_matrix(d, Val(matrix_format))
     end
-    return (weighted ? (friction_tensor=friction_tensor,B=B,W=W) : (friction_tensor=friction_tensor,B=B))
+    return (weighted ? (friction_tensor=friction_tensor,B=B,Tfm=Tfm,W=W,) : (friction_tensor=friction_tensor,B=B, Tfm=Tfm,))
 end
 
 function flux_assemble(data::Array{DATA}, fm::FrictionModel, transforms::NamedTuple; matrix_format=:dense_reduced, weighted=true, join_sites=true) where {DATA<:FrictionData}

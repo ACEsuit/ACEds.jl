@@ -1,10 +1,13 @@
 module FrictionModels
 
+using StaticArrays, SparseArrays
 using ACEds.MatrixModels
 import ACEds.MatrixModels: basis, matrix
 using LinearAlgebra
 using JuLIP: Atoms
 using ACE
+using ACEds.PWMatrix
+
 import ACE: params, nparams, set_params!
 import ACEds.MatrixModels: set_zero!
 import ACE: scaling
@@ -80,6 +83,38 @@ function Gamma(M::MatrixModel, at::Atoms; kvargs...)
     Σ_vec = Sigma(M, at; kvargs...) 
     return sum(Σ*transpose(Σ) for Σ in Σ_vec)
 end
+
+function Gamma(M::NewPWMatrixModel, at::Atoms; kvargs...) 
+    Σ_vec = Sigma(M, at; kvargs...) 
+    return sum(square(Σ) for Σ in Σ_vec)
+end
+
+function _square(Σ::SparseMatrixCSC{Tv,Ti}, ::NewPW2MatrixModel) where {Tv, Ti}
+    @assert iseven(length(Σ.nzval))
+    nvals = 2*length(Σ.nzval) #+ length(Σ.m)
+    Is, Js, Vs = findnz(Σ)
+    I, J, V = Array{Ti}(undef,nvals), Array{Ti}(undef,nvals), Array{SMatrix{3, 3,eltype(Tv), 9}}(undef,nvals)
+    k = 1 
+    for (i,j,σij) in zip(Is, Js, Vs)
+        if i < j 
+            σji = Σ[j,i]
+            Γij = σij * σji'
+            I[k], J[k], V[k] = i,j,-σij * σji'
+            I[k+1], J[k+1], V[k+1] = j,i, -σji * σij'
+            I[k+2], J[k+2], V[k+2] = i,i, σij* σij'
+            I[k+3], J[k+3], V[k+3] = j,j, σji* σji'
+            k+=4
+        end
+    end
+    A = sparse(I, J, V, Σ.m, Σ.n)
+    return A
+end
+
+function Gamma(M::NewPW2MatrixModel, at::Atoms; kvargs...) 
+    Σ_vec = Sigma(M, at; kvargs...) 
+    return sum(_square(Σ,M) for Σ in Σ_vec)
+end
+
 
 # using Tullio
 # function Gamma(M::MatrixModel{Covariant}, at::Atoms; kvargs...) 

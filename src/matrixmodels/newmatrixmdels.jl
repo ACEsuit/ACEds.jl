@@ -7,45 +7,200 @@
 #     id::Symbol
 # end
 
-_mreduce(z1,z2, ::SpeciesUnCoupled) = (z1,z2)
-_mreduce(z1,z2, ::SpeciesCoupled) = _msort(z1,z2)
 
 
-struct NewACMatrixModel{O3S,TM1,TM2,Z2S,CUTOFF,COUPLING,SPSYM} <: MatrixModel{O3S}
-    onsite::OnSiteModels{O3S,TM1}
-    offsite::OffSiteModels{O3S,TM2,Z2S,CUTOFF} 
-    n_rep::Int
-    inds::SiteInds
-    id::Symbol
-    function NewACMatrixModel(onsite::OnSiteModels{O3S,TM1}, offsite::OffSiteModels{O3S,TM2,Z2S,CUTOFF}, id::Symbol, ::COUPLING, spsym::SPSYM) where {O3S,TM1, TM2, SPSYM, Z2S,CUTOFF,COUPLING}
-        _assert_offsite_keys(offsite,spsym)
-        @assert  _n_rep(onsite) ==  _n_rep(offsite)
-        #@assert all([z1 in keys(onsite), z2 in keys(offsite)  for (z1,z2) in zzkeys])
-        return new{O3S,TM1,TM2,Z2S,CUTOFF,COUPLING,SPSYM}(onsite, offsite, _n_rep(onsite), SiteInds(_get_basisinds(onsite), _get_basisinds(offsite)), id)
-    end
-end #TODO: Add proper constructor that checks for correct Species coupling
 
-struct NewOnsiteMatrixModel{O3S,TM} <: MatrixModel{O3S}
-    onsite::OnSiteModels{O3S,TM}
-    n_rep::Int
-    inds::SiteInds
-    id::Symbol
-    function NewOnsiteMatrixModel(onsite::OnSiteModels{O3S,TM}, id::Symbol) where {O3S,TM}
-        return new{O3S,TM}(onsite, _n_rep(onsite), SiteInds(_get_basisinds(onsite)), id)
+# function matrix(M::MatrixModel, at::Atoms; sparse=:sparse, filter=(_,_)->true, T=Float64) 
+#     A = allocate_matrix(M, at, sparse, T)
+#     matrix!(M, at, A, filter)
+#     return A
+# end
+
+# function allocate_matrix(M::NewACMatrixModel, at::Atoms, sparse=:sparse, T=Float64) 
+#     N = length(at)
+#     if sparse == :sparse
+#         # Γ = repeat([spzeros(_block_type(M,T),N,N)], M.n_rep)
+#         A = [spzeros(_block_type(M,T),N,N) for _ = 1:M.n_rep]
+#     else
+#         # Γ = repeat([zeros(_block_type(M,T),N,N)], M.n_rep)
+#         A = [zeros(_block_type(M,T),N,N) for _ = 1:M.n_rep]
+#     end
+#     return A
+# end
+
+# function allocate_matrix(M::NewPWMatrixModel, at::Atoms, sparse=:sparse, T=Float64) 
+#     N = length(at)
+#     if sparse == :sparse
+#         # Γ = repeat([spzeros(_block_type(M,T),N,N)], M.n_rep)
+#         A = [spzeros(_block_type(M,T),N,N) for _ = 1:M.n_rep]
+#     else
+#         # Γ = repeat([zeros(_block_type(M,T),N,N)], M.n_rep)
+#         A = [zeros(_block_type(M,T),N,N) for _ = 1:M.n_rep]
+#     end
+#     return A
+# end
+
+using LinearAlgebra: Diagonal
+
+evaluate(sm::OnSiteModel, Rs, Zs) = evaluate(sm.linmodel, env_transform(Rs, Zs, sm.cutoff))
+evaluate(sm::OffSiteModel, rrij, zi::AtomicNumber, zj::AtomicNumber, Rs, Zs) = evaluate(sm.linmodel, env_transform(rrij, zi, zj, Rs, Zs, sm.cutoff)) 
+
+function matrix!(M::NewOnsiteOnlyMatrixModel{O3S}, at::Atoms, Σ, filter=(_,_)->true) where {O3S}
+    site_filter(i,at) = (haskey(M.onsite, at.Z[i]) && filter(i, at))
+    for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite))
+        if site_filter(i, at) && length(neigs) > 0
+            # evaluate onsite model
+            Zs = at.Z[neigs]
+            sm = _get_model(M, at.Z[i])
+            #cfg = env_transform(Rs, Zs, sm.cutoff)
+            Σ_temp = evaluate(sm, Rs, Zs)
+            for r=1:M.n_rep
+                Σ[r][i,i] += _val2block(M, Σ_temp[r].val)
+            end
+            # evaluate offsite model
+        end
     end
 end
 
-struct NewOffsiteMatrixModel{O3S,TM,Z2S,CUTOFF,COUPLING,SPSYM} <: MatrixModel{O3S}
-    offsite::OffSiteModels{O3S,TM,Z2S,CUTOFF} 
-    n_rep::Int
-    inds::SiteInds
-    id::Symbol
-    function NewOffsiteMatrixModel(offsite::OffSiteModels{O3S,TM,Z2S,CUTOFF}, id::Symbol, ::COUPLING, spsym::SPSYM) where {O3S,TM, SPSYM, Z2S,CUTOFF,COUPLING}
-        _assert_offsite_keys(offsite,spsym)
-        return new{O3S,TM,Z2S,CUTOFF,COUPLING,SPSYM}(offsite, _n_rep(offsite), SiteInds(_get_basisinds(offsite)), id)
+function matrix!(M::NewPWMatrixModel{O3S}, at::Atoms, A, filter=(_,_)->true) where {O3S}
+    #ite_filter(i,at) = filter(i, at)
+    if !isempty(M.offsite)
+        for (i, j, rrij, Js, Rs, Zs) in bonds(at, Dict(zz=>cut for (zz,cut) in M.offsite), filter)
+            zz = _msort(at.Z[i], at.Z[j])
+            sm = M.offsite[zz]
+            # transform the ellipse to a sphere
+            cfg = env_transform(rrij, at.Z[i], at.Z[j], Rs, Zs, sm.cutoff)
+            A_temp = evaluate(sm.linmodel, cfg)
+            for r=1:M.n_rep
+                add!(A[r][zz], _val2block(M, A_temp[r].val), i, j)
+            end
+        end
     end
 end
 
+function matrix!(M::NewPW2MatrixModel{O3S,<:SphericalCutoff,Z2S,SpeciesUnCoupled}, at::Atoms, A, filter=(_,_)->true) where {O3S, Z2S}
+    site_filter(i,at) = filter(i, at)
+    for (i, neigs, Rs) in sites(at, env_cutoff(M.offsite))
+        if site_filter(i, at) && length(neigs) > 0
+            Zs = at.Z[neigs]
+            # evaluate offsite model
+            for (j_loc, j) in enumerate(neigs) #rij, riι
+                Zi, Zj = at.Z[i],at.Z[j]
+                if haskey(M.offsite,(Zi,Zj))
+                    sm = M.offsite[(Zi,Zj)]
+                    cfg = env_transform(j_loc, Rs, Zs, sm.cutoff)
+                    Σ_temp = evaluate(sm.linmodel, cfg)
+                    for r=1:M.n_rep
+                        A[r][i,j] += _val2block(M, Σ_temp[r].val)
+                    end
+                end
+            end
+        end
+    end
+end
+
+
+_index_map(i,j, ::NewACMatrixModel{O3S,CUTOFF,ColumnCoupling}) where {O3S,CUTOFF} = i,j
+_index_map(i,j, ::NewACMatrixModel{O3S,CUTOFF,RowCoupling}) where {O3S,CUTOFF} = j,i 
+
+function matrix!(M::NewACMatrixModel{O3S,SphericalCutoff,COUPLING}, at::Atoms, Σ, filter=(_,_)->true) where {O3S,CUTOFF,COUPLING}
+    site_filter(i,at) = (haskey(M.onsite, at.Z[i]) && filter(i, at))
+    for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite))
+        if site_filter(i, at) && length(neigs) > 0
+            # evaluate onsite model
+            Zs = at.Z[neigs]
+            sm = _get_model(M, at.Z[i])
+            #cfg = env_transform(Rs, Zs, sm.cutoff)
+            Σ_temp = evaluate(sm, Rs, Zs)
+            for r=1:M.n_rep
+                Σ[r][i,i] += _val2block(M, Σ_temp[r].val)
+            end
+            # evaluate offsite model
+            for (j_loc, j) in enumerate(neigs) #rij, riι
+                Zi, Zj = at.Z[i],at.Z[j]
+                if haskey(M.offsite,(Zi,Zj))
+                    sm = M.offsite[(Zi,Zj)]
+                    cfg = env_transform(j_loc, Rs, Zs, sm.cutoff)
+                    Σ_temp = evaluate(sm.linmodel, cfg)
+                    for r=1:M.n_rep
+                        Σ[r][_index_map(i,j, M)...] += _val2block(M, Σ_temp[r].val)
+                    end
+                end
+            end
+        end
+    end
+end
+
+function basis!(B, M::NewACMatrixModel, at::Atoms, filter=(_,_)->true) where {O3S,CUTOFF,COUPLING} # Todo change type of B to NamedTuple{(:onsite,:offsite)} 
+    site_filter(i,at) = (haskey(M.onsite, at.Z[i]) && filter(i, at))
+    for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite))
+        if site_filter(i, at) && length(neigs) > 0
+            # evaluate basis of onsite model
+            Zs = at.Z[neigs]
+            sm = _get_model(M, at.Z[i])
+            inds = get_range(M, at.Z[i])
+            Bii = evaluate(sm.linmodel.basis, env_transform(Rs, Zs, sm.cutoff))
+            for (k,b) in zip(inds,Bii)
+                B.onsite[k][i,i] += _val2block(M, b.val)
+            end
+            for (j_loc, j) in enumerate(neigs)
+                Zi, Zj = at.Z[i],at.Z[j]
+                if haskey(M.offsite,(Zi,Zj))
+                    sm = M.offsite[(Zi,Zj)]
+                    inds = get_range(M, (Zi,Zj))
+                    cfg = env_transform(j_loc, Rs, Zs, sm.cutoff)
+                    Bij = evaluate(sm.linmodel.basis, cfg)
+                    for (k,b) in zip(inds, Bij)
+                        B.offsite[k][_index_map(i,j, M)...] += _val2block(M, b.val)
+                    end
+                end
+            end
+        end
+    end
+end
+
+function basis!(B, M::NewPW2MatrixModel{O3S,<:SphericalCutoff,Z2S,SpeciesUnCoupled}, at::Atoms, filter=(_,_)->true) where {O3S, Z2S} 
+    site_filter(i,at) = filter(i, at)
+    for (i, neigs, Rs) in sites(at, env_cutoff(M.offsite))
+        if site_filter(i, at) && length(neigs) > 0
+            Zs = at.Z[neigs]
+            # evaluate offsite model
+            for (j_loc, j) in enumerate(neigs) #rij, riι
+                Zi, Zj = at.Z[i],at.Z[j]
+                if haskey(M.offsite,(Zi,Zj))
+                    sm = M.offsite[(Zi,Zj)]
+                    inds = get_range(M, (Zi,Zj))
+                    cfg = env_transform(j_loc, Rs, Zs, sm.cutoff)
+                    Bij = evaluate(sm.linmodel.basis, cfg)
+                    for (k,b) in zip(inds, Bij)
+                        B.offsite[k][i,j] += _val2block(M, b.val)
+                    end
+                end
+            end
+        end
+    end
+end
+
+function basis!(M::NewPW2MatrixModel{O3S,<:SphericalCutoff,Z2S,SpeciesUnCoupled}, at::Atoms, B, filter=(_,_)->true) where {O3S, Z2S}
+    site_filter(i,at) = filter(i, at)
+    for (i, neigs, Rs) in sites(at, env_cutoff(M.offsite))
+        if site_filter(i, at) && length(neigs) > 0
+            Zs = at.Z[neigs]
+            # evaluate offsite model
+            for (j_loc, j) in enumerate(neigs) #rij, riι
+                Zi, Zj = at.Z[i],at.Z[j]
+                if haskey(M.offsite,(Zi,Zj))
+                    sm = M.offsite[(Zi,Zj)]
+                    cfg = env_transform(j_loc, Rs, Zs, sm.cutoff)
+                    Σ_temp = evaluate(sm.linmodel, cfg)
+                    for r=1:M.n_rep
+                        A[r][i,j] += _val2block(M, Σ_temp[r].val)
+                    end
+                end
+            end
+        end
+    end
+end
 
 using ACEds.AtomCutoffs: SphericalCutoff
 #using ACEds.Utils: SymmetricBondSpecies_basis
@@ -57,8 +212,8 @@ using JuLIP: AtomicNumber
 
 
 _z2couplingToString(::NoZ2Sym) = "noz2sym"
-_z2couplingToString(::Even) = "invariant"
-_z2couplingToString(::Odd) = "covariant"
+_z2couplingToString(::Even) = "Invariant"
+_z2couplingToString(::Odd) = "Covariant"
 
 
 function offsite_linbasis(property,species;
@@ -78,6 +233,7 @@ function offsite_linbasis(property,species;
     species_maxorder_dict = Dict{Any, Float64}(),
     species_weight_cat = Dict(c => 1.0 for c in species),
     )
+    @info "Generate offsite basis"
     @time offsite = SymmetricEllipsoidBondBasis(property; 
                 r0 = r0_ratio, 
                 rin = rin_ratio, 
@@ -96,6 +252,7 @@ function offsite_linbasis(property,species;
                 isym=isym, 
                 bond_weight = bond_weight,  
     )
+    @info "Size of offsite basis elements: $(length(offsite))"
     return BondBasis(offsite,z2symmetry)
 end
 

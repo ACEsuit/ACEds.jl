@@ -1,7 +1,8 @@
 module MatrixModels
 
+export NewACMatrixModel, NewOnsiteOnlyMatrixModel, NewPWMatrixModel, NewPW2MatrixModel
 export SiteModel, OnSiteModel, OffSiteModel,  OnSiteModels, OffSiteModels, SiteInds
-export onsite_linbasis, offsite_linbasis
+export onsite_linbasis, offsite_linbasis, env_cutoff, basis_size
 export MatrixModel, ACMatrixModel, BCMatrixModel
 export O3Symmetry, Invariant, Covariant, Equivariant
 export Odd, Even, NoZ2Sym
@@ -20,6 +21,7 @@ using StaticArrays
 using SparseArrays
 using ACEds.Utils: reinterpret
 using ACEds.AtomCutoffs
+using ACEds.PWMatrix
 
 import ACEbase: evaluate, evaluate!
 
@@ -51,6 +53,19 @@ struct PairCoupling <: NoiseCoupling end
 struct RowCoupling <: NoiseCoupling end
 struct ColumnCoupling <: NoiseCoupling end
 
+_mreduce(z1,z2, ::SpeciesUnCoupled) = (z1,z2)
+_mreduce(z1,z2, ::SpeciesCoupled) = _msort(z1,z2)
+
+function _species_symmetry(mkeys)
+    if all([(z2,z1)==_msort(z1,z2) for (z1,z2) in mkeys])
+        return SpeciesCoupled()
+    elseif all([(z2,z1) in mkeys  for (z1,z2) in mkeys])
+        return SpeciesUnCoupled()
+    else
+        @error "The species coupling is inconsistent." 
+    end
+end
+
 function _assert_offsite_keys(offsite_dict, ::SpeciesCoupled)
     return @assert all([(z2,z1)==_msort(z1,z2) for (z1,z2) in keys(offsite_dict)])
 end
@@ -72,7 +87,7 @@ function _o3symmetry(models::NamedCollection)
     if isempty(models)
         return O3Symmetry
     else
-        O3S = eltype([_o3symmetry(mo.basis)()  for mo in values(models)])
+        O3S = eltype([_o3symmetry(mo.linmodel.basis)()  for mo in values(models)])
         @assert ( O3S <: O3Symmetry && O3S != O3Symmetry) "Symmetries of model bases inconsistent. Symmetries must be of same type."
         return O3S 
     end
@@ -118,12 +133,12 @@ end
 OffSiteModel(bb::BondBasis{TM,Z2S},r_cut::T, n_rep::IT) where {TM,Z2S,T<:Real,IT<:Int} = OffSiteModel(bb, SphericalCutoff(r_cut), n_rep)
 OffSiteModel(bb::BondBasis{TM,Z2S}, rcutbond::T, rcutenv::T, zcutenv::T, n_rep::IT) where {TM,Z2S,T<:Real,IT<:Int} = OffSiteModel(bb, EllipsoidCutoff(rcutbond,rcutenv,zcutenv), n_rep)
 
-
+import ACEbonds: env_cutoff
 const OnSiteModels{O3S,TM} = Dict{AtomicNumber,OnSiteModel{O3S,TM}}
-linmodel_size(models::OnSiteModels) = sum(length(mo.linmodel.basis) for mo in values(models))
+#linmodel_size(models::OnSiteModels) = sum(length(mo.linmodel.basis) for mo in values(models))
 
 const OffSiteModels{O3S,TM,Z2S,CUTOFF} = Dict{Tuple{AtomicNumber, AtomicNumber},OffSiteModel{O3S,TM,Z2S,CUTOFF}}
-linmodel_size(models::OffSiteModels) = sum(length(mo.linmodel.basis) for mo in values(models))
+#linmodel_size(models::OffSiteModels) = sum(length(mo.linmodel.basis) for mo in values(models))
 
 const SiteModels = Union{OnSiteModels,OffSiteModels}
 
@@ -132,6 +147,12 @@ function _n_rep(models::SiteModels)
     @assert length(unique(n_reps)) == 1
     return n_reps[1]
 end
+linmodel_size(models::SiteModels) = sum(length(mo.linmodel.basis) for mo in values(models))
+
+env_cutoff(models::SiteModels) = maximum(env_cutoff(mo.cutoff) for mo in values(models))
+
+
+
 # struct PWCoupledMatrixModel{O3S,TM,SPSYM,Z2S,CUTOFF} 
 #     onsite::Dict{AtomicNumber,OnSiteModel{O3S,TM}}
 #     offsite::Dict{Tuple{AtomicNumber,AtomicNumber},OffSiteModel{O3S,TM,SPSYM,Z2S,CUTOFF}}
@@ -202,16 +223,18 @@ end
 # end
 
 
-ACEbonds.bonds(at::Atoms, offsite::OffSiteModels) = ACEbonds.bonds( at, offsite.env.rcutbond, 
-    max(offsite.env.rcutbond*.5 + offsite.env.zcutenv, 
-        sqrt((offsite.env.rcutbond*.5)^2+ offsite.env.rcutenv^2)),
-                (r, z) -> env_filter(r, z, offsite.env) )
+ACEbonds.bonds(at::Atoms, offsite::OffSiteModels, site_filter) = ACEbonds.bonds(at, Dict(zz=> mo.cutoff for (zz,mo) in offsite), site_filter) 
+#ACEbonds.bonds(at::Atoms, curoff::EllipsoidCutoff, site_filter) = ACEbonds.bonds(at, cutoff, site_filter) 
 
-ACEbonds.bonds(at::Atoms, offsite::OffSiteModels, site_filter) = ACEbonds.bonds( at, offsite.env.rcutbond, 
-    max(offsite.env.rcutbond*.5 + offsite.env.zcutenv, 
-        sqrt((offsite.env.rcutbond*.5)^2+ offsite.env.rcutenv^2)),
-                (r, z) -> env_filter(r, z, offsite.env), site_filter )
+# ACEbonds.bonds(at::Atoms, offsite::OffSiteModels, site_filter) = ACEbonds.bonds( at, envoffsite.env.rcutbond, 
+#     max(offsite.env.rcutbond*.5 + offsite.env.zcutenv, 
+#         sqrt((offsite.env.rcutbond*.5)^2+ offsite.env.rcutenv^2)),
+#                 (r, z, zzi, zzj) -> env_filter(r, z, offsite[_msort(zzi,zzj)].cutoff), site_filter )
 
+# ACEbonds.bonds(at::Atoms, offsite::OffSiteModels, site_filter) = ACEbonds.bonds( at, offsite.env.rcutbond, 
+#     max(offsite.env.rcutbond*.5 + offsite.env.zcutenv, 
+#         sqrt((offsite.env.rcutbond*.5)^2+ offsite.env.rcutenv^2)),
+#                 (r, z, i, j) -> env_filter(r, z), site_filter )
 struct SiteInds
     onsite::Dict{AtomicNumber, UnitRange{Int}}
     offsite::Dict{Tuple{AtomicNumber, AtomicNumber}, UnitRange{Int}}
@@ -300,8 +323,9 @@ function _get_basisinds(models::Dict{Z, TM}) where {Z,TM}
 end
 
 
-_get_model(calc::MatrixModel, zz::Tuple{AtomicNumber,AtomicNumber}) = calc.offsite.models[zz]
-_get_model(calc::MatrixModel, z::AtomicNumber) =  calc.onsite.models[z]
+_get_model(calc::MatrixModel, zz::Tuple{AtomicNumber,AtomicNumber}) = calc.offsite[zz]
+_get_model(calc::MatrixModel, z::AtomicNumber) =  calc.onsite[z]
+
 
 
 function ACE.params(mb::MatrixModel; format=:matrix, joinsites=true) # :vector, :matrix
@@ -318,10 +342,10 @@ end
 
 function ACE.params(mb::MatrixModel, site::Symbol; format=:matrix)
     θ = zeros(SVector{mb.n_rep,Float64}, nparams(mb, site))
-    for z in keys(getfield(mb,site).models)
+    for z in keys(getfield(mb,site))
         sm = _get_model(mb, z)
         inds = get_range(mb, z)
-        θ[inds] = params(sm) 
+        θ[inds] = params(sm.linmodel) 
     end
     return _transform(θ, Val(format), mb.n_rep)
 end
@@ -360,11 +384,13 @@ end
 
 function set_params!(mb::MatrixModel, site::Symbol, θ)
     θt = _rev_transform(θ, mb.n_rep)
-    sitedict = getfield(mb, site).models
+    sitedict = getfield(mb, site)
     for z in keys(sitedict)
         ACE.set_params!(_get_model(mb,z),θt[get_range(mb,z)]) 
     end
 end
+
+set_params!(model::SiteModel, θt) = set_params!(model.linmodel, θt)
 
 function ACE.set_params!(calc::MatrixModel, zzz::Union{AtomicNumber,Tuple{AtomicNumber,AtomicNumber}}, θ)
     return ACE.set_params!(_get_model(calc,zzz),θ)
@@ -403,6 +429,66 @@ function _rev_transform(θ, n_rep)
     return reinterpret(Vector{SVector{n_rep,Float64}}, θ)
 end
 
+# Z2S<:Uncoupled, SPSYM<:SpeciesUnCoupled, CUTOFF<:SphericalCutoff
+struct NewACMatrixModel{O3S,CUTOFF,COUPLING} <: MatrixModel{O3S}
+    onsite::Dict{AtomicNumber,OnSiteModel{O3S,TM1}} where {TM1}
+    offsite::Dict{Tuple{AtomicNumber, AtomicNumber},OffSiteModel{O3S,TM2,Z2S,CUTOFF}} where {TM2, Z2S}#, CUTOFF<:SphericalCutoff}
+    n_rep::Int
+    inds::SiteInds
+    id::Symbol
+    function NewACMatrixModel(onsite::OnSiteModels{O3S,TM1}, offsite::OffSiteModels{O3S,TM2,Z2S,CUTOFF}, id::Symbol, ::COUPLING) where {O3S,TM1, TM2,Z2S, CUTOFF<:SphericalCutoff, COUPLING<:Union{RowCoupling,ColumnCoupling}}
+        _assert_offsite_keys(offsite, SpeciesUnCoupled())
+        @assert _n_rep(onsite) ==  _n_rep(offsite)
+        @assert length(unique([mo.cutoff for mo in values(offsite)])) == 1 
+        @assert length(unique([mo.cutoff for mo in values(onsite)])) == 1 
+        #@assert all([z1 in keys(onsite), z2 in keys(offsite)  for (z1,z2) in zzkeys])
+        return new{O3S,CUTOFF,COUPLING}(onsite, offsite, _n_rep(onsite), SiteInds(_get_basisinds(onsite), _get_basisinds(offsite)), id)
+    end
+end #TODO: Add proper constructor that checks for correct Species coupling
+
+# Z2S<:Even, SPSYM<:SpeciesCoupled
+struct NewPWMatrixModel{O3S} <: MatrixModel{O3S}
+    offsite::OffSiteModels{O3S,TM2,Z2S,CUTOFF} where {TM2, Z2S<:Even, CUTOFF<:EllipsoidCutoff}
+    n_rep::Int
+    inds::SiteInds
+    id::Symbol
+    function NewPWMatrixModel(offsite::OffSiteModels{O3S,TM2,Z2S,CUTOFF}, id::Symbol) where {O3S, TM2,Z2S <: Even,CUTOFF}
+        _assert_offsite_keys(offsite, SpeciesCoupled())
+        @assert length(unique([mo.n_rep for mo in values(offsite)])) == 1
+        @assert length(unique([mo.cutoff for mo in values(offsite)])) == 1 
+        #@assert all([z1 in keys(onsite), z2 in keys(offsite)  for (z1,z2) in zzkeys])
+        return new{O3S}(offsite, _n_rep(offsite), SiteInds(_get_basisinds(offsite)), id)
+    end
+end
+
+struct NewPW2MatrixModel{O3S,CUTOFF,Z2S,SC} <: MatrixModel{O3S}
+    offsite::OffSiteModels{O3S,TM2,Z2S,CUTOFF} where {TM2, Z2S, CUTOFF}
+    n_rep::Int
+    inds::SiteInds
+    id::Symbol
+    function NewPW2MatrixModel(offsite::OffSiteModels{O3S,TM2,Z2S,CUTOFF}, id::Symbol) where {O3S,TM2,Z2S,CUTOFF}
+        #_assert_offsite_keys(offsite, SpeciesCoupled())
+        SC = typeof(_species_symmetry(keys(offsite)))
+        @assert length(unique([mo.n_rep for mo in values(offsite)])) == 1
+        @assert length(unique([mo.cutoff for mo in values(offsite)])) == 1 
+        #@assert all([z1 in keys(onsite), z2 in keys(offsite)  for (z1,z2) in zzkeys])
+        return new{O3S,CUTOFF,Z2S,SC}(offsite, _n_rep(offsite), SiteInds(_get_basisinds(offsite)), id)
+    end
+end
+
+struct NewOnsiteOnlyMatrixModel{O3S} <: MatrixModel{O3S}
+    onsite::OnSiteModels{O3S,TM} where {TM}
+    n_rep::Int
+    inds::SiteInds
+    id::Symbol
+    function NewOnsiteOnlyMatrixModel(onsite::OnSiteModels{O3S,TM}, id::Symbol) where {O3S,TM}
+        @show unique([mo.n_rep for mo in values(onsite)])
+        @assert length(unique([mo.n_rep for mo in values(onsite)])) == 1
+        @assert length(unique([mo.cutoff for mo in values(onsite)])) == 1 
+        return new{O3S}(onsite, _n_rep(onsite), SiteInds(_get_basisinds(onsite)), id)
+    end
+end
+
 # function _transform(θ, ::Val{:vector}, n_rep)
 #     return reinterpret(Vector{Float64}, θ)
 # end
@@ -433,6 +519,7 @@ function matrix(M::MatrixModel, at::Atoms; sparse=:sparse, filter=(_,_)->true, T
     return A
 end
 
+
 function allocate_matrix(M::MatrixModel, at::Atoms, sparse=:sparse, T=Float64) 
     N = length(at)
     if sparse == :sparse
@@ -444,6 +531,30 @@ function allocate_matrix(M::MatrixModel, at::Atoms, sparse=:sparse, T=Float64)
     end
     return A
 end
+
+function allocate_matrix(M::NewOnsiteOnlyMatrixModel, at::Atoms, sparse=:sparse, T=Float64) 
+    N = length(at)
+    return [Diagonal(zeros(_block_type(M,T),N)) for _ = 1:M.n_rep]
+end
+
+function allocate_matrix(M::NewPWMatrixModel, at::Atoms, sparse=:sparse, T=Float64) 
+    N = length(at)
+    return [Dict(zz=>PWNoiseMatrix(N,2*N, T, _block_type(M,T)) for zz in keys(M.offsite)) for _ = 1:M.n_rep] #TODO: Allocation can be made more economic by taking into account #s per speices 
+end
+
+function allocate_matrix(M::NewPW2MatrixModel, at::Atoms, sparse=:sparse, T=Float64) 
+    N = length(at)
+    if sparse == :sparse
+        # Γ = repeat([spzeros(_block_type(M,T),N,N)], M.n_rep)
+        A = [spzeros(_block_type(M,T),N,N) for _ = 1:M.n_rep]
+    else
+        # Γ = repeat([zeros(_block_type(M,T),N,N)], M.n_rep)
+        A = [zeros(_block_type(M,T),N,N) for _ = 1:M.n_rep]
+    end
+    return A
+end
+
+
 
 function basis(M::MatrixModel, at::Atoms; join_sites=false, sparsity= :sparse, filter=(_,_)->true, T=Float64) 
     B = allocate_B(M, at, sparsity, T)

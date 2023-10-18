@@ -3,6 +3,7 @@ module ACEds
 # monkey patching to fix minor ACE bug:
 #include("./patches/ACEfixes.jl")
 # utility functions for conversion of arrays, manipulation of bases and generation of bases for bond environments
+include("./pwnoisematrix.jl")
 include("./utils/utils.jl")
 # utility functions for importing and internally storing data of friction tensors/matrices 
 include("./datautils.jl")

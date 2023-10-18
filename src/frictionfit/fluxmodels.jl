@@ -47,39 +47,76 @@ function _Sigma(BB::Tuple, cc::Tuple) # not tested
     return Tuple(_Sigma(b,c) for (b,c) in zip(BB,cc))
 end
 
-function _Gamma(BB::Tuple, cc::Tuple) 
-    return sum(_Gamma(b,c) for (b,c) in zip(BB,cc))
+function _Gamma(BB::Tuple, cc::Tuple, Tfm::Tuple) 
+    return sum(_Gamma(b,c, tfm) for (b,c,tfm) in zip(BB,cc, Tfm))
 end
 
 function _Sigma(B::AbstractArray{T,3}, cc::AbstractArray{T,2}) where {T}
     return @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
 end
 
-function _Gamma(B::AbstractArray{T,3}, cc::AbstractArray{T,2}) where {T}
+function _Gamma(B::AbstractArray{T,3}, cc::AbstractArray{T,2}, ::Type{Tfm}) where {T, Tfm<:MatrixModel}
     @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
     @tullio Γ[i,j] := Σ[i,k,r] * Σ[j,k,r]
     return Γ
 end
 
+function _Gamma(B::AbstractArray{T,3}, cc::AbstractArray{T,2}, ::Type{Tfm}) where {T, Tfm<:NewPW2MatrixModel}
+    @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
+    @tullio Γ[i,j] :=  Σ[i,j,r] * transpose(Σ[j,i,r])
+    @tullio Γ[i,i] :=  Σ[i,k,r] * transpose(Σ[i,k,r])
+    return Γ
+end
+
+
+#TODO: need to extend functions below to include
 function _Sigma(B::AbstractArray{SMatrix{3, 3, T, 9},3}, cc::AbstractArray{T,2}) where {T}
     return @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
 end
 
-function _Gamma(B::AbstractArray{SMatrix{3, 3, T, 9},3}, cc::AbstractArray{T,2}) where {T}
+function _Gamma(B::AbstractArray{SMatrix{3, 3, T, 9},3}, cc::AbstractArray{T,2}, ::Type{Tfm}) where {T, Tfm<:MatrixModel}
     @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
     @tullio Γ[i,j] := Σ[i,k,r] * Σ[j,k,r]
     return Γ
 end
+
+function _Gamma(B::AbstractArray{SMatrix{3, 3, T, 9},3}, cc::AbstractArray{T,2}, ::Type{Tfm}) where {T, Tfm<:NewPW2MatrixModel}
+    @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
+    @tullio Γ[i,j] :=  Σ[i,j,r] * transpose(Σ[j,i,r])
+    @tullio Γ[i,i] :=  Σ[i,k,r] * transpose(Σ[i,k,r])
+    return Γ
+end
+
 
 function _Sigma(B::AbstractArray{SVector{3,T},3}, cc::AbstractArray{T,2}) where {T}
     return @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
 end
 
-function _Gamma(B::AbstractArray{SVector{3,T},3}, cc::AbstractArray{T,2}) where {T}
+function _Gamma(B::AbstractArray{SVector{3,T},3}, cc::AbstractArray{T,2}, ::Type{Tfm}) where {T, Tfm<:MatrixModel}
     @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
     @tullio Γ[i,j] := Σ[i,k,r] * transpose(Σ[j,k,r])
     return Γ
 end
+
+function _Gamma(B::AbstractArray{SVector{3,T},3}, cc::AbstractArray{T,2}, ::Type{Tfm}) where {T, Tfm<:NewPW2MatrixModel}
+    @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
+    @tullio Γ[i,j] :=  -Σ[i,j,r] * transpose(Σ[j,i,r])
+    @tullio Γ[i,i] :=  Σ[i,k,r] * transpose(Σ[i,k,r])
+    return Γ
+end
+
+
+#%% 
+# function _Sigma(B::AbstractArray{T,3}, cc::AbstractArray{T,2}, ::Val{:PW}) where {T}
+#     return @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
+# end
+
+# function _Gamma(B::AbstractArray{T,3}, cc::AbstractArray{T,2}, ::Val{:PW}) where {T}
+#     @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
+#     @tullio Γ[i,j] :=  Σ[i,j,r] * Σ[j,i,r]
+#     @tullio Γ[i,i] :=  Σ[i,k,r] * transpose(Σ[i,k,r])
+#     return Γ
+# end
 
 # Fourth optimization Einsum
 # using Einsum
@@ -200,7 +237,7 @@ function set_params!(m::FluxFrictionModel, c_new::NamedTuple)
 end
 
 get_ids(m::FluxFrictionModel) = m.model_ids
-(m::FluxFrictionModel)(B) = _Gamma(B, m.c)
+(m::FluxFrictionModel)(B, Tfm) = _Gamma(B, m.c, Tfm)
 Flux.@functor FluxFrictionModel (c,)
 Flux.trainable(m::FluxFrictionModel) = (c=m.c,)
 params(m::FluxFrictionModel; transformed=true) = NamedTuple{m.model_ids}(transformed ? rev_transform_params(m.c,m.transforms) : m.c )
@@ -208,9 +245,9 @@ get_transform(m::FluxFrictionModel) = NamedTuple{m.model_ids}(m.transforms)
 
 _l2(Γ_fit::AbstractMatrix{SMatrix{3,3,T,9}},Γ_true::AbstractMatrix{SMatrix{3,3,T,9}}) where {T<:Number}= sum(sum((Γ_fit.- Γ_true).^2))
 _l2(Γ_fit::Matrix{T},Γ_true::Matrix{T}) where {T<:Number}= sum((Γ_fit.- Γ_true).^2)
-l2_loss(fm, data) = sum(_l2(fm(d.B), d.friction_tensor) for d in data)
+l2_loss(fm, data) = sum(_l2(fm(d.B, d.Tfm), d.friction_tensor) for d in data)
 
-weighted_l2_loss(fm, data) = sum(_weighted_l2(fm(d.B), d.friction_tensor, d.W) for d in data)
+weighted_l2_loss(fm, data) = sum(_weighted_l2(fm(d.B, d.Tfm), d.friction_tensor, d.W) for d in data)
 
 _weighted_l2(Γ_fit::AbstractMatrix{SMatrix{3,3,T,9}},Γ_true::AbstractMatrix{SMatrix{3,3,T,9}}, W::AbstractMatrix{SMatrix{3,3,T,9}}) where {T<:Number}= sum(sum(W.*(Γ_fit.- Γ_true).^2))
 _weighted_l2(Γ_fit::Matrix{T},Γ_true::Matrix{T},W::Matrix{T}) where {T<:Number}= sum(W .* (Γ_fit.- Γ_true).^2)
