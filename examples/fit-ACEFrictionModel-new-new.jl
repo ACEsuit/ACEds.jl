@@ -117,13 +117,15 @@ ffm = FluxFrictionModel(c)
 
 typeof(fdata["train"]) <: Array{T} where {T<:FrictionData}
 
-flux_data = Dict( tt=> flux_assemble(fdata[tt], fm, ffm; weighted=true, matrix_format=:dense_block) for tt in ["train","test"]);
+flux_data = Dict( tt=> flux_assemble(fdata[tt], fm, ffm; weighted=true, matrix_format=:dense_scalar) for tt in ["train","test"]);
 
 set_params!(ffm; sigma=1E-8)
 if cuda
     ffm = fmap(cu, ffm)
 end
 
+
+flux_data["train"][1].friction_tensor
 # # typeof(ffm.c[1])
 
 # # import ACEds.FrictionFit: _Gamma, _square

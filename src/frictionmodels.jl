@@ -90,6 +90,9 @@ function Gamma(M::NewPWMatrixModel, at::Atoms; kvargs...)
 end
 
 function _square(Σ::SparseMatrixCSC{Tv,Ti}, ::NewPW2MatrixModel) where {Tv, Ti}
+    if !iseven(length(Σ.nzval))
+        @show Matrix(Σ)
+    end
     @assert iseven(length(Σ.nzval))
     nvals = 2*length(Σ.nzval) #+ length(Σ.m)
     Is, Js, Vs = findnz(Σ)
@@ -98,7 +101,6 @@ function _square(Σ::SparseMatrixCSC{Tv,Ti}, ::NewPW2MatrixModel) where {Tv, Ti}
     for (i,j,σij) in zip(Is, Js, Vs)
         if i < j 
             σji = Σ[j,i]
-            Γij = σij * σji'
             I[k], J[k], V[k] = i,j,-σij * σji'
             I[k+1], J[k+1], V[k+1] = j,i, -σji * σij'
             I[k+2], J[k+2], V[k+2] = i,i, σij* σij'

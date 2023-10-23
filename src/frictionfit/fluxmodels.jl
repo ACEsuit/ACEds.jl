@@ -47,63 +47,81 @@ function _Sigma(BB::Tuple, cc::Tuple) # not tested
     return Tuple(_Sigma(b,c) for (b,c) in zip(BB,cc))
 end
 
-function _Gamma(BB::Tuple, cc::Tuple, Tfm::Tuple) 
-    return sum(_Gamma(b,c, tfm) for (b,c,tfm) in zip(BB,cc, Tfm))
-end
-
 function _Sigma(B::AbstractArray{T,3}, cc::AbstractArray{T,2}) where {T}
     return @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
 end
 
-function _Gamma(B::AbstractArray{T,3}, cc::AbstractArray{T,2}, ::Type{Tfm}) where {T, Tfm<:MatrixModel}
+function _Gamma(BB::Tuple, cc::Tuple, Tmf::Tuple) 
+    return reduce(_msum, _Gamma(b,c,tmf) for (b,c,tmf) in zip(BB,cc,Tmf))
+end
+
+_msum(B::AbstractArray{T,3}, A::AbstractArray{T,4}) where {T} = _msum(A, B) 
+function _msum(A::AbstractArray{T,4}, B::AbstractArray{T,3}) where {T} 
+    @tullio A[d1,d2,i,i] = A[d1,d2,i,i]+B[d1,d2,i]
+    return A
+end
+_msum(A::AbstractArray{T,N}, B::AbstractArray{T,N}) where {T,N} = A+B
+
+
+function _Gamma(B::AbstractArray{T,3}, cc::AbstractArray{T,2}, ::Type{Tfm}) where {T, Tfm<:NewACMatrixModel}
     @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
     @tullio Γ[i,j] := Σ[i,k,r] * Σ[j,k,r]
     return Γ
 end
 
-function _Gamma(B::AbstractArray{T,3}, cc::AbstractArray{T,2}, ::Type{Tfm}) where {T, Tfm<:NewPW2MatrixModel}
-    @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
-    @tullio Γ[i,j] :=  Σ[i,j,r] * transpose(Σ[j,i,r])
-    @tullio Γ[i,i] :=  Σ[i,k,r] * transpose(Σ[i,k,r])
+function _Gamma(Bt::AbstractArray{T,4}, cc::AbstractArray{T,2}, ::Type{<:NewPW2MatrixModel}) where {T}
+    @tullio Σ[d,i,j,r] := Bt[d,i,j,k] * cc[k,r]
+    @tullio Γ[d1,d2,i,j] := - Σ[d1,i,j,r] *  Σ[d2,j,i,r]
+    @tullio Γ[d1,d2,i,i] = Σ[d1,i,j,r] * Σ[d2,i,j,r] 
     return Γ
 end
+function _Gamma(Bt::AbstractArray{T,5}, cc::AbstractArray{T,2}, ::Type{<:NewPW2MatrixModel}) where {T}
+    @tullio Σ[d1,d2,i,j,r] := Bt[d1,d2,i,j,k] * cc[k,r]
+    @tullio Γ[d1,d2,i,j] := - Σ[d1,d,i,j,r] *  Σ[d2,d,j,i,r]
+    @tullio Γ[d1,d2,i,i] = Σ[d1,d,i,j,r] * Σ[d2,d,i,j,r] 
+    return Γ
+end
+
+function _Gamma(Bt::AbstractArray{T,3}, cc::AbstractArray{T,2}, ::Type{<:NewOnsiteOnlyMatrixModel}) where {T} 
+    @tullio Σ[i,l,r] := Bt[i,l,k] * cc[k,r]
+    @tullio Γ[i,j,l] :=  Σ[i,l,r] * Σ[j,l,r]
+    return Γ
+end
+
+function _Gamma(Bt::AbstractArray{T,4}, cc::AbstractArray{T,2}, ::Type{<:NewOnsiteOnlyMatrixModel}) where {T} 
+    @tullio Σ[i,j,l,r] := Bt[i,j,l,k] * cc[k,r]
+    @tullio Γ[i,j,l] :=  Σ[i,d,l,r] * Σ[j,d,l,r]
+    return Γ
+end
+
+
+
+
+
+
+
 
 
 #TODO: need to extend functions below to include
 function _Sigma(B::AbstractArray{SMatrix{3, 3, T, 9},3}, cc::AbstractArray{T,2}) where {T}
     return @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
 end
-
-function _Gamma(B::AbstractArray{SMatrix{3, 3, T, 9},3}, cc::AbstractArray{T,2}, ::Type{Tfm}) where {T, Tfm<:MatrixModel}
-    @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
-    @tullio Γ[i,j] := Σ[i,k,r] * Σ[j,k,r]
-    return Γ
-end
-
-function _Gamma(B::AbstractArray{SMatrix{3, 3, T, 9},3}, cc::AbstractArray{T,2}, ::Type{Tfm}) where {T, Tfm<:NewPW2MatrixModel}
-    @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
-    @tullio Γ[i,j] :=  Σ[i,j,r] * transpose(Σ[j,i,r])
-    @tullio Γ[i,i] :=  Σ[i,k,r] * transpose(Σ[i,k,r])
-    return Γ
-end
-
-
 function _Sigma(B::AbstractArray{SVector{3,T},3}, cc::AbstractArray{T,2}) where {T}
     return @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
 end
 
-function _Gamma(B::AbstractArray{SVector{3,T},3}, cc::AbstractArray{T,2}, ::Type{Tfm}) where {T, Tfm<:MatrixModel}
+function _Gamma(B::AbstractArray{SMatrix{3, 3, T, 9},3}, cc::AbstractArray{T,2}, ::Type{Tfm}) where {T, Tfm<:NewACMatrixModel}
+    @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
+    @tullio Γ[i,j] := Σ[i,k,r] * Σ[j,k,r]
+    return Γ
+end
+function _Gamma(B::AbstractArray{SVector{3,T},3}, cc::AbstractArray{T,2}, ::Type{Tfm}) where {T, Tfm<:NewACMatrixModel}
     @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
     @tullio Γ[i,j] := Σ[i,k,r] * transpose(Σ[j,k,r])
     return Γ
 end
 
-function _Gamma(B::AbstractArray{SVector{3,T},3}, cc::AbstractArray{T,2}, ::Type{Tfm}) where {T, Tfm<:NewPW2MatrixModel}
-    @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
-    @tullio Γ[i,j] :=  -Σ[i,j,r] * transpose(Σ[j,i,r])
-    @tullio Γ[i,i] :=  Σ[i,k,r] * transpose(Σ[i,k,r])
-    return Γ
-end
+
 
 
 #%% 

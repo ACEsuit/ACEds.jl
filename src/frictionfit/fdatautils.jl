@@ -10,19 +10,74 @@ function flux_assemble(data::Array{DATA}, fm::FrictionModel, ffm::FluxFrictionMo
     return flux_assemble(data, fm, transforms; matrix_format= matrix_format, weighted=weighted)
 end
 
-# _format_friction(::Val{:dense_reduced},Γ::Matrix{T}) where {T <:Real}= Γ
-# _format_friction(::Val{:dense_reduced},Γ) = reinterpret(Matrix,Γ)
-# _format_friction(::Val{:block_reduced},Γ) = reinterpret(Matrix{SMatrix{3, 3, Float64, 9}},Γ)
-# _format_basis(::Val{:dense_reduced},b,fi) = reinterpret(Matrix,(Matrix(b[fi,fi])))
-# _format_basis(::Val{:block_reduced},b,fi) =  Matrix(b[fi,fi])
 
 _format_tensor(::Val{:dense_scalar},b,fi) = reinterpret(Matrix,(Matrix(b[fi,fi])))
-_format_tensor(::Val{:dense_block},b,fi) =  Matrix(b[fi,fi])
-#_format_tensor(::Val{:sparse_single},b,fi)  =  todo: implement this 
-_format_tensor(::Val{:sparse_block},b,fi) =  b[fi,fi]
+_format_tensor(::Val{:dense_block},b,fi) =  Matrix(b[fi,fi]) # not working yet 
+_format_tensor(::Val{:sparse_block},b,fi) =  b[fi,fi]   # not working yet
+
+function _tensor_Gamma(A::SparseMatrixCSC{SMatrix{3,3,T,9},Ti},fi) where {T<:Real, Ti}
+    Γt = zeros(T,3,3,length(fi),length(fi))
+    for (li,i) in enumerate(fi)
+        for (lj,j) in enumerate(fi)
+            Γt[:,:,li,lj] = A[i,j]
+        end
+    end
+    return Γt
+end
+
+function _tensor_basis(B::Vector{SparseMatrixCSC{SVector{3,T},Ti}}, fi, ::Type{TM}) where {T<:Real,Ti<:Int, TM<:NewPW2MatrixModel}
+    K = length(B)
+    Bt = zeros(T,3,length(fi),length(fi),K)
+    for (k,b) in enumerate(B)
+        for (li,i) in enumerate(fi)
+            for (lj,j) in enumerate(fi)
+                Bt[:,li,lj,k] = b[i,j]
+            end
+        end 
+    end
+    return Bt
+end
+
+function _tensor_basis(B::Vector{SparseMatrixCSC{SMatrix{3,3,T,9},Ti}}, fi, ::Type{<:NewPW2MatrixModel}) where {T<:Real,Ti<:Int}
+    K = length(B)
+    Bt = zeros(T,3,3,length(fi),length(fi),K)
+
+    for (k,b) in enumerate(B)
+        for (li,i) in enumerate(fi)
+            for (lj,j) in enumerate(fi)
+                Bt[:,:,li,lj,k] = b[i,j]
+            end
+        end 
+    end
+    return Bt
+end
+
+function _tensor_basis(B::Vector{<:Diagonal{SVector{3,T}}}, fi, ::Type{<:NewOnsiteOnlyMatrixModel}) where {T<:Real,Ti<:Int}
+    K = length(B)
+    n = length(fi)
+    B_diag = zeros(T,3,n,K)
+    for (k,b) in enumerate(B)
+        for (l,i) in enumerate(fi)
+            B_diag[:,l,k] += b[i,i] 
+        end 
+    end
+    return B_diag
+end
+
+function _tensor_basis(B::Vector{<:Diagonal{SMatrix{3,3,T,9}}}, fi, ::Type{<:NewOnsiteOnlyMatrixModel}) where {T<:Real,Ti<:Int}
+    K = length(B)
+    n = length(fi)
+    B_diag = zeros(T,3,3,n,K)
+    for (k,b) in enumerate(B)
+        for (l,i) in enumerate(fi)
+            B_diag[:,:,l,k] += b[i,i] 
+        end 
+    end
+    return B_diag
+end
 
 
-function flux_data(d::FrictionData,fm::FrictionModel, transforms::NamedTuple, matrix_format::Symbol, weighted=true, join_sites=true, stacked=true)
+function flux_data_AC(d::FrictionData,fm::FrictionModel, transforms::NamedTuple, matrix_format::Symbol, weighted=true, join_sites=true, stacked=true)
     # TODO: in-place data manipulations
     if d.friction_tensor_ref === nothing
         friction_tensor = _format_tensor(Val(matrix_format), d.friction_tensor,d.friction_indices)
@@ -41,6 +96,32 @@ function flux_data(d::FrictionData,fm::FrictionModel, transforms::NamedTuple, ma
     end
     return (weighted ? (friction_tensor=friction_tensor,B=B,Tfm=Tfm,W=W,) : (friction_tensor=friction_tensor,B=B, Tfm=Tfm,))
 end
+
+function flux_data_PW(d::FrictionData,fm::FrictionModel, transforms::NamedTuple, matrix_format::Symbol, weighted=true, join_sites=true, stacked=true)
+    # TODO: in-place data manipulations
+    if d.friction_tensor_ref === nothing
+        friction_tensor = _tensor_Gamma(d.friction_tensor,d.friction_indices)
+    else
+        friction_tensor = _format_Gamma(d.friction_tensor-d.friction_tensor_ref,d.friction_indices)
+    end
+    BB = basis(fm, d.atoms; join_sites=join_sites)  
+    #BB = basis(fm, at; join_sites=true); 
+
+    Tmf = Tuple([typeof(mo) for mo in fm.matrixmodels]);
+
+    Bt =  Tuple([_tensor_basis(B,fi,tmf) for (B,tmf) in zip(BB,Tmf)]) ;
+    if stacked
+        B = Tuple(Flux.stack(transform_basis(map(b->_format_tensor(Val(matrix_format),b, d.friction_indices), B[s]), transforms[s]); dims=1) for s in keys(B))
+    else
+        B = Tuple(transform_basis(map(b->_format_tensor(Val(matrix_format),b, d.friction_indices), B[s]), transforms[s]) for s in keys(B))
+    end
+    Tfm = Tuple(typeof(mo) for mo in values(fm.matrixmodels))
+    if weighted
+        W = weight_matrix(d, Val(matrix_format))
+    end
+    return (weighted ? (friction_tensor=friction_tensor,B=B,Tfm=Tfm,W=W,) : (friction_tensor=friction_tensor,B=B, Tfm=Tfm,))
+end
+
 
 function flux_assemble(data::Array{DATA}, fm::FrictionModel, transforms::NamedTuple; matrix_format=:dense_reduced, weighted=true, join_sites=true) where {DATA<:FrictionData}
     #model_ids = (isempty(model_ids) ? keys(fm.matrixmodels) : model_ids)

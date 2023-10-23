@@ -78,27 +78,6 @@ function matrix!(M::NewPWMatrixModel{O3S}, at::Atoms, A, filter=(_,_)->true) whe
     end
 end
 
-function matrix!(M::NewPW2MatrixModel{O3S,<:SphericalCutoff,Z2S,SpeciesUnCoupled}, at::Atoms, A, filter=(_,_)->true) where {O3S, Z2S}
-    site_filter(i,at) = filter(i, at)
-    for (i, neigs, Rs) in sites(at, env_cutoff(M.offsite))
-        if site_filter(i, at) && length(neigs) > 0
-            Zs = at.Z[neigs]
-            # evaluate offsite model
-            for (j_loc, j) in enumerate(neigs) #rij, riι
-                Zi, Zj = at.Z[i],at.Z[j]
-                if haskey(M.offsite,(Zi,Zj))
-                    sm = M.offsite[(Zi,Zj)]
-                    cfg = env_transform(j_loc, Rs, Zs, sm.cutoff)
-                    Σ_temp = evaluate(sm.linmodel, cfg)
-                    for r=1:M.n_rep
-                        A[r][i,j] += _val2block(M, Σ_temp[r].val)
-                    end
-                end
-            end
-        end
-    end
-end
-
 
 _index_map(i,j, ::NewACMatrixModel{O3S,CUTOFF,ColumnCoupling}) where {O3S,CUTOFF} = i,j
 _index_map(i,j, ::NewACMatrixModel{O3S,CUTOFF,RowCoupling}) where {O3S,CUTOFF} = j,i 
@@ -131,6 +110,24 @@ function matrix!(M::NewACMatrixModel{O3S,SphericalCutoff,COUPLING}, at::Atoms, �
     end
 end
 
+function basis!(B, M::NewOnsiteOnlyMatrixModel, at::Atoms, filter=(_,_)->true)
+    site_filter(i,at) = (haskey(M.onsite, at.Z[i]) && filter(i, at))
+    for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite))
+        if site_filter(i, at) && length(neigs) > 0
+            # evaluate basis of onsite model
+            Zs = at.Z[neigs]
+            sm = _get_model(M, at.Z[i])
+            inds = get_range(M, at.Z[i])
+            Bii = evaluate(sm.linmodel.basis, env_transform(Rs, Zs, sm.cutoff))
+            for (k,b) in zip(inds,Bii)
+                B.onsite[k][i,i] += _val2block(M, b.val)
+            end
+        end
+    end
+end
+
+
+
 function basis!(B, M::NewACMatrixModel, at::Atoms, filter=(_,_)->true) where {O3S,CUTOFF,COUPLING} # Todo change type of B to NamedTuple{(:onsite,:offsite)} 
     site_filter(i,at) = (haskey(M.onsite, at.Z[i]) && filter(i, at))
     for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite))
@@ -159,21 +156,22 @@ function basis!(B, M::NewACMatrixModel, at::Atoms, filter=(_,_)->true) where {O3
     end
 end
 
-function basis!(B, M::NewPW2MatrixModel{O3S,<:SphericalCutoff,Z2S,SpeciesUnCoupled}, at::Atoms, filter=(_,_)->true) where {O3S, Z2S} 
+function matrix!(M::NewPW2MatrixModel{O3S,<:SphericalCutoff,Z2S,COUPLING}, at::Atoms, A, filter=(_,_)->true) where {O3S, Z2S, COUPLING}
     site_filter(i,at) = filter(i, at)
     for (i, neigs, Rs) in sites(at, env_cutoff(M.offsite))
         if site_filter(i, at) && length(neigs) > 0
             Zs = at.Z[neigs]
             # evaluate offsite model
             for (j_loc, j) in enumerate(neigs) #rij, riι
-                Zi, Zj = at.Z[i],at.Z[j]
-                if haskey(M.offsite,(Zi,Zj))
-                    sm = M.offsite[(Zi,Zj)]
-                    inds = get_range(M, (Zi,Zj))
-                    cfg = env_transform(j_loc, Rs, Zs, sm.cutoff)
-                    Bij = evaluate(sm.linmodel.basis, cfg)
-                    for (k,b) in zip(inds, Bij)
-                        B.offsite[k][i,j] += _val2block(M, b.val)
+                if site_filter(j, at)
+                    Zi, Zj = at.Z[i],at.Z[j]
+                    if haskey(M.offsite,(Zi,Zj))
+                        sm = M.offsite[(Zi,Zj)]
+                        cfg = env_transform(j_loc, Rs, Zs, sm.cutoff)
+                        Σ_temp = evaluate(sm.linmodel, cfg)
+                        for r=1:M.n_rep
+                            A[r][i,j] += _val2block(M, Σ_temp[r].val)
+                        end
                     end
                 end
             end
@@ -181,20 +179,23 @@ function basis!(B, M::NewPW2MatrixModel{O3S,<:SphericalCutoff,Z2S,SpeciesUnCoupl
     end
 end
 
-function basis!(M::NewPW2MatrixModel{O3S,<:SphericalCutoff,Z2S,SpeciesUnCoupled}, at::Atoms, B, filter=(_,_)->true) where {O3S, Z2S}
+function basis!(B, M::NewPW2MatrixModel{O3S,<:SphericalCutoff,Z2S,CUTOFF}, at::Atoms, filter=(_,_)->true) where {O3S, Z2S, CUTOFF} 
     site_filter(i,at) = filter(i, at)
     for (i, neigs, Rs) in sites(at, env_cutoff(M.offsite))
         if site_filter(i, at) && length(neigs) > 0
             Zs = at.Z[neigs]
             # evaluate offsite model
             for (j_loc, j) in enumerate(neigs) #rij, riι
-                Zi, Zj = at.Z[i],at.Z[j]
-                if haskey(M.offsite,(Zi,Zj))
-                    sm = M.offsite[(Zi,Zj)]
-                    cfg = env_transform(j_loc, Rs, Zs, sm.cutoff)
-                    Σ_temp = evaluate(sm.linmodel, cfg)
-                    for r=1:M.n_rep
-                        A[r][i,j] += _val2block(M, Σ_temp[r].val)
+                if site_filter(j, at)
+                    Zi, Zj = at.Z[i],at.Z[j]
+                    if haskey(M.offsite,(Zi,Zj))
+                        sm = M.offsite[(Zi,Zj)]
+                        inds = get_range(M, (Zi,Zj))
+                        cfg = env_transform(j_loc, Rs, Zs, sm.cutoff)
+                        Bij = evaluate(sm.linmodel.basis, cfg)
+                        for (k,b) in zip(inds, Bij)
+                            B.offsite[k][i,j] += _val2block(M, b.val)
+                        end
                     end
                 end
             end
