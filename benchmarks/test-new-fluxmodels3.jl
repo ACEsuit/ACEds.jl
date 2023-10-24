@@ -108,17 +108,28 @@ _msum(A::AbstractArray{T,N}, B::AbstractArray{T,N}) where {T,N} = A+B
 
 #%%
 
-at = gen_config(species;n_min=3,n_max=3)
+at = gen_config(species;n_min=1,n_max=1)
 
 
 #at.pbc = (false,false,false)
-#set_pbc!(at, (false,false,false))
-
+set_pbc!(at, (false,false,false))
+using ACEds.Utils: reinterpret
 
 fi =1:length(at)
 Γ = Gamma(fm,at; filter = (i,_) -> (i in fi));
+Γs = reinterpret(Matrix,(Matrix(Γ[fi,fi])))
 Γt = _tensor_Gamma(Γ, fi) 
+using Tullio
 
+tol = 1E-8
+Γs2 = Γs * transpose(Γs)
+@tullio Γt2[d1,d2,i,j] := Γt[d1,d,i,k]  * Γt[d2,d,j,k] 
+for i=1:length(at)
+    for j=1:length(at)
+        @assert norm(Γs2[(3*(i-1)+1):(3*i),(3*(j-1)+1):(3*j)] - Γt2[:,:,i,j]) < tol
+    end
+end
+#%%
 # _reconstruct_Gamma(Γt, I, J,fi,n)
 
 # typeof(_reconstruct_Gamma(Γ_flat, I, J,fi,n))
@@ -224,3 +235,8 @@ kk = 1
 Γ_native[kk,kk]
 sum(Σc[kk,i] * transpose(Σc[kk,i]) for i = 1:4)
 Γ_flat_rec[kk,kk]
+
+
+using StaticArrays, SparseArrays
+
+(Vector{<:SparseMatrixCSC{SVector{3,T},Ti}} where {T<:Real,Ti<:Int}) <: Vector{<:AbstractMatrix{SVector{3,T}}} where {T<:Real}

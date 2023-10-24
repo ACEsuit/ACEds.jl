@@ -11,7 +11,7 @@ using Random: randn!
 using Tullio
 using KernelAbstractions, CUDAKernels, CUDA
 using ACEds.MatrixModels
-
+using LinearAlgebra: Diagonal
 include("./fluxmodels.jl")
 
 using ACEds.DataUtils: FrictionData

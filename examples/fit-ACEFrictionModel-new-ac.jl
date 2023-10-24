@@ -211,8 +211,65 @@ flux_data["train"][1].friction_tensor
 
 # Flux.gradient(fm->sum(sum((fm(d.B)-d.friction_tensor).^2)  for d in data[1:2]), ffm)[1]
 
+d= flux_data["train"][1]
+using ACEds.FrictionFit: weighted_l2_loss, _l2, _Gamma
+using Tullio
 
-g = Flux.gradient(l2_loss,ffm, flux_data["train"][1:2])[1]
+function _l2b(Γ_fit::Array{T,4},Γ_true::Array{T,4}) where {T<:Number}
+    @tullio err:= (Γ_fit[d1,d2,i,j]- Γ_true[d1,d2,i,j])^2
+    return err
+end 
+l2_lossb(fm, data) = sum(_l2b(fm(d.B, d.Tfm), d.friction_tensor) for d in data)
+
+function _weighted_l2b(Γ_fit::Array{T,4},Γ_true::Array{T,4},W::Array{T,4}) where {T<:Number}
+    @tullio err:= W[d1,d2,i,j] * (Γ_fit[d1,d2,i,j]- Γ_true[d1,d2,i,j])^2
+    return err
+end 
+weighted_l2_lossb(fm, data) = sum(_weighted_l2b(fm(d.B, d.Tfm), d.friction_tensor, d.W) for d in data)
+
+
+# function _Gamma2(BB::Tuple, cc::Tuple, Tmf::Tuple) 
+#     return norm(sum(_Gamma(BB[i], cc[i], Tmf[i]) for i=1:length(cc)))
+#     #i = 2
+#     #return _Gamma(BB[i],cc[i],Tmf[i])
+#    # return sum([_Gamma(b,c,tmf) for (b,c,tmf) in zip(BB,cc,Tmf)])
+#     #return reduce(_msum, _Gamma(b,c,tmf) for (b,c,tmf) in zip(BB,cc,Tmf))
+# end
+
+
+# l2_loss(ffm, flux_data["train"][1:2])
+# l2_lossb(ffm, flux_data["train"])
+# _l2(ffm(d.B,d.Tfm), d.friction_tensor)
+
+# BB = flux_data["train"][1].B
+# Tmf = flux_data["train"][1].Tfm
+
+# h_(cc) = norm(_Gamma2(BB, cc, Tmf))
+
+# h_(ffm.c) 
+# Flux.gradient(h_,ffm.c)
+
+# h2_(cc) = norm(_Gamma(BB[2], cc, Tmf[2]))
+
+# typeof(ffm.c[2])
+# h2_(ffm.c[2]) 
+# Flux.gradient(h2_,ffm.c[2])
+
+# #h3_(cc) = norm(_Gamma(BB[1], cc[1], Tmf[1])+_Gamma(BB[2], cc[2], Tmf[2]))
+# length(BB)
+# h3_(cc) = norm(sum(_Gamma(BB[i], cc[i], Tmf[i]) for i=1:length(cc)))
+# #h3_(cc) = norm(sum(_Gamma(B, c, tmf) for (B,c,tmf) in zip(BB,cc,Tmf)))  
+# h3_(ffm.c)
+
+# Flux.gradient(h3_,ffm.c)
+
+# h4_(cc) = _Gamma2(BB, cc, Tmf) 
+
+# sum(1,2)
+
+
+
+g = Flux.gradient(weighted_l2_lossb,ffm, flux_data["train"][1:2])
 
 # typeof(g[1])
 # g[2][1].friction_tensor
@@ -230,9 +287,9 @@ epoch = 0
 
 
 #opt = Flux.setup(Adam(5E-5, (0.9999, 0.99999)),ffm)
-bsize = 10
+bsize = 100
 #opt = Flux.setup(Adam(1E-4, (0.99, 0.999)),ffm)
-opt = Flux.setup(Adam(1E-3, (0.99, 0.999)),ffm)
+opt = Flux.setup(Adam(1E-4, (0.99, 0.999)),ffm)
 # opt = Flux.setup(Adam(1E-9, (0.99, 0.999)),ffm)
 train = [(friction_tensor=d.friction_tensor,B=d.B,Tfm=d.Tfm, W=d.W) for d in flux_data["train"]]
 
@@ -244,11 +301,11 @@ using ACEds.FrictionFit: weighted_l2_loss
 for _ in 1:nepochs
     epoch+=1
     @time for d in dloader5
-        ∂L∂m = Flux.gradient(weighted_l2_loss,ffm, d)[1]
+        ∂L∂m = Flux.gradient(l2_lossb,ffm, d)[1]
         Flux.update!(opt,ffm, ∂L∂m)       # method for "explicit" gradient
     end
     for tt in ["test","train"]
-        push!(loss_traj[tt], weighted_l2_loss(ffm,flux_data[tt]))
+        push!(loss_traj[tt], l2_lossb(ffm,flux_data[tt]))
     end
     println("Epoch: $epoch, Abs avg Training Loss: $(loss_traj["train"][end]/n_train)), Test Loss: $(loss_traj["test"][end]/n_test))")
 end

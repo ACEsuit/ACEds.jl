@@ -51,35 +51,45 @@ function _Sigma(B::AbstractArray{T,3}, cc::AbstractArray{T,2}) where {T}
     return @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
 end
 
-function _Gamma(BB::Tuple, cc::Tuple, Tmf::Tuple) 
-    return reduce(_msum, _Gamma(b,c,tmf) for (b,c,tmf) in zip(BB,cc,Tmf))
+# function _Gamma(BB, cc, Tmf) 
+#     return sum(_Gamma(b,c,tmf) for (b,c,tmf) in zip(BB,cc,Tmf))
+#     #return reduce(_msum, _Gamma(b,c,tmf) for (b,c,tmf) in zip(BB,cc,Tmf))
+# end
+
+# # function _Gamma(BB::Tuple, cc::Tuple, Tmf::Tuple) 
+# #     return sum(_Gamma(b,c,tmf) for (b,c,tmf) in zip(BB,cc,Tmf))
+# #     #return reduce(_msum, _Gamma(b,c,tmf) for (b,c,tmf) in zip(BB,cc,Tmf))
+# # end
+
+# _msum(B::AbstractArray{T,3}, A::AbstractArray{T,4}) where {T} = _msum(A, B) 
+# function _msum(A::AbstractArray{T,4}, B::AbstractArray{T,3}) where {T} 
+#     @tullio A[d1,d2,i,i] = A[d1,d2,i,i]+B[d1,d2,i]
+#     return A
+# end
+# _msum(A::AbstractArray{T,N}, B::AbstractArray{T,N}) where {T,N} = A+B
+
+function _Gamma(B::AbstractArray{T,4}, cc::AbstractArray{T,2}, ::Type{Tfm}) where {T, Tfm<:NewACMatrixModel}
+    @tullio Σ[d,i,j,r] := B[d,i,j,k] * cc[k,r]
+    @tullio Γ[d1,d2,i,j] := Σ[d1,i,k,r]  * Σ[d2,j,k,r] 
+    return Γ
 end
-
-_msum(B::AbstractArray{T,3}, A::AbstractArray{T,4}) where {T} = _msum(A, B) 
-function _msum(A::AbstractArray{T,4}, B::AbstractArray{T,3}) where {T} 
-    @tullio A[d1,d2,i,i] = A[d1,d2,i,i]+B[d1,d2,i]
-    return A
-end
-_msum(A::AbstractArray{T,N}, B::AbstractArray{T,N}) where {T,N} = A+B
-
-
-function _Gamma(B::AbstractArray{T,3}, cc::AbstractArray{T,2}, ::Type{Tfm}) where {T, Tfm<:NewACMatrixModel}
-    @tullio Σ[i,j,r] := B[k,i,j] * cc[k,r]
-    @tullio Γ[i,j] := Σ[i,k,r] * Σ[j,k,r]
+function _Gamma(B::AbstractArray{T,5}, cc::AbstractArray{T,2}, ::Type{Tfm}) where {T, Tfm<:NewACMatrixModel}
+    @tullio Σ[d1,d2,i,j,r] := B[d1,d2,i,j,k] * cc[k,r]
+    @tullio Γ[d1,d2,i,j] := Σ[d1,d,i,k,r] * Σ[d2,d,j,k,r] 
     return Γ
 end
 
 function _Gamma(Bt::AbstractArray{T,4}, cc::AbstractArray{T,2}, ::Type{<:NewPW2MatrixModel}) where {T}
     @tullio Σ[d,i,j,r] := Bt[d,i,j,k] * cc[k,r]
     @tullio Γ[d1,d2,i,j] := - Σ[d1,i,j,r] *  Σ[d2,j,i,r]
-    @tullio Γ[d1,d2,i,i] = Σ[d1,i,j,r] * Σ[d2,i,j,r] 
-    return Γ
+    @tullio Γd[d1,d2,i,i] := Σ[d1,i,j,r] * Σ[d2,i,j,r] 
+    return Γ + Γd
 end
 function _Gamma(Bt::AbstractArray{T,5}, cc::AbstractArray{T,2}, ::Type{<:NewPW2MatrixModel}) where {T}
     @tullio Σ[d1,d2,i,j,r] := Bt[d1,d2,i,j,k] * cc[k,r]
     @tullio Γ[d1,d2,i,j] := - Σ[d1,d,i,j,r] *  Σ[d2,d,j,i,r]
-    @tullio Γ[d1,d2,i,i] = Σ[d1,d,i,j,r] * Σ[d2,d,i,j,r] 
-    return Γ
+    @tullio Γd[d1,d2,i,i] := Σ[d1,d,i,j,r] * Σ[d2,d,i,j,r] 
+    return Γ + Γd
 end
 
 function _Gamma(Bt::AbstractArray{T,3}, cc::AbstractArray{T,2}, ::Type{<:NewOnsiteOnlyMatrixModel}) where {T} 
@@ -255,17 +265,54 @@ function set_params!(m::FluxFrictionModel, c_new::NamedTuple)
 end
 
 get_ids(m::FluxFrictionModel) = m.model_ids
-(m::FluxFrictionModel)(B, Tfm) = _Gamma(B, m.c, Tfm)
+(m::FluxFrictionModel)(B, Tfm) = _Gamma(B, m.c, Tfm) 
+#sum(_Gamma(B[i], m.c[i], Tfm[i]) for i=1:length(m.c))
+
+function _Gamma(BB, cc, Tmf) 
+    #i = 1
+    #return _Gamma(BB[i], cc[i], Tmf[i])
+    #return sum(_Gamma(b,c,tmf) for (b,c,tmf) in zip(BB,cc,Tmf))
+    return reduce(_msum, _Gamma(b,c,tmf) for (b,c,tmf) in zip(BB,cc,Tmf))
+end
+
+_msum(B::AbstractArray{T,3}, A::AbstractArray{T,4}) where {T} = _msum(A, B) 
+function _msum(A::AbstractArray{T,4}, B::AbstractArray{T,3}) where {T} 
+    @tullio C[d1,d2,i,i] := B[d1,d2,i]
+    return C + A
+end
+function _msum(A::AbstractArray{T,N}, B::AbstractArray{T,N}) where {T,N} 
+    C = A+B
+    return C
+end
+
+
+
+#_Gamma(B, m.c, Tfm)
 Flux.@functor FluxFrictionModel (c,)
 Flux.trainable(m::FluxFrictionModel) = (c=m.c,)
 params(m::FluxFrictionModel; transformed=true) = NamedTuple{m.model_ids}(transformed ? rev_transform_params(m.c,m.transforms) : m.c )
 get_transform(m::FluxFrictionModel) = NamedTuple{m.model_ids}(m.transforms)
 
-_l2(Γ_fit::AbstractMatrix{SMatrix{3,3,T,9}},Γ_true::AbstractMatrix{SMatrix{3,3,T,9}}) where {T<:Number}= sum(sum((Γ_fit.- Γ_true).^2))
-_l2(Γ_fit::Matrix{T},Γ_true::Matrix{T}) where {T<:Number}= sum((Γ_fit.- Γ_true).^2)
-l2_loss(fm, data) = sum(_l2(fm(d.B, d.Tfm), d.friction_tensor) for d in data)
+function _l2b(Γ_fit::Array{T,4},Γ_true::Array{T,4}) where {T<:Number}
+    @tullio err:= (Γ_fit[d1,d2,i,j]- Γ_true[d1,d2,i,j])^2
+    return err
+end 
+l2_lossb(fm, data) = sum(_l2b(fm(d.B, d.Tfm), d.friction_tensor) for d in data)
 
-weighted_l2_loss(fm, data) = sum(_weighted_l2(fm(d.B, d.Tfm), d.friction_tensor, d.W) for d in data)
+function _weighted_l2b(Γ_fit::Array{T,4},Γ_true::Array{T,4},W::Array{T,4}) where {T<:Number}
+    @tullio err:= W[d1,d2,i,j] * (Γ_fit[d1,d2,i,j]- Γ_true[d1,d2,i,j])^2
+    return err
+end 
+weighted_l2_lossb(fm, data) = sum(_weighted_l2b(fm(d.B, d.Tfm), d.friction_tensor, d.W) for d in data)
 
-_weighted_l2(Γ_fit::AbstractMatrix{SMatrix{3,3,T,9}},Γ_true::AbstractMatrix{SMatrix{3,3,T,9}}, W::AbstractMatrix{SMatrix{3,3,T,9}}) where {T<:Number}= sum(sum(W.*(Γ_fit.- Γ_true).^2))
-_weighted_l2(Γ_fit::Matrix{T},Γ_true::Matrix{T},W::Matrix{T}) where {T<:Number}= sum(W .* (Γ_fit.- Γ_true).^2)
+
+# _l2(Γ_fit::AbstractMatrix{SMatrix{3,3,T,9}},Γ_true::AbstractMatrix{SMatrix{3,3,T,9}}) where {T<:Number}= sum(sum((Γ_fit.- Γ_true).^2))
+# _l2(Γ_fit::Matrix{T},Γ_true::Matrix{T}) where {T<:Number}= sum((Γ_fit.- Γ_true).^2)
+# _l2(Γ_fit::Array{T,4},Γ_true::Array{T,4}) where {T<:Number}= sum((Γ_fit.- Γ_true).^2)
+# l2_loss(fm, data) = sum(_l2(fm(d.B, d.Tfm), d.friction_tensor) for d in data)
+
+# weighted_l2_loss(fm, data) = sum(_weighted_l2(fm(d.B, d.Tfm), d.friction_tensor, d.W) for d in data)
+
+# _weighted_l2(Γ_fit::AbstractMatrix{SMatrix{3,3,T,9}},Γ_true::AbstractMatrix{SMatrix{3,3,T,9}}, W::AbstractMatrix{SMatrix{3,3,T,9}}) where {T<:Number}= sum(sum(W.*(Γ_fit.- Γ_true).^2))
+# _weighted_l2(Γ_fit::Matrix{T},Γ_true::Matrix{T},W::Matrix{T}) where {T<:Number}= sum(W .* (Γ_fit.- Γ_true).^2)
+# _weighted_l2(Γ_fit::Array{T,4},Γ_true::Array{T,4},W::Array{T,4}) where {T<:Number}= sum(W .* (Γ_fit.- Γ_true).^2)

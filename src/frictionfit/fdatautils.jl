@@ -11,9 +11,9 @@ function flux_assemble(data::Array{DATA}, fm::FrictionModel, ffm::FluxFrictionMo
 end
 
 
-_format_tensor(::Val{:dense_scalar},b,fi) = reinterpret(Matrix,(Matrix(b[fi,fi])))
-_format_tensor(::Val{:dense_block},b,fi) =  Matrix(b[fi,fi]) # not working yet 
-_format_tensor(::Val{:sparse_block},b,fi) =  b[fi,fi]   # not working yet
+# _format_tensor(::Val{:dense_scalar},b,fi) = reinterpret(Matrix,(Matrix(b[fi,fi])))
+# _format_tensor(::Val{:dense_block},b,fi) =  Matrix(b[fi,fi]) # not working yet 
+# _format_tensor(::Val{:sparse_block},b,fi) =  b[fi,fi]   # not working yet
 
 function _tensor_Gamma(A::SparseMatrixCSC{SMatrix{3,3,T,9},Ti},fi) where {T<:Real, Ti}
     Γt = zeros(T,3,3,length(fi),length(fi))
@@ -23,6 +23,31 @@ function _tensor_Gamma(A::SparseMatrixCSC{SMatrix{3,3,T,9},Ti},fi) where {T<:Rea
         end
     end
     return Γt
+end
+function _tensor_basis(B::Vector{<:AbstractMatrix{SVector{3,T}}}, fi, ::Type{TM}) where {T<:Real, TM<:NewACMatrixModel}
+    K = length(B)
+    Bt = zeros(T,3,length(fi),length(fi),K)
+    for (k,b) in enumerate(B)
+        for (li,i) in enumerate(fi)
+            for (lj,j) in enumerate(fi)
+                Bt[:,li,lj,k] = b[i,j]
+            end
+        end 
+    end
+    return Bt
+end
+
+function _tensor_basis(B::Vector{<:AbstractMatrix{SMatrix{3,3,T,9}}}, fi, ::Type{TM}) where {T<:Real, TM<:NewACMatrixModel}
+    K = length(B)
+    Bt = zeros(T,3,3,length(fi),length(fi),K)
+    for (k,b) in enumerate(B)
+        for (li,i) in enumerate(fi)
+            for (lj,j) in enumerate(fi)
+                Bt[:,:,li,lj,k] = b[i,j]
+            end
+        end 
+    end
+    return Bt
 end
 
 function _tensor_basis(B::Vector{SparseMatrixCSC{SVector{3,T},Ti}}, fi, ::Type{TM}) where {T<:Real,Ti<:Int, TM<:NewPW2MatrixModel}
@@ -77,58 +102,46 @@ function _tensor_basis(B::Vector{<:Diagonal{SMatrix{3,3,T,9}}}, fi, ::Type{<:New
 end
 
 
-function flux_data_AC(d::FrictionData,fm::FrictionModel, transforms::NamedTuple, matrix_format::Symbol, weighted=true, join_sites=true, stacked=true)
-    # TODO: in-place data manipulations
-    if d.friction_tensor_ref === nothing
-        friction_tensor = _format_tensor(Val(matrix_format), d.friction_tensor,d.friction_indices)
-    else
-        friction_tensor = _format_tensor(Val(matrix_format), d.friction_tensor-d.friction_tensor_ref,d.friction_indices)
-    end
-    B = basis(fm, d.atoms; join_sites=join_sites)  
-    if stacked
-        B = Tuple(Flux.stack(transform_basis(map(b->_format_tensor(Val(matrix_format),b, d.friction_indices), B[s]), transforms[s]); dims=1) for s in keys(B))
-    else
-        B = Tuple(transform_basis(map(b->_format_tensor(Val(matrix_format),b, d.friction_indices), B[s]), transforms[s]) for s in keys(B))
-    end
-    Tfm = Tuple(typeof(mo) for mo in values(fm.matrixmodels))
-    if weighted
-        W = weight_matrix(d, Val(matrix_format))
-    end
-    return (weighted ? (friction_tensor=friction_tensor,B=B,Tfm=Tfm,W=W,) : (friction_tensor=friction_tensor,B=B, Tfm=Tfm,))
-end
-
-function flux_data_PW(d::FrictionData,fm::FrictionModel, transforms::NamedTuple, matrix_format::Symbol, weighted=true, join_sites=true, stacked=true)
+function flux_data(d::FrictionData,fm::FrictionModel, transforms::NamedTuple, matrix_format::Symbol, weighted=true, join_sites=true, stacked=true)
     # TODO: in-place data manipulations
     if d.friction_tensor_ref === nothing
         friction_tensor = _tensor_Gamma(d.friction_tensor,d.friction_indices)
     else
-        friction_tensor = _format_Gamma(d.friction_tensor-d.friction_tensor_ref,d.friction_indices)
-    end
-    BB = basis(fm, d.atoms; join_sites=join_sites)  
-    #BB = basis(fm, at; join_sites=true); 
-
-    Tmf = Tuple([typeof(mo) for mo in fm.matrixmodels]);
-
-    Bt =  Tuple([_tensor_basis(B,fi,tmf) for (B,tmf) in zip(BB,Tmf)]) ;
-    if stacked
-        B = Tuple(Flux.stack(transform_basis(map(b->_format_tensor(Val(matrix_format),b, d.friction_indices), B[s]), transforms[s]); dims=1) for s in keys(B))
-    else
-        B = Tuple(transform_basis(map(b->_format_tensor(Val(matrix_format),b, d.friction_indices), B[s]), transforms[s]) for s in keys(B))
+        friction_tensor = _tensor_Gamma(d.friction_tensor-d.friction_tensor_ref,d.friction_indices)
     end
     Tfm = Tuple(typeof(mo) for mo in values(fm.matrixmodels))
+    BB = basis(fm, d.atoms; join_sites=join_sites)  
+    BB = Tuple(_tensor_basis(transform_basis(B,trans),d.friction_indices, tfm) for (B,tfm,trans) in zip(BB,Tfm,transforms)) 
     if weighted
-        W = weight_matrix(d, Val(matrix_format))
+        W = weight_matrix(d.weights, length(d.friction_indices))
     end
-    return (weighted ? (friction_tensor=friction_tensor,B=B,Tfm=Tfm,W=W,) : (friction_tensor=friction_tensor,B=B, Tfm=Tfm,))
+    return (weighted ? (friction_tensor=friction_tensor,B=BB,Tfm=Tfm,W=W,) : (friction_tensor=friction_tensor,B=BB, Tfm=Tfm,))
 end
 
 
-function flux_assemble(data::Array{DATA}, fm::FrictionModel, transforms::NamedTuple; matrix_format=:dense_reduced, weighted=true, join_sites=true) where {DATA<:FrictionData}
+function flux_assemble(data::Array{DATA}, fm::FrictionModel, transforms::NamedTuple; matrix_format=:dense_scalar, weighted=true, join_sites=true) where {DATA<:FrictionData}
     #model_ids = (isempty(model_ids) ? keys(fm.matrixmodels) : model_ids)
     #feature_data = Array{Float64}(undef, ACEfit.count_observations(d))
     return @showprogress [  begin
                             flux_data(d,fm, transforms, matrix_format, weighted, join_sites)
                             end for (i,d) in enumerate(data)]
+end
+
+function weight_matrix(weights::Dict, n::Ti, T=Float64) where {Ti<:Int}
+    dw, sdw, odw = weights["diag"],weights["sub_diag"] ,weights["off_diag"]
+    W = Array{T}(undef,3,3,n,n)
+    for i=1:n
+        for j=1:n
+            if i==j
+                for d1=1:3, d2=1:3
+                    W[d1,d2,i,i] = (d1==d2 ? dw : sdw)
+                end
+            else
+                W[:,:,i,j] .= odw
+            end
+        end
+    end
+    return W
 end
 
 function weight_matrix(d::FrictionData, ::Val{:dense_scalar}, T=Float64)

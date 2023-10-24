@@ -460,6 +460,14 @@ function ACE.set_params!(mb::MatrixModel, θ::NamedTuple)
     ACE.set_params!(mb, :offsite, θ.offsite)
 end
 
+function ACE.set_params!(mb::NewPW2MatrixModel, θ::NamedTuple)
+    ACE.set_params!(mb, :offsite, θ.offsite)
+end
+
+function ACE.set_params!(mb::NewOnsiteOnlyMatrixModel, θ::NamedTuple)
+    ACE.set_params!(mb, :onsite,  θ.onsite)
+end
+
 function set_params!(mb::MatrixModel, site::Symbol, θ)
     θt = _rev_transform(θ, mb.n_rep)
     sitedict = getfield(mb, site)

@@ -82,7 +82,7 @@ end
 _index_map(i,j, ::NewACMatrixModel{O3S,CUTOFF,ColumnCoupling}) where {O3S,CUTOFF} = i,j
 _index_map(i,j, ::NewACMatrixModel{O3S,CUTOFF,RowCoupling}) where {O3S,CUTOFF} = j,i 
 
-function matrix!(M::NewACMatrixModel{O3S,SphericalCutoff,COUPLING}, at::Atoms, Σ, filter=(_,_)->true) where {O3S,CUTOFF,COUPLING}
+function matrix!(M::NewACMatrixModel, at::Atoms, Σ, filter=(_,_)->true) where {O3S,CUTOFF,COUPLING}
     site_filter(i,at) = (haskey(M.onsite, at.Z[i]) && filter(i, at))
     for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite))
         if site_filter(i, at) && length(neigs) > 0
