@@ -3,3 +3,5 @@ Manifest.toml
 *.csv
 *.jld
 .ipynb_checkpoints
+scatter-detailed-equ-cov.pdf
+scatter-equ-cov.pdf

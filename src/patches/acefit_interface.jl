@@ -3,7 +3,7 @@ import JuLIP: Atoms, energy, forces, mat
 using PrettyTables
 using StaticArrays: SVector
 using ACEds.Utils: compress_matrix
-using ACEds.MatrixModels: BCMatrixModel
+using ACEds.MatrixModels: MatrixModel
 
 # SymmetriMatrixData
 # MatrixData
@@ -45,7 +45,7 @@ function ACEfit.count_observations(d::SymmetriMatrixData)
 end
 
 #TODO: update & adapt for FrictionModel 
-function ACEfit.feature_matrix(d::SymmetriMatrixData, m::BCMatrixModel)
+function ACEfit.feature_matrix(d::SymmetriMatrixData, m::MatrixModel)
     dm = zeros(ACEfit.count_observations(d), length(m))
     #dm = Array{Float64}(undef, ACEfit.count_observations(d), length(m))
     #filter(i) = (i in d.matrix_indices)

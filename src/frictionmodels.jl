@@ -84,17 +84,17 @@ function Gamma(M::MatrixModel, at::Atoms; kvargs...)
     return sum(Σ*transpose(Σ) for Σ in Σ_vec)
 end
 
-function Gamma(M::NewPWMatrixModel, at::Atoms; kvargs...) 
+function Gamma(M::MBDPDMatrixModel, at::Atoms; kvargs...) 
     Σ_vec = Sigma(M, at; kvargs...) 
     return sum(square(Σ) for Σ in Σ_vec)
 end
 
-function Gamma(M::NewPW2MatrixModel, at::Atoms; kvargs...) 
+function Gamma(M::PWCMatrixModel, at::Atoms; kvargs...) 
     Σ_vec = Sigma(M, at; kvargs...) 
     return sum(_square(Σ,M) for Σ in Σ_vec)
 end
 
-function _square(Σ::SparseMatrixCSC{Tv,Ti}, ::NewPW2MatrixModel) where {Tv, Ti}
+function _square(Σ::SparseMatrixCSC{Tv,Ti}, ::PWCMatrixModel) where {Tv, Ti}
     # if !iseven(length(Σ.nzval))
     #     @warn "Self-interactions of particles are present and included friction matrix."
     # end

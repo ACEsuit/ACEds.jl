@@ -1,66 +1,60 @@
-struct ACMatrixModel{S,ACNC} <: MatrixModel{S}
-    onsite::OnSiteModels{S}
-    offsite::OffSiteModels{S}
+# Z2S<:Uncoupled, SPSYM<:SpeciesUnCoupled, CUTOFF<:SphericalCutoff
+struct ACMatrixModel{O3S,CUTOFF,COUPLING} <: MatrixModel{O3S}
+    onsite::Dict{AtomicNumber,OnSiteModel{O3S,TM1}} where {TM1}
+    offsite::Dict{Tuple{AtomicNumber, AtomicNumber},OffSiteModel{O3S,TM2,Z2S,CUTOFF}} where {TM2, Z2S}#, CUTOFF<:SphericalCutoff}
     n_rep::Int
     inds::SiteInds
     id::Symbol
-    function ACMatrixModel{S}(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int, id::Symbol, acnc::Symbol) where {S}
-        @assert acnc in [:sc,:nc]
-        return new{S,acnc}(onsite,offsite, n_rep, _get_basisinds(onsite.models, offsite.models), id)
+    function ACMatrixModel(onsite::OnSiteModels{O3S,TM1}, offsite::OffSiteModels{O3S,TM2,Z2S,CUTOFF}, id::Symbol, ::COUPLING) where {O3S,TM1, TM2,Z2S, CUTOFF<:SphericalCutoff, COUPLING<:Union{RowCoupling,ColumnCoupling}}
+        _assert_offsite_keys(offsite, SpeciesUnCoupled())
+        @assert _n_rep(onsite) ==  _n_rep(offsite)
+        @assert length(unique([mo.cutoff for mo in values(offsite)])) == 1 
+        @assert length(unique([mo.cutoff for mo in values(onsite)])) == 1 
+        #@assert all([z1 in keys(onsite), z2 in keys(offsite)  for (z1,z2) in zzkeys])
+        return new{O3S,CUTOFF,COUPLING}(onsite, offsite, _n_rep(onsite), SiteInds(_get_basisinds(onsite), _get_basisinds(offsite)), id)
+    end
+end #TODO: Add proper constructor that checks for correct Species coupling
+
+function ACE.set_params!(mb::ACMatrixModel, θ::NamedTuple)
+    ACE.set_params!(mb, :onsite,  θ.onsite)
+    ACE.set_params!(mb, :offsite, θ.offsite)
+end
+
+function ACE.set_params!(mb::ACMatrixModel, θ)
+    θt = _split_sites(mb, θ) 
+    ACE.set_params!(mb::ACMatrixModel, θt)
+end
+
+function set_params!(mb::ACMatrixModel, site::Symbol, θ)
+    θt = _rev_transform(θ, mb.n_rep)
+    sitedict = getfield(mb, site)
+    for z in keys(sitedict)
+        ACE.set_params!(_get_model(mb,z),θt[get_range(mb,z)]) 
     end
 end
 
-# Basic constructor 
-function ACMatrixModel(onsite::OnSiteModels,offsite::OffSiteModels,n_rep::Int, acnc::Symbol=:nc; id = nothing) 
-    S = _o3symmetry(onsite.models, offsite.models)
-    id = (id === nothing ? _default_id(S) : id) 
-    return ACMatrixModel{S}(onsite,offsite,n_rep, id, acnc)
-end
+_index_map(i,j, ::ACMatrixModel{O3S,CUTOFF,ColumnCoupling}) where {O3S,CUTOFF} = i,j
+_index_map(i,j, ::ACMatrixModel{O3S,CUTOFF,RowCoupling}) where {O3S,CUTOFF} = j,i 
 
-# Convenience constructors 
-function ACMatrixModel(onsitemodels::Dict{AtomicNumber, TM},offsitemodels::Dict{Tuple{AtomicNumber, AtomicNumber}, TM},
-    rcut::T, n_rep::Int; id = nothing,  acnc::Symbol=:nc) where {TM, T<:Real}
-    onsite = OnSiteModels(onsitemodels, rcut)
-    offsite = OffSiteModels(offsitemodels, rcut)
-    return ACMatrixModel(onsite, offsite, n_rep, acnc; id=id)
-end
-
-function ACMatrixModel(onsitemodels::Dict{AtomicNumber, TM},
-    rcut::T, n_rep::Int, acnc::Symbol=:nc; id = nothing) where {TM, T<:Real}
-    onsite = OnSiteModels(onsitemodels, rcut)
-    offsite = OffSiteModels(Dict{Tuple{AtomicNumber, AtomicNumber},TM}(), rcut)
-    return ACMatrixModel(onsite, offsite, n_rep, acnc; id=id)
-end
-
-function ACMatrixModel(offsitemodels::Dict{Tuple{AtomicNumber, AtomicNumber}, TM},
-    rcut::T, n_rep::Int, acnc::Symbol=:nc; id = nothing) where {TM, T<:Real}
-    onsite = OnSiteModels(Dict{AtomicNumber, TM}(), rcut)
-    offsite = OffSiteModels(offsitemodels, rcut)
-    return ACMatrixModel(onsite, offsite, n_rep, acnc; id=id)
-end
-
-_index_map(i,j, M::ACMatrixModel{S,:sc}) where {S} = i,j
-_index_map(i,j, M::ACMatrixModel{S,:nc}) where {S} = j,i 
-
-function matrix!(M::ACMatrixModel{S,ACNC}, at::Atoms, Σ, filter=(_,_)->true) where {S,ACNC}
-    site_filter(i,at) = (haskey(M.onsite.models, at.Z[i]) && filter(i, at))
-    for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
+function matrix!(M::ACMatrixModel{O3S,<:SphericalCutoff,COUPLING}, at::Atoms, Σ, filter=(_,_)->true) where {O3S,COUPLING}
+    site_filter(i,at) = (haskey(M.onsite, at.Z[i]) && filter(i, at))
+    for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite))
         if site_filter(i, at) && length(neigs) > 0
             # evaluate onsite model
             Zs = at.Z[neigs]
             sm = _get_model(M, at.Z[i])
-            cfg = env_transform(Rs, Zs, M.onsite.env)
-            Σ_temp = evaluate(sm, cfg)
+            #cfg = env_transform(Rs, Zs, sm.cutoff)
+            Σ_temp = evaluate(sm, Rs, Zs)
             for r=1:M.n_rep
                 Σ[r][i,i] += _val2block(M, Σ_temp[r].val)
             end
             # evaluate offsite model
             for (j_loc, j) in enumerate(neigs) #rij, riι
                 Zi, Zj = at.Z[i],at.Z[j]
-                if haskey(M.offsite.models,(Zi,Zj))
-                    sm = _get_model(M, (Zi,Zj))
-                    cfg = env_transform(j_loc, Rs, Zs, M.offsite.env)
-                    Σ_temp = evaluate(sm, cfg)
+                if haskey(M.offsite,(Zi,Zj))
+                    sm = M.offsite[(Zi,Zj)]
+                    cfg = env_transform(j_loc, Rs, Zs, sm.cutoff)
+                    Σ_temp = evaluate(sm.linmodel, cfg)
                     for r=1:M.n_rep
                         Σ[r][_index_map(i,j, M)...] += _val2block(M, Σ_temp[r].val)
                     end
@@ -70,26 +64,25 @@ function matrix!(M::ACMatrixModel{S,ACNC}, at::Atoms, Σ, filter=(_,_)->true) wh
     end
 end
 
-function basis!(B, M::ACMatrixModel, at::Atoms, filter=(_,_)->true ) # Todo change type of B to NamedTuple{(:onsite,:offsite)} 
-    
-    site_filter(i,at) = (haskey(M.onsite.models, at.Z[i]) && filter(i, at))
-    for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite.env))
+function basis!(B, M::ACMatrixModel{O3S,<:SphericalCutoff,COUPLING}, at::Atoms, filter=(_,_)->true) where {O3S,COUPLING} # Todo change type of B to NamedTuple{(:onsite,:offsite)} 
+    site_filter(i,at) = (haskey(M.onsite, at.Z[i]) && filter(i, at))
+    for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite))
         if site_filter(i, at) && length(neigs) > 0
+            # evaluate basis of onsite model
             Zs = at.Z[neigs]
             sm = _get_model(M, at.Z[i])
             inds = get_range(M, at.Z[i])
-            cfg = env_transform(Rs, Zs, M.onsite.env)
-            Bii = evaluate(sm.basis, cfg)
+            Bii = evaluate(sm.linmodel.basis, env_transform(Rs, Zs, sm.cutoff))
             for (k,b) in zip(inds,Bii)
                 B.onsite[k][i,i] += _val2block(M, b.val)
             end
             for (j_loc, j) in enumerate(neigs)
                 Zi, Zj = at.Z[i],at.Z[j]
-                if haskey(M.offsite.models,(Zi,Zj))
-                    sm = _get_model(M, (Zi,Zj))
+                if haskey(M.offsite,(Zi,Zj))
+                    sm = M.offsite[(Zi,Zj)]
                     inds = get_range(M, (Zi,Zj))
-                    cfg = env_transform(j_loc, Rs, Zs, M.offsite.env)
-                    Bij =  evaluate(sm.basis, cfg)
+                    cfg = env_transform(j_loc, Rs, Zs, sm.cutoff)
+                    Bij = evaluate(sm.linmodel.basis, cfg)
                     for (k,b) in zip(inds, Bij)
                         B.offsite[k][_index_map(i,j, M)...] += _val2block(M, b.val)
                     end

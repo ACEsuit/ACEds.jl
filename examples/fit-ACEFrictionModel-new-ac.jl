@@ -7,7 +7,7 @@ using ACEds.DataUtils
 using Flux
 using Flux.MLUtils
 using ACE
-using ACEds: new_ac_matrixmodel
+using ACEds: ac_matrixmodel
 using Random
 using ACEds.Analytics
 using ACEds.FrictionFit
@@ -37,14 +37,14 @@ species_friction = [:H]
 species_env = [:Cu]
 rcut = 8.0
 coupling= RowCoupling()
-m_inv = new_ac_matrixmodel(ACE.Invariant(),species_friction,species_env, coupling; n_rep = 2, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
+m_inv = ac_matrixmodel(ACE.Invariant(),species_friction,species_env, coupling; n_rep = 2, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         species_maxorder_dict_off = Dict( :H => 0), 
         species_weight_cat_off = Dict(:H => 1.0, :Cu=> 1.0),
         bond_weight = .5
     );
-m_cov = new_ac_matrixmodel(ACE.EuclideanVector(Float64),species_friction,species_env, coupling; n_rep=3, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
+m_cov = ac_matrixmodel(ACE.EuclideanVector(Float64),species_friction,species_env, coupling; n_rep=3, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         species_maxorder_dict_off = Dict( :H => 0), 
@@ -52,7 +52,7 @@ m_cov = new_ac_matrixmodel(ACE.EuclideanVector(Float64),species_friction,species
         bond_weight = .5
     );
 
-m_equ = new_ac_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_env, coupling; n_rep=2, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
+m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_env, coupling; n_rep=2, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         species_maxorder_dict_off = Dict( :H => 0), 
@@ -64,8 +64,7 @@ m_equ = new_ac_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species
 fm= FrictionModel((m_cov,m_equ)); #fm= FrictionModel((cov=m_cov,equ=m_equ));
 model_ids = get_ids(fm)
 
-#%%
-
+# Create friction data in internally used format
 fdata =  Dict(
     tt => [FrictionData(d.at,
             d.friction_tensor, 
@@ -73,251 +72,59 @@ fdata =  Dict(
             weights=Dict("diag" => 2.0, "sub_diag" => 1.0, "off_diag"=>1.0)) for d in data[tt]] for tt in ["test","train"]
 );
                                             
+
 c = params(fm;format=:matrix, joinsites=true)
-#transforms::NamedTuple=NamedTuple()
-# using ACEds.FrictionFit: RandomProjection
-# using BlockDiagonals
-# transforms = NamedTuple(Dict(
-#     k =>
-#     begin
-#         p = (onsite=length(fm.matrixmodels[k],:onsite), offsite=length(fm.matrixmodels[k],:offsite))
-#         ps = (onsite=Int(floor(p[:onsite]/2)), offsite=Int(floor(p[:offsite]/2)))
-#         RandomProjection(BlockDiagonal([randn(ps[:onsite],p[:onsite]),randn(ps[:offsite],p[:offsite])]))
-#     end
-#     for k in keys(fm.matrixmodels)))
-
-#transforms::NamedTuple=NamedTuple()
-# using ACEds.FrictionFit: RandomProjection
-# using BlockDiagonals
-# transforms = NamedTuple(Dict(
-#     k =>
-#     begin
-#         p = (onsite=length(fm.matrixmodels[k],:onsite), offsite=length(fm.matrixmodels[k],:offsite))
-#         ps = (onsite=Int(floor(p[:onsite]/2)), offsite=Int(floor(p[:offsite]/2)))
-#         RandomProjection(BlockDiagonal([randn(ps[:onsite],p[:onsite]),randn(ps[:offsite],p[:offsite])]))
-#     end
-#     for k in keys(fm.matrixmodels)))
-
 ffm = FluxFrictionModel(c)
 
 
-# import ACEds.FrictionFit: set_params!
-
-# function set_params!(m::FluxFrictionModel; sigma=1E-8, model_ids::Array{Symbol}=Symbol[])
-#     model_ids = (isempty(model_ids) ? get_ids(m) : model_ids)
-#     for (sc,s) in zip(m.c,m.model_ids)
-#         if s in model_ids
-#             for c in sc
-#                 randn!(c) 
-#                 c .*=sigma 
-#             end
-#         end
-#     end
-# end
-
-typeof(fdata["train"]) <: Array{T} where {T<:FrictionData}
-
+# Create preprocessed data including basis evaluations that can be used to fit the model
 flux_data = Dict( tt=> flux_assemble(fdata[tt], fm, ffm; weighted=true, matrix_format=:dense_scalar) for tt in ["train","test"]);
 
 set_params!(ffm; sigma=1E-8)
+
+#if CUDA is available, convert relevant arrays to cuarrays
 if cuda
     ffm = fmap(cu, ffm)
 end
-
-
-flux_data["train"][1].friction_tensor
-# # typeof(ffm.c[1])
-
-# # import ACEds.FrictionFit: _Gamma, _square
-# # import ACEds.FrictionFit: FluxFrictionModel
-# # import Flux
-# # using StaticArrays
-# # using Flux.MLUtils: stack
-
-# # function _Gamma(B::Vector{Matrix{T}}, sc::SVector{N,Vector{T}}) where {N,T}
-# #     return sum(map(_square, map(c->sum(B.*c), sc)))
-# # end 
-
-
-# # function _Gamma(B::Array{T,3}, sc::SVector{N,Vector{T}}) where {N,T}
-# #     #return sum(map(_square, map(c->sum(B.*c), sc)))
-# #     return sum(map(_square, map(c->sum(B.*c), sc)))
-# # end
-# function _Gamma(B::Array{T,3}, sc::SVector{N,Vector{T}}) where {N,T}
-#     #return sum(map(_square, map(c->sum(B.*c), sc)))
-#     return sum(map(_square, map(c->_Sigma(B,c), sc)))
-# end
-
-# function _Gamma(B::Array{T,3}, cc::Matrix{T}) where {T}
-#     #return sum(map(_square, map(c->sum(B.*c), sc)))
-#     @tullio Σ[r,i,j] := B[k,i,j] * cc[r,k]
-#     @tullio Γ[i,j] := Σ[r,i,k] * Σ[r,j,k]
-#     return Γ
-# end
-
-# function _Gamma(BB::Tuple, cc::Tuple) 
-#     return sum(_Gamma(b,c) for (b,c) in zip(BB,cc))
-# end
-
-# using Tullio
-
-# BB = flux_data["train"][3].B
-# B1 = BB[1]
-# cs = ffm.c[1]
-# cc = reinterpret( Vector{SVector{Float64}},cs)
-# cc = reinterpret( Matrix{Float64},cs)
-# cct = copy(transpose(reinterpret( Matrix{Float64},cs)))
-# B1s = Flux.stack(B1,dims=1);
-# B1st = stack(B1,dims=3);
-# function _Sigma(B::Array{T,3}, c::Vector{T}) where {T}
-#     #return sum(map(_square, map(c->sum(B.*c), sc)))
-#     #Σ = @tullio Bc[i,j] := B[k,i,j] * c[k]
-#     return @tullio Bc[i,j] := B[k,i,j] * c[k]
-# end
-
-# function _Gammat(B::Array{T,3}, cc::Matrix{T}) where {T}
-#     #return sum(map(_square, map(c->sum(B.*c), sc)))
-#     @tullio Σ[i,j,r] := B[i,j,k] * cc[k,r]
-#     @tullio Γ[i,j] := Σ[i,k,r] * Σ[j,k,r]
-#     return Γ
-# end
-# @time _Gamma(B1,cs)
-# @time _Gamma(B1s,cs)
-# @time _Gamma(B1s,cc)
-# @time _Gammat(B1st,cct)
-
-# sum(map(_square, map( c-> @tullio Bc[i,j] := B1s[k,i,j] * c[k],cc))) 
-
-# xs = [[1, 2], [3, 4], [5, 6]]
-# stack(xs, dims=1)
-
-# size(B1s)
-
-# B1[1]
-# typeof(BB)
-# typeof(ffm.c)
-# Γ = flux_data["train"][1].friction_tensor
-# d = flux_data["train"][1]
-# sc = ffm.c
-# _Gamma(BB,sc)-Γ
-# l2_loss(fm, data) = sum(sum(((fm(d.B) .- d.friction_tensor)).^2) for d in data)
-
-# # data = flux_data["train"][1:2]
-# sum(sum((_Gamma(d.B,sc)-d.friction_tensor).^2)  for d in data)
-
-# Flux.gradient(sc->sum(sum((_Gamma(d.B,sc)-d.friction_tensor).^2)  for d in data[1:2]), sc)[1]
-
-
-
-# Flux.gradient(fm->sum(sum((fm(d.B)-d.friction_tensor).^2)  for d in data[1:2]), ffm)[1]
-
-d= flux_data["train"][1]
-using ACEds.FrictionFit: weighted_l2_loss, _l2, _Gamma
-using Tullio
-
-function _l2b(Γ_fit::Array{T,4},Γ_true::Array{T,4}) where {T<:Number}
-    @tullio err:= (Γ_fit[d1,d2,i,j]- Γ_true[d1,d2,i,j])^2
-    return err
-end 
-l2_lossb(fm, data) = sum(_l2b(fm(d.B, d.Tfm), d.friction_tensor) for d in data)
-
-function _weighted_l2b(Γ_fit::Array{T,4},Γ_true::Array{T,4},W::Array{T,4}) where {T<:Number}
-    @tullio err:= W[d1,d2,i,j] * (Γ_fit[d1,d2,i,j]- Γ_true[d1,d2,i,j])^2
-    return err
-end 
-weighted_l2_lossb(fm, data) = sum(_weighted_l2b(fm(d.B, d.Tfm), d.friction_tensor, d.W) for d in data)
-
-
-# function _Gamma2(BB::Tuple, cc::Tuple, Tmf::Tuple) 
-#     return norm(sum(_Gamma(BB[i], cc[i], Tmf[i]) for i=1:length(cc)))
-#     #i = 2
-#     #return _Gamma(BB[i],cc[i],Tmf[i])
-#    # return sum([_Gamma(b,c,tmf) for (b,c,tmf) in zip(BB,cc,Tmf)])
-#     #return reduce(_msum, _Gamma(b,c,tmf) for (b,c,tmf) in zip(BB,cc,Tmf))
-# end
-
-
-# l2_loss(ffm, flux_data["train"][1:2])
-# l2_lossb(ffm, flux_data["train"])
-# _l2(ffm(d.B,d.Tfm), d.friction_tensor)
-
-# BB = flux_data["train"][1].B
-# Tmf = flux_data["train"][1].Tfm
-
-# h_(cc) = norm(_Gamma2(BB, cc, Tmf))
-
-# h_(ffm.c) 
-# Flux.gradient(h_,ffm.c)
-
-# h2_(cc) = norm(_Gamma(BB[2], cc, Tmf[2]))
-
-# typeof(ffm.c[2])
-# h2_(ffm.c[2]) 
-# Flux.gradient(h2_,ffm.c[2])
-
-# #h3_(cc) = norm(_Gamma(BB[1], cc[1], Tmf[1])+_Gamma(BB[2], cc[2], Tmf[2]))
-# length(BB)
-# h3_(cc) = norm(sum(_Gamma(BB[i], cc[i], Tmf[i]) for i=1:length(cc)))
-# #h3_(cc) = norm(sum(_Gamma(B, c, tmf) for (B,c,tmf) in zip(BB,cc,Tmf)))  
-# h3_(ffm.c)
-
-# Flux.gradient(h3_,ffm.c)
-
-# h4_(cc) = _Gamma2(BB, cc, Tmf) 
-
-# sum(1,2)
-
-
-
-g = Flux.gradient(weighted_l2_lossb,ffm, flux_data["train"][1:2])
-
-# typeof(g[1])
-# g[2][1].friction_tensor
-
-
-
-# typeof(data[1])
-# Flux.gradient(sum(sum((ffm(d.B)-d.friction_tensor).^2)  for d in data[1:2]), ffm.c)[1]
-
-# Flux.gradient(l2_loss,ffm, data)
 
 loss_traj = Dict("train"=>Float64[], "test" => Float64[])
 n_train, n_test = length(flux_data["train"]), length(flux_data["test"])
 epoch = 0
 
 
-#opt = Flux.setup(Adam(5E-5, (0.9999, 0.99999)),ffm)
-bsize = 100
-#opt = Flux.setup(Adam(1E-4, (0.99, 0.999)),ffm)
-opt = Flux.setup(Adam(1E-4, (0.99, 0.999)),ffm)
-# opt = Flux.setup(Adam(1E-9, (0.99, 0.999)),ffm)
-train = [(friction_tensor=d.friction_tensor,B=d.B,Tfm=d.Tfm, W=d.W) for d in flux_data["train"]]
-
-dloader5 = cuda ? DataLoader(train |> gpu, batchsize=bsize, shuffle=true) : DataLoader(train, batchsize=bsize, shuffle=true)
+bsize = 10
 nepochs = 10
 
+opt = Flux.setup(Adam(1E-4, (0.99, 0.999)),ffm)
+train = [(friction_tensor=d.friction_tensor,B=d.B,Tfm=d.Tfm, W=d.W) for d in flux_data["train"]]
+dloader5 = cuda ? DataLoader(train |> gpu, batchsize=bsize, shuffle=true) : DataLoader(train, batchsize=bsize, shuffle=true)
 
 using ACEds.FrictionFit: weighted_l2_loss
+
+mloss = weighted_l2_loss
+Flux.gradient(mloss,ffm, train[1:2])[1]
 for _ in 1:nepochs
     epoch+=1
     @time for d in dloader5
-        ∂L∂m = Flux.gradient(l2_lossb,ffm, d)[1]
+        ∂L∂m = Flux.gradient(mloss,ffm, d)[1]
         Flux.update!(opt,ffm, ∂L∂m)       # method for "explicit" gradient
     end
     for tt in ["test","train"]
-        push!(loss_traj[tt], l2_lossb(ffm,flux_data[tt]))
+        push!(loss_traj[tt], mloss(ffm,flux_data[tt]))
     end
     println("Epoch: $epoch, Abs avg Training Loss: $(loss_traj["train"][end]/n_train)), Test Loss: $(loss_traj["test"][end]/n_test))")
 end
 println("Epoch: $epoch, Abs Training Loss: $(loss_traj["train"][end]), Test Loss: $(loss_traj["test"][end])")
 println("Epoch: $epoch, Avg Training Loss: $(loss_traj["train"][end]/n_train), Test Loss: $(loss_traj["test"][end]/n_test)")
 
-
+# The following code can be used to fit the model using the BFGS algorithm
+# include("./additional-bfgs-iterations.jl")
 
 c_fit = params(ffm)
+set_params!(fm, c_fit)
 
-ACE.set_params!(fm, c_fit)
 
+# Evaluate different error statistics 
 
 using ACEds.Analytics: error_stats, plot_error, plot_error_all,friction_entries
 
@@ -333,7 +140,7 @@ fig1.savefig("./scatter-detailed-equ-cov.pdf", bbox_inches="tight")
 fig2, ax2 = plot_error_all(data, fm; merrors=merrors)
 display(fig2)
 fig2.savefig("./scatter-equ-cov.pdf", bbox_inches="tight")
-#%%
+
 
 using PyPlot
 N_train, N_test = length(flux_data["train"]),length(flux_data["test"])
@@ -344,12 +151,3 @@ ax.set_yscale(:log)
 ax.legend()
 display(fig)
 
-# using NeighbourLists
-# using ACEds.CutoffEnv: env_cutoff
-# using JuLIP: neighbourlist
-
-# rcut = env_cutoff(m_inv.onsite.env)+1.0
-# at = fdata["train"][116].atoms
-
-# nlist = neighbourlist(at, rcut)
-# Js, Rs = NeighbourLists.neigs(nlist, 55)

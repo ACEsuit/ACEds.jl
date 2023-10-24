@@ -8,7 +8,6 @@ using ACEds.DataUtils
 using Flux
 using Flux.MLUtils
 using ACE
-using ACEds: ac_matrixmodel
 using Random
 using ACEds.Analytics
 using ACEds.FrictionFit
@@ -104,16 +103,16 @@ _n_rep(onsitemodels)
 _n_rep(offsitemodels)
 env_cutoff(onsitemodels)
 
-m_cov0 = NewOnsiteOnlyMatrixModel(onsitemodels, :cov )
+m_cov0 = OnsiteOnlyMatrixModel(onsitemodels, :cov )
 
-m_cov1 = NewPWMatrixModel(offsitemodels, :cov )
+m_cov1 = MBDPDMatrixModel(offsitemodels, :cov )
 
-m_cov2r = NewACMatrixModel(onsitemodels, offsitemodelsUC, :cov, RowCoupling())
-m_cov2c = NewACMatrixModel(onsitemodels, offsitemodelsUC, :cov, ColumnCoupling())
+m_cov2r = ACMatrixModel(onsitemodels, offsitemodelsUC, :cov, RowCoupling())
+m_cov2c = ACMatrixModel(onsitemodels, offsitemodelsUC, :cov, ColumnCoupling())
 
-m_covpw2 = NewPW2MatrixModel(offsitemodelsUC, :cov)
+m_covpw2 = PWCMatrixModel(offsitemodelsUC, :cov)
 
-typeof(m_covpw2)<:NewPW2MatrixModel{O3S, SphericalCutoff{T}, Z2S, SpeciesUnCoupled} where {O3S,Z2S,T}
+typeof(m_covpw2)<:PWCMatrixModel{O3S, SphericalCutoff{T}, Z2S, SpeciesUnCoupled} where {O3S,Z2S,T}
 
 fm0= FrictionModel((m_cov0,)); #fm= FrictionModel((cov=m_cov,equ=m_equ));
 fm1= FrictionModel((m_cov1,));
