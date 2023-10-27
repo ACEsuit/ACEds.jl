@@ -44,7 +44,7 @@ function json2internal(filename )
                 # friction_tensor = (blockformat ? reinterpret(Matrix{SMatrix{3,3,Float64,9}}, d.friction_tensor) : d.friction_tensor), 
                 # friction_indices = Int64.(d.friction_indices.+1)[:], 
                 # hirshfeld_volumes=d.hirshfeld_volumes,
-                no_friction = Int64.(d.no_friction)[:]
+                # no_friction = Int64.(d.no_friction)[:]
             ) 
         end 
         for i in 1:length(df)];
