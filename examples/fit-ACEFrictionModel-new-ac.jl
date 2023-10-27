@@ -97,15 +97,16 @@ nepochs = 10
 
 opt = Flux.setup(Adam(1E-4, (0.99, 0.999)),ffm)
 train = [(friction_tensor=d.friction_tensor,B=d.B,Tfm=d.Tfm, W=d.W) for d in flux_data["train"]]
-dloader5 = cuda ? DataLoader(train |> gpu, batchsize=bsize, shuffle=true) : DataLoader(train, batchsize=bsize, shuffle=true)
+dloader = cuda ? DataLoader(train |> gpu, batchsize=bsize, shuffle=true) : DataLoader(train, batchsize=bsize, shuffle=true)
 
 using ACEds.FrictionFit: weighted_l2_loss
 
 mloss = weighted_l2_loss
 Flux.gradient(mloss,ffm, train[1:2])[1]
+
 for _ in 1:nepochs
     epoch+=1
-    @time for d in dloader5
+    @time for d in dloader
         ∂L∂m = Flux.gradient(mloss,ffm, d)[1]
         Flux.update!(opt,ffm, ∂L∂m)       # method for "explicit" gradient
     end

@@ -78,6 +78,8 @@ _o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanVector}) where {PIB} = Covar
 _o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanMatrix}) where {PIB} = Equivariant
 _o3symmetry(m::ACE.LinearACEModel) = _o3symmetry(m.basis)
 
+_n_rep(::ACE.LinearACEModel{TB, SVector{N,T}, TEV}) where {TB,N,T,TEV} = N
+
 
 _msort(z1,z2) = (z1<=z2 ? (z1,z2) : (z2,z1))
 
@@ -107,28 +109,33 @@ end
 Base.length(bb::BondBasis) = length(bb.linbasis)
 abstract type SiteModel end
 # Todo: allow for easy exclusion of onsite and offsite models 
-_n_rep(model::SiteModel) = model.n_rep
+_n_rep(model::SiteModel) = _n_rep(model.linmodel)
 struct OnSiteModel{O3S,TM} <: SiteModel
     linmodel::TM
     cutoff::SphericalCutoff
-    n_rep
-    function OnSiteModel(linbasis::TM, cutoff::SphericalCutoff, n_rep::T) where {TM,T<:Int}
-        linmodel = ACE.LinearACEModel(linbasis, rand(SVector{n_rep,Float64},length(linbasis)))
-        return new{_o3symmetry(linbasis),typeof(linmodel)}(linmodel, cutoff,n_rep)
+    function OnSiteModel(linbasis::TM, cutoff::SphericalCutoff, c::Vector{SVector{N,T}}) where {TM,N,T}
+        @assert length(linbasis) == length(c)
+        linmodel = ACE.LinearACEModel(linbasis, c)
+        return new{_o3symmetry(linmodel),typeof(linmodel)}(linmodel, cutoff)
     end
+end
+function OnSiteModel(linbasis::TM, cutoff::SphericalCutoff, n_rep::Ti) where {TM, Ti<:Int}
+    return OnSiteModel(linbasis, cutoff, rand(SVector{n_rep,Float64},length(linbasis)))
 end
 OnSiteModel(linbasis::TM,r_cut::T, n_rep::IT) where {TM,T<:Real,IT<:Int} = OnSiteModel(linbasis,SphericalCutoff(r_cut),n_rep)
 struct OffSiteModel{O3S,TM,Z2S,CUTOFF} <: SiteModel # where {O3S<:O3Symmetry, CUTOFF<:AbstractCutoff, Z2S<:Z2Symmetry, SPSYM<:SpeciesCoupling}
     linmodel::TM
     cutoff::CUTOFF
-    n_rep
-    function OffSiteModel(bb::BondBasis{TM,Z2S},  cutoff::CUTOFF, n_rep::T) where { T<:Int, TM, CUTOFF<:AbstractCutoff, Z2S<:Z2Symmetry}
-        linmodel = ACE.LinearACEModel(bb.linbasis,rand(SVector{n_rep,Float64},length(bb.linbasis)))
-        return new{_o3symmetry(bb.linbasis),typeof(linmodel),Z2S,CUTOFF}(linmodel, cutoff,n_rep)
+    function OffSiteModel(bb::BondBasis{TM,Z2S},  cutoff::CUTOFF, c::Vector{SVector{N,T}}) where  {TM, CUTOFF<:AbstractCutoff, Z2S<:Z2Symmetry, N, T<:Real}
+        @assert length(bb.linbasis) == length(c)
+        linmodel = ACE.LinearACEModel(bb.linbasis,c)
+        return new{_o3symmetry(linmodel),typeof(linmodel),Z2S,CUTOFF}(linmodel, cutoff)
     end
 end
 
-
+function OffSiteModel(bb::BondBasis{TM,Z2S},  cutoff::CUTOFF, n_rep::T) where { T<:Int, TM, CUTOFF<:AbstractCutoff, Z2S<:Z2Symmetry}
+    return OffSiteModel(bb,  cutoff, rand(SVector{n_rep,Float64},length(bb.linbasis)))
+end
 
 OffSiteModel(bb::BondBasis{TM,Z2S},r_cut::T, n_rep::IT) where {TM,Z2S,T<:Real,IT<:Int} = OffSiteModel(bb, SphericalCutoff(r_cut), n_rep)
 OffSiteModel(bb::BondBasis{TM,Z2S}, rcutbond::T, rcutenv::T, zcutenv::T, n_rep::IT) where {TM,Z2S,T<:Real,IT<:Int} = OffSiteModel(bb, EllipsoidCutoff(rcutbond,rcutenv,zcutenv), n_rep)
