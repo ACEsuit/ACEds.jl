@@ -37,13 +37,13 @@ function json2internal(filename )
             end 
             sparse_friction_tensor = sparse(I, J, vals, length(at), length(at))
             (   at=at, 
-                E=d.energy, 
-                F=d.forces, 
+                # E=d.energy, 
+                # F=d.forces, 
                 friction_tensor = sparse_friction_tensor,
                 friction_indices = friction_indices,
                 # friction_tensor = (blockformat ? reinterpret(Matrix{SMatrix{3,3,Float64,9}}, d.friction_tensor) : d.friction_tensor), 
                 # friction_indices = Int64.(d.friction_indices.+1)[:], 
-                hirshfeld_volumes=d.hirshfeld_volumes,
+                # hirshfeld_volumes=d.hirshfeld_volumes,
                 no_friction = Int64.(d.no_friction)[:]
             ) 
         end 
