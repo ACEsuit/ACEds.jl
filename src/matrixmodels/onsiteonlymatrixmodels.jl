@@ -4,7 +4,6 @@ struct OnsiteOnlyMatrixModel{O3S} <: MatrixModel{O3S}
     inds::SiteInds
     id::Symbol
     function OnsiteOnlyMatrixModel(onsite::OnSiteModels{O3S,TM}, id::Symbol) where {O3S,TM}
-        @show unique([_n_rep(mo) for mo in values(onsite)])
         @assert length(unique([_n_rep(mo) for mo in values(onsite)])) == 1
         @assert length(unique([mo.cutoff for mo in values(onsite)])) == 1 
         return new{O3S}(onsite, _n_rep(onsite), SiteInds(_get_basisinds(onsite)), id)

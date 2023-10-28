@@ -62,6 +62,22 @@ function matrix!(M::PWCMatrixModel{O3S,<:SphericalCutoff,Z2S,COUPLING}, at::Atom
     end
 end
 
+function matrix!(M::PWCMatrixModel{O3S,<:EllipsoidCutoff,Z2S,COUPLING}, at::Atoms, A, filter=(_,_)->true) where {O3S, Z2S, COUPLING}
+    site_filter(i,at) = filter(i, at)
+    if !isempty(M.offsite)
+        for (i, j, rrij, Js, Rs, Zs) in bonds(at, Dict(zz=>cut for (zz,cut) in M.offsite), filter)
+            zz = (at.Z[i], at.Z[j])
+            sm = M.offsite[zz]
+            # transform the ellipse to a sphere
+            cfg = env_transform(rrij, at.Z[i], at.Z[j], Rs, Zs, sm.cutoff)
+            A_temp = evaluate(sm.linmodel, cfg)
+            for r=1:M.n_rep
+                A[r][i,j] = _val2block(M, A_temp[r].val)
+            end
+        end
+    end
+end
+
 #TODO: this is a bit of a hack. We need to find a better way to handle the different types of basis.
 function basis(M::PWCMatrixModel, at::Atoms; join_sites=false, sparsity= :sparse, filter=(_,_)->true, T=Float64) 
     B = allocate_B(M, at, sparsity, T)
@@ -99,6 +115,24 @@ function basis!(B, M::PWCMatrixModel{O3S,<:SphericalCutoff,Z2S,CUTOFF}, at::Atom
                         end
                     end
                 end
+            end
+        end
+    end
+end
+
+
+function basis!(B, M::PWCMatrixModel{O3S,<:EllipsoidCutoff,Z2S,CUTOFF}, at::Atoms, filter=(_,_)->true) where {O3S, Z2S, CUTOFF} 
+    site_filter(i,at) = filter(i, at)
+    if !isempty(M.offsite)
+        for (i, j, rrij, Js, Rs, Zs) in bonds(at, Dict(zz=>cut for (zz,cut) in M.offsite), filter)
+            zz = (at.Z[i], at.Z[j])
+            sm = M.offsite[zz]
+            # transform the ellipse to a sphere
+            cfg = env_transform(rrij, at.Z[i], at.Z[j], Rs, Zs, sm.cutoff)
+            inds = get_range(M, zz)
+            Bij = evaluate(sm.linmodel.basis, cfg)
+            for (k,b) in zip(inds, Bij)
+                B.offsite[k][i,j] += _val2block(M, b.val)
             end
         end
     end

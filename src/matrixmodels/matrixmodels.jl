@@ -294,6 +294,8 @@ _val2block(::MatrixModel{Invariant}, val::T) where {T<:Number}= SMatrix{3,3,T,9}
 _val2block(::MatrixModel{Covariant}, val) = val
 _val2block(::MatrixModel{Equivariant}, val) = val
 
+_n_rep(M::MatrixModel) = M.n_rep
+
 using LinearAlgebra: Diagonal
 
 evaluate(sm::OnSiteModel, Rs, Zs) = evaluate(sm.linmodel, env_transform(Rs, Zs, sm.cutoff))
@@ -527,7 +529,6 @@ function _rev_transform(θ, n_rep)
 end
 
 
-
 # function _transform(θ, ::Val{:vector}, n_rep)
 #     return reinterpret(Vector{Float64}, θ)
 # end
@@ -600,8 +601,7 @@ include("./pwcmatrixmodels.jl")
 include("./onsiteonlymatrixmodels.jl")
 # Multi-body DPD matrix models:
 include("./mbdpdmatrixmodels.jl")
-# Atom and Bond-centered matrix models for Dissipative Particle Dynamics models:
-#include("./dpdmatrixmodels.jl")
-include("./newmatrixmdels.jl")
+# Input-Output functions:
+include("./matrixmodels-io.jl")
 
 end

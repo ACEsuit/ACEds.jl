@@ -1,6 +1,8 @@
 module AtomCutoffs
 
 import ACEbonds.BondCutoffs: EllipsoidCutoff, env_cutoff, env_filter, env_transform
+import ACE: read_dict, write_dict
+export read_dict, write_dict
 
 export SphericalCutoff, AbstractCutoff
 export env_filter, env_transform, env_cutoff
@@ -49,5 +51,32 @@ function env_transform(j::Int,
     cfg = [State( rr = Rs[l]/dse.rcut, mube = (l == j ? :bond : chemical_symbol(Zs[l])) ) for l = eachindex(Rs)] |> ACEConfig
     return cfg 
 end
+
+function ACE.write_dict(cutoff::SphericalCutoff{T}) where {T}
+    return Dict("__id__" => "ACEds_SphericalCutoff",
+          "rcut" => cutoff.rcut,
+             "T" => T)         
+ end 
+
+ function ACE.read_dict(::Val{:ACEds_SphericalCutoff}, D::Dict)
+    rcut = D["rcut"]
+    T = D["T"]
+    return SphericalCutoff{T}(rcut)
+ end
+
+ # function ACE.write_dict(cutoff::EllipsoidCutoff{T}) where {T}
+#      Dict("__id__" => "ACEbonds_EllipsoidCutoff",
+#            "rcutbond" => cutoff.rcutbond,
+#            "rcutenv" => cutoff.rcutenv,
+#            "zcutenv" => cutoff.zcutenv,
+#               "T" => T)         
+# end 
+# function ACE.read_dict(::Val{:ACEds_EllipsoidCutoff}, D::Dict)
+#      rcutbond = D["rcutbond"]
+#      rcutenv = D["rcutenv"]
+#      zcutenv = D["zcutenv"]
+#      T = D["T"]
+#      return EllipsoidCutoff{T}(rcutbond,rcutenv,zcutenv)
+# end
 
 end

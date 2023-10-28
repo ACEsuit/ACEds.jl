@@ -10,7 +10,8 @@ using ACEds.PWMatrix
 
 import ACE: params, nparams, set_params!
 import ACEds.MatrixModels: set_zero!
-import ACE: scaling
+import ACE: scaling, write_dict, read_dict
+export write_dict, read_dict
 
 export params, nparams, set_params!, get_ids
 export basis, matrix, Gamma, Sigma
@@ -148,6 +149,15 @@ end
 # end
 
 Sigma(M::MatrixModel, at::Atoms; kvargs...) = matrix(M, at; kvargs...) 
+
+function ACE.write_dict(fm::FrictionModel)
+    return Dict("__id__" => "ACEds_FrictionModel",
+          "matrixmodels" => Dict(id=>write_dict(fm.matrixmodels[id]) for id in keys(fm.matrixmodels)))        
+end 
+function ACE.read_dict(::Val{:ACEds_FrictionModel}, D::Dict)
+    matrixmodels = NamedTuple(Dict(id=>read_dict(val) for (id,val) in D["matrixmodels"]))
+    return FrictionModel(matrixmodels)
+end
 
 
 end
