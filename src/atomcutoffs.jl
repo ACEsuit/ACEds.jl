@@ -64,19 +64,4 @@ function ACE.write_dict(cutoff::SphericalCutoff{T}) where {T}
     return SphericalCutoff{T}(rcut)
  end
 
- # function ACE.write_dict(cutoff::EllipsoidCutoff{T}) where {T}
-#      Dict("__id__" => "ACEbonds_EllipsoidCutoff",
-#            "rcutbond" => cutoff.rcutbond,
-#            "rcutenv" => cutoff.rcutenv,
-#            "zcutenv" => cutoff.zcutenv,
-#               "T" => T)         
-# end 
-# function ACE.read_dict(::Val{:ACEds_EllipsoidCutoff}, D::Dict)
-#      rcutbond = D["rcutbond"]
-#      rcutenv = D["rcutenv"]
-#      zcutenv = D["zcutenv"]
-#      T = D["T"]
-#      return EllipsoidCutoff{T}(rcutbond,rcutenv,zcutenv)
-# end
-
 end
