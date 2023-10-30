@@ -1,7 +1,7 @@
 name = "ACEds"
 uuid = "286ca7f0-9926-4809-930a-857c1b5bb5cd"
 authors = ["Christoph Ortner <c.ortner@warwick.ac.uk> and Matthias Sachs <e.matthias.sachs@gmail.com>"]
-version = "0.1.3"
+version = "0.1.4"
 
 [deps]
 ACE = "3e8ccfd2-c8b0-11ea-32f1-f3a5990fd77a"
@@ -42,7 +42,7 @@ ACEatoms = "0.0.14"
 JuLIP = "0.13.3"
 StaticArrays = "1.0"
 julia = "1.7"
-ACEbonds = "0.0.5"
+ACEbonds = "0.0.6"
 
 [extras]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
