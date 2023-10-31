@@ -11,7 +11,6 @@ struct ACMatrixModel{O3S,CUTOFF,COUPLING} <: MatrixModel{O3S}
         @assert length(unique([mo.cutoff for mo in values(offsite)])) == 1 
         @assert length(unique([mo.cutoff for mo in values(onsite)])) == 1 
         #@assert all([z1 in keys(onsite), z2 in keys(offsite)  for (z1,z2) in zzkeys])
-        @show typeof(onsite)
         return new{O3S,CUTOFF,COUPLING}(onsite, offsite, _n_rep(onsite), SiteInds(_get_basisinds(onsite), _get_basisinds(offsite)), id)
     end
 end #TODO: Add proper constructor that checks for correct Species coupling
