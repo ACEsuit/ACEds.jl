@@ -30,7 +30,7 @@ function ACE.read_dict(::Val{:ACEds_OnSiteModel}, D::Dict)
     return OnSiteModel(linbasis, cutoff, reinterpret(Vector{SVector{n_rep, T}}, c_vec))
 end
 
-function ACE.write_dict(m::OffSiteModel{O3S,TM,Z2S,CUTOFF}) where {O3S,TM,Z2S,CUTOFF}
+function ACE.write_dict(m::OffSiteModel{O3S,Z2S,CUTOFF,TM}) where {O3S,TM,Z2S,CUTOFF}
     T = _T(m.linmodel)
     c_vec = reinterpret(Vector{T}, m.linmodel.c)
     n_rep = _n_rep(m.linmodel)
@@ -84,26 +84,6 @@ end
 function ACE.read_dict(::Val{:ACEds_NoiseCoupling}, D::Dict) 
     coupling = getfield(ACEds.MatrixModels, Symbol(D["coupling"]))
     return coupling()
-end
-
-function ACE.write_dict(onsite::Dict{AtomicNumber,TM}) where {TM}
-    return Dict("__id__" => "ACEds_onsitemodels",
-                "zval" => Dict(string(chemical_symbol(z))=>ACE.write_dict(val) for (z,val) in onsite)
-                )
-end
-function ACE.read_dict(::Val{:ACEds_onsitemodels}, D::Dict) 
-    return Dict(AtomicNumber(Symbol(z)) => ACE.read_dict(val) for (z,val) in D["zval"])  
-end
-
-function ACE.write_dict(offsite::Dict{Tuple{AtomicNumber, AtomicNumber},TM}) where {TM}
-    return Dict("__id__" => "ACEds_offsitemodels",
-                "vals" => Dict(i=>ACE.write_dict(val) for (i,val) in enumerate(values(offsite))),
-                "z1" => Dict(i=>string(chemical_symbol(zz[1])) for (i,zz) in enumerate(keys(offsite))),
-                "z2" => Dict(i=>string(chemical_symbol(zz[2])) for (i,zz) in enumerate(keys(offsite)))
-    )
-end
-function ACE.read_dict(::Val{:ACEds_offsitemodels}, D::Dict) 
-    return Dict( (AtomicNumber(Symbol(z1)),AtomicNumber(Symbol(z2))) => ACE.read_dict(val)   for (z1,z2,val) in zip(values(D["z1"]),values(D["z2"]),values(D["vals"])))  
 end
 
 function ACE.write_dict(M::ACMatrixModel{O3S,CUTOFF,COUPLING}) where {O3S,CUTOFF,COUPLING}

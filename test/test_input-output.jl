@@ -24,14 +24,14 @@ using ACEbonds.BondCutoffs
 #ACE.read_dict(ACE.write_dict(RowCoupling()))
 
 #%%
-
+using LinearAlgebra
 using Test
 using JuLIP
 using Distributions: Categorical
 
 tol = 1E-11
 species_friction = [:H,:Cu]
-species_env = []
+species_env = Symbol[]
 function gen_config(species; n_min=2,n_max=2, species_prop = Dict(z=>1.0/length(species) for z in species), species_min = Dict(z=>1 for z in keys(species_prop)),  maxnit = 1000)
     species = collect(keys(species_prop))
     n = rand(n_min:n_max)
@@ -80,25 +80,26 @@ m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_env
 
 fm= FrictionModel((m_cov,m_equ));
 
-typeof(fm.matrixmodels.cov.onsite[AtomicNumber(:H)].linmodel)
+# typeof(fm.matrixmodels.cov.onsite[AtomicNumber(:H)].linmodel)
 
-onsitemodel = fm.matrixmodels.equ.onsite[AtomicNumber(:H)]
-onsitemodel2 = read_dict(ACE.write_dict(onsitemodel))
-typeof(onsitemodel2)
+# onsitemodel = fm.matrixmodels.equ.onsite[AtomicNumber(:H)]
+# onsitemodel2 = read_dict(ACE.write_dict(onsitemodel))
+# typeof(onsitemodel2)
 
-linmodel = fm.matrixmodels.cov.onsite[AtomicNumber(:H)].linmodel;
-linmodel2 = read_dict(ACE.write_dict(linmodel))
-linmodel == linmodel2
-typeof(linmodel)<:typeof(linmodel2)
+# linmodel = fm.matrixmodels.cov.onsite[AtomicNumber(:H)].linmodel;
+# linmodel2 = read_dict(ACE.write_dict(linmodel))
+# linmodel == linmodel2
+# typeof(linmodel)<:typeof(linmodel2)
 
 
-linmodelb = fm.matrixmodels.cov.onsite[AtomicNumber(:Cu)].linmodel;
-linmodelb2 = read_dict(ACE.write_dict(linmodelb))
-typeof(linmodel2)<:typeof(linmodel)
-ACE.LinearACEModel{ACE.SymmetricBasis{PIBasis{ACE.Product1pBasis{3, Tuple{ACE.B1pComponent{(:n,), Tuple{Int64}, ACE.SChain{Tuple{ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#606#607"}}, ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#602#603"}}, ACE.OrthPolys.OrthPolyBasis{Float64}}}, ACE.Transforms.GetVal{:rr}}, ACE.B1pComponent{(:l, :m), Tuple{Int64, Int64}, ACE.SphericalHarmonics.SHBasis{Float64}, ACE.Transforms.GetVal{:rr}}, Categorical1pBasis{:mu, :mu, 2, Symbol}}}, typeof(identity)}, ACE.EuclideanVector{ComplexF64}, ACE.O3{:l, :m}, typeof(real)}, StaticArraysCore.SVector{3, Float64}, ACE.ProductEvaluator{StaticArraysCore.SVector{3, ACE.EuclideanVector{ComplexF64}}, PIBasis{ACE.Product1pBasis{3, Tuple{ACE.B1pComponent{(:n,), Tuple{Int64}, ACE.SChain{Tuple{ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#606#607"}}, ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#602#603"}}, ACE.OrthPolys.OrthPolyBasis{Float64}}}, ACE.Transforms.GetVal{:rr}}, ACE.B1pComponent{(:l, :m), Tuple{Int64, Int64}, ACE.SphericalHarmonics.SHBasis{Float64}, ACE.Transforms.GetVal{:rr}}, Categorical1pBasis{:mu, :mu, 2, Symbol}}}, typeof(identity)}, typeof(real)}}
-ACE.LinearACEModel{ACE.SymmetricBasis{PIBasis{ACE.Product1pBasis{3, Tuple{ACE.B1pComponent{(:n,), Tuple{Int64}, ACE.SChain{Tuple{ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#726#727"}}, ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#728#729"}}, ACE.OrthPolys.OrthPolyBasis{Float64}}}, ACE.Transforms.GetVal{:rr}}, ACE.B1pComponent{(:l, :m), Tuple{Int64, Int64}, ACE.SphericalHarmonics.SHBasis{Float64}, ACE.Transforms.GetVal{:rr}}, Categorical1pBasis{:mu, :mu, 2, Symbol}}}, typeof(identity)}, ACE.EuclideanVector{ComplexF64}, ACE.O3{:l, :m}, typeof(real)}, StaticArraysCore.SVector{3, Float64}, ACE.ProductEvaluator{StaticArraysCore.SVector{3, ACE.EuclideanVector{ComplexF64}}, PIBasis{ACE.Product1pBasis{3, Tuple{ACE.B1pComponent{(:n,), Tuple{Int64}, ACE.SChain{Tuple{ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#726#727"}}, ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#728#729"}}, ACE.OrthPolys.OrthPolyBasis{Float64}}}, ACE.Transforms.GetVal{:rr}}, ACE.B1pComponent{(:l, :m), Tuple{Int64, Int64}, ACE.SphericalHarmonics.SHBasis{Float64}, ACE.Transforms.GetVal{:rr}}, Categorical1pBasis{:mu, :mu, 2, Symbol}}}, typeof(identity)}, typeof(real)}}
-typeof(linmodel2)
+# linmodelb = fm.matrixmodels.cov.onsite[AtomicNumber(:Cu)].linmodel;
+# linmodelb2 = read_dict(ACE.write_dict(linmodelb))
+# typeof(linmodel2)<:typeof(linmodel)
+# ACE.LinearACEModel{ACE.SymmetricBasis{PIBasis{ACE.Product1pBasis{3, Tuple{ACE.B1pComponent{(:n,), Tuple{Int64}, ACE.SChain{Tuple{ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#606#607"}}, ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#602#603"}}, ACE.OrthPolys.OrthPolyBasis{Float64}}}, ACE.Transforms.GetVal{:rr}}, ACE.B1pComponent{(:l, :m), Tuple{Int64, Int64}, ACE.SphericalHarmonics.SHBasis{Float64}, ACE.Transforms.GetVal{:rr}}, Categorical1pBasis{:mu, :mu, 2, Symbol}}}, typeof(identity)}, ACE.EuclideanVector{ComplexF64}, ACE.O3{:l, :m}, typeof(real)}, StaticArraysCore.SVector{3, Float64}, ACE.ProductEvaluator{StaticArraysCore.SVector{3, ACE.EuclideanVector{ComplexF64}}, PIBasis{ACE.Product1pBasis{3, Tuple{ACE.B1pComponent{(:n,), Tuple{Int64}, ACE.SChain{Tuple{ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#606#607"}}, ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#602#603"}}, ACE.OrthPolys.OrthPolyBasis{Float64}}}, ACE.Transforms.GetVal{:rr}}, ACE.B1pComponent{(:l, :m), Tuple{Int64, Int64}, ACE.SphericalHarmonics.SHBasis{Float64}, ACE.Transforms.GetVal{:rr}}, Categorical1pBasis{:mu, :mu, 2, Symbol}}}, typeof(identity)}, typeof(real)}}
+# ACE.LinearACEModel{ACE.SymmetricBasis{PIBasis{ACE.Product1pBasis{3, Tuple{ACE.B1pComponent{(:n,), Tuple{Int64}, ACE.SChain{Tuple{ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#726#727"}}, ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#728#729"}}, ACE.OrthPolys.OrthPolyBasis{Float64}}}, ACE.Transforms.GetVal{:rr}}, ACE.B1pComponent{(:l, :m), Tuple{Int64, Int64}, ACE.SphericalHarmonics.SHBasis{Float64}, ACE.Transforms.GetVal{:rr}}, Categorical1pBasis{:mu, :mu, 2, Symbol}}}, typeof(identity)}, ACE.EuclideanVector{ComplexF64}, ACE.O3{:l, :m}, typeof(real)}, StaticArraysCore.SVector{3, Float64}, ACE.ProductEvaluator{StaticArraysCore.SVector{3, ACE.EuclideanVector{ComplexF64}}, PIBasis{ACE.Product1pBasis{3, Tuple{ACE.B1pComponent{(:n,), Tuple{Int64}, ACE.SChain{Tuple{ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#726#727"}}, ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#728#729"}}, ACE.OrthPolys.OrthPolyBasis{Float64}}}, ACE.Transforms.GetVal{:rr}}, ACE.B1pComponent{(:l, :m), Tuple{Int64, Int64}, ACE.SphericalHarmonics.SHBasis{Float64}, ACE.Transforms.GetVal{:rr}}, Categorical1pBasis{:mu, :mu, 2, Symbol}}}, typeof(identity)}, typeof(real)}}
+# typeof(linmodel2)
 
+# ACE.read_dict(ACE.write_dict(SphericalCutoff(3.5)))
 @info "Testing write_dict and test_dict for ACMatrixModel with SphericalCutoff"
 fm2 = ACE.read_dict(ACE.write_dict(fm));
 for _ in 1:5

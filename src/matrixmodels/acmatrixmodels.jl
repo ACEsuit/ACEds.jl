@@ -1,11 +1,13 @@
 # Z2S<:Uncoupled, SPSYM<:SpeciesUnCoupled, CUTOFF<:SphericalCutoff
 struct ACMatrixModel{O3S,CUTOFF,COUPLING} <: MatrixModel{O3S}
-    onsite::Dict{AtomicNumber,OnSiteModel{O3S,TM1}} where {TM1}
-    offsite::Dict{Tuple{AtomicNumber, AtomicNumber},OffSiteModel{O3S,TM2,Z2S,CUTOFF}} where {TM2, Z2S}#, CUTOFF<:SphericalCutoff}
+    onsite::Dict{AtomicNumber,<:OnSiteModel{O3S}}
+    offsite::Dict{Tuple{AtomicNumber, AtomicNumber},<:OffSiteModel{O3S,Z2S,CUTOFF}} where {Z2S}#, CUTOFF<:SphericalCutoff}
     n_rep::Int
     inds::SiteInds
     id::Symbol
-    function ACMatrixModel(onsite::OnSiteModels{O3S,TM1}, offsite::OffSiteModels{O3S,TM2,Z2S,CUTOFF}, id::Symbol, ::COUPLING) where {O3S,TM1, TM2,Z2S, CUTOFF<:SphericalCutoff, COUPLING<:Union{RowCoupling,ColumnCoupling}}
+    function ACMatrixModel(onsite::Dict{AtomicNumber,<:OnSiteModel{O3S}}, 
+                        offsite::Dict{Tuple{AtomicNumber, AtomicNumber},<:OffSiteModel{O3S,Z2S,CUTOFF}}, 
+                        id::Symbol, ::COUPLING) where {O3S,Z2S, CUTOFF<:SphericalCutoff, COUPLING<:Union{RowCoupling,ColumnCoupling}}
         _assert_offsite_keys(offsite, SpeciesUnCoupled())
         @assert _n_rep(onsite) ==  _n_rep(offsite)
         @assert length(unique([mo.cutoff for mo in values(offsite)])) == 1 
