@@ -78,8 +78,10 @@ _o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanVector}) where {PIB} = Covar
 _o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanMatrix}) where {PIB} = Equivariant
 _o3symmetry(m::ACE.LinearACEModel) = _o3symmetry(m.basis)
 
-_n_rep(::ACE.LinearACEModel{TB, SVector{N,T}, TEV}) where {TB,N,T,TEV} = N
+_CM(::ACE.LinearACEModel{TB, CM, TEV}) where {TB,CM,TEV} = CM
 
+_n_rep(::ACE.LinearACEModel{TB, SVector{N,T}, TEV}) where {TB,N,T,TEV} = N
+_T(::ACE.LinearACEModel{TB, SVector{N,T}, TEV}) where {TB,N,T,TEV} = T
 
 _msort(z1,z2) = (z1<=z2 ? (z1,z2) : (z2,z1))
 

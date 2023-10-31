@@ -1,6 +1,7 @@
 using ACEds
 using ACEds: ac_matrixmodel
 using ACE
+using ACE.Testing
 using ACEds.MatrixModels
 #using ACEds.MatrixModels: _n_rep, OnSiteModel, OffSiteModel, BondBasis
 using JuLIP
@@ -28,8 +29,9 @@ using Test
 using JuLIP
 using Distributions: Categorical
 
-species_friction = [:H]
-species_env = [:Cu]
+tol = 1E-11
+species_friction = [:H,:Cu]
+species_env = []
 function gen_config(species; n_min=2,n_max=2, species_prop = Dict(z=>1.0/length(species) for z in species), species_min = Dict(z=>1 for z in keys(species_prop)),  maxnit = 1000)
     species = collect(keys(species_prop))
     n = rand(n_min:n_max)
@@ -77,11 +79,43 @@ m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_env
 );
 
 fm= FrictionModel((m_cov,m_equ));
+
+typeof(fm.matrixmodels.cov.onsite[AtomicNumber(:H)].linmodel)
+
+onsitemodel = fm.matrixmodels.equ.onsite[AtomicNumber(:H)]
+onsitemodel2 = read_dict(ACE.write_dict(onsitemodel))
+typeof(onsitemodel2)
+
+linmodel = fm.matrixmodels.cov.onsite[AtomicNumber(:H)].linmodel;
+linmodel2 = read_dict(ACE.write_dict(linmodel))
+linmodel == linmodel2
+typeof(linmodel)<:typeof(linmodel2)
+
+
+linmodelb = fm.matrixmodels.cov.onsite[AtomicNumber(:Cu)].linmodel;
+linmodelb2 = read_dict(ACE.write_dict(linmodelb))
+typeof(linmodel2)<:typeof(linmodel)
+ACE.LinearACEModel{ACE.SymmetricBasis{PIBasis{ACE.Product1pBasis{3, Tuple{ACE.B1pComponent{(:n,), Tuple{Int64}, ACE.SChain{Tuple{ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#606#607"}}, ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#602#603"}}, ACE.OrthPolys.OrthPolyBasis{Float64}}}, ACE.Transforms.GetVal{:rr}}, ACE.B1pComponent{(:l, :m), Tuple{Int64, Int64}, ACE.SphericalHarmonics.SHBasis{Float64}, ACE.Transforms.GetVal{:rr}}, Categorical1pBasis{:mu, :mu, 2, Symbol}}}, typeof(identity)}, ACE.EuclideanVector{ComplexF64}, ACE.O3{:l, :m}, typeof(real)}, StaticArraysCore.SVector{3, Float64}, ACE.ProductEvaluator{StaticArraysCore.SVector{3, ACE.EuclideanVector{ComplexF64}}, PIBasis{ACE.Product1pBasis{3, Tuple{ACE.B1pComponent{(:n,), Tuple{Int64}, ACE.SChain{Tuple{ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#606#607"}}, ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#602#603"}}, ACE.OrthPolys.OrthPolyBasis{Float64}}}, ACE.Transforms.GetVal{:rr}}, ACE.B1pComponent{(:l, :m), Tuple{Int64, Int64}, ACE.SphericalHarmonics.SHBasis{Float64}, ACE.Transforms.GetVal{:rr}}, Categorical1pBasis{:mu, :mu, 2, Symbol}}}, typeof(identity)}, typeof(real)}}
+ACE.LinearACEModel{ACE.SymmetricBasis{PIBasis{ACE.Product1pBasis{3, Tuple{ACE.B1pComponent{(:n,), Tuple{Int64}, ACE.SChain{Tuple{ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#726#727"}}, ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#728#729"}}, ACE.OrthPolys.OrthPolyBasis{Float64}}}, ACE.Transforms.GetVal{:rr}}, ACE.B1pComponent{(:l, :m), Tuple{Int64, Int64}, ACE.SphericalHarmonics.SHBasis{Float64}, ACE.Transforms.GetVal{:rr}}, Categorical1pBasis{:mu, :mu, 2, Symbol}}}, typeof(identity)}, ACE.EuclideanVector{ComplexF64}, ACE.O3{:l, :m}, typeof(real)}, StaticArraysCore.SVector{3, Float64}, ACE.ProductEvaluator{StaticArraysCore.SVector{3, ACE.EuclideanVector{ComplexF64}}, PIBasis{ACE.Product1pBasis{3, Tuple{ACE.B1pComponent{(:n,), Tuple{Int64}, ACE.SChain{Tuple{ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#726#727"}}, ACE.Lambda{LegibleLambdas.LegibleLambda{ACE.var"#728#729"}}, ACE.OrthPolys.OrthPolyBasis{Float64}}}, ACE.Transforms.GetVal{:rr}}, ACE.B1pComponent{(:l, :m), Tuple{Int64, Int64}, ACE.SphericalHarmonics.SHBasis{Float64}, ACE.Transforms.GetVal{:rr}}, Categorical1pBasis{:mu, :mu, 2, Symbol}}}, typeof(identity)}, typeof(real)}}
+typeof(linmodel2)
+
+@info "Testing write_dict and test_dict for ACMatrixModel with SphericalCutoff"
 fm2 = ACE.read_dict(ACE.write_dict(fm));
 for _ in 1:5
     at = gen_config([:H,:Cu], n_min=2,n_max=2, species_prop = Dict(:H=>.5, :Cu=>.5), species_min = Dict(:H=>1, :Cu=>1),  maxnit = 1000)
-    @test Gamma(fm,at) == Gamma(fm2,at)
+    print_tf(@test norm(Gamma(fm,at) - Gamma(fm2,at))< tol)
 end
+println()
+
+@info "Testing save_dict and load_dict for ACCMatrixModel with SphericalCutoff"
+tmpname = tempname()
+save_dict(tmpname, write_dict(fm))
+fm2 = read_dict(load_dict(tmpname))
+for _ in 1:5
+    at = gen_config([:H,:Cu], n_min=2,n_max=2, species_prop = Dict(:H=>.5, :Cu=>.5), species_min = Dict(:H=>1, :Cu=>1),  maxnit = 1000)
+    print_tf(@test norm(Gamma(fm,at) - Gamma(fm2,at))< tol)
+end
+println()
 
 #%%
 z2sym= NoZ2Sym()
@@ -133,15 +167,24 @@ m_equ0 = onsiteonly_matrixmodel(ACE.EuclideanMatrix(Float64), species_friction, 
     species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0)
     );
 
-
 fm= FrictionModel((m_cov,m_equ, m_cov0, m_equ0)); 
-
+@info "Testing write_dict and test_dict for PWCMatrixModel with SphericalCutoff"
 fm2 = ACE.read_dict(ACE.write_dict(fm));
 for _ in 1:5
     at = gen_config([:H,:Cu], n_min=2,n_max=2, species_prop = Dict(:H=>.5, :Cu=>.5), species_min = Dict(:H=>1, :Cu=>1),  maxnit = 1000)
-    @test Gamma(fm,at) == Gamma(fm2,at)
+    print_tf(@test norm(Gamma(fm,at) - Gamma(fm2,at))< tol)
 end
+println()
 
+@info "Testing save_dict and load_dict for PWCMatrixModel with SphericalCutoff"
+tmpname = tempname()
+save_dict(tmpname, write_dict(fm))
+fm2 = read_dict(load_dict(tmpname))
+for _ in 1:5
+    at = gen_config([:H,:Cu], n_min=2,n_max=2, species_prop = Dict(:H=>.5, :Cu=>.5), species_min = Dict(:H=>1, :Cu=>1),  maxnit = 1000)
+    print_tf(@test norm(Gamma(fm,at) - Gamma(fm2,at))< tol)
+end
+println()
 
 #%%
 z2sym= NoZ2Sym()
@@ -195,9 +238,20 @@ m_equ0 = onsiteonly_matrixmodel(ACE.EuclideanMatrix(Float64), species_friction, 
     );
 
 fm= FrictionModel((m_cov,m_equ, m_cov0, m_equ0)); 
-ACE.write_dict(fm)
+@info "Testing write_dict and test_dict for PWCMatrixModel with EllipsoidCutoff"
 fm2 = ACE.read_dict(ACE.write_dict(fm));
 for _ in 1:5
     at = gen_config([:H,:Cu], n_min=2,n_max=2, species_prop = Dict(:H=>.5, :Cu=>.5), species_min = Dict(:H=>1, :Cu=>1),  maxnit = 1000)
-    @test Gamma(fm,at) == Gamma(fm2,at)
+    print_tf(@test norm(Gamma(fm,at) - Gamma(fm2,at))< tol)
 end
+println()
+
+@info "Testing save_dict and load_dict for PWCMatrixModel with EllipsoidCutoff"
+tmpname = tempname()
+save_dict(tmpname, write_dict(fm))
+fm2 = read_dict(load_dict(tmpname))
+for _ in 1:5
+    at = gen_config([:H,:Cu], n_min=2,n_max=2, species_prop = Dict(:H=>.5, :Cu=>.5), species_min = Dict(:H=>1, :Cu=>1),  maxnit = 1000)
+    print_tf(@test norm(Gamma(fm,at) - Gamma(fm2,at))< tol)
+end
+println()
