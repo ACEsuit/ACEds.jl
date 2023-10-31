@@ -1,9 +1,9 @@
 struct OnsiteOnlyMatrixModel{O3S} <: MatrixModel{O3S}
-    onsite::OnSiteModels{O3S,TM} where {TM}
+    onsite::OnSiteModels{O3S}
     n_rep::Int
     inds::SiteInds
     id::Symbol
-    function OnsiteOnlyMatrixModel(onsite::OnSiteModels{O3S,TM}, id::Symbol) where {O3S,TM}
+    function OnsiteOnlyMatrixModel(onsite::OnSiteModels{O3S}, id::Symbol) where {O3S}
         @assert length(unique([_n_rep(mo) for mo in values(onsite)])) == 1
         @assert length(unique([mo.cutoff for mo in values(onsite)])) == 1 
         return new{O3S}(onsite, _n_rep(onsite), SiteInds(_get_basisinds(onsite)), id)
@@ -69,4 +69,17 @@ function basis!(B, M::OnsiteOnlyMatrixModel, at::Atoms, filter=(_,_)->true)
             end
         end
     end
+end
+
+function ACE.write_dict(M::OnsiteOnlyMatrixModel) 
+    return Dict("__id__" => "ACEds_OnsiteOnlyMatrixModel",
+            "onsite" => write_dict(M.onsite),
+            #Dict(zz=>write_dict(val) for (zz,val) in M.onsite),
+            "id" => string(M.id))         
+end
+function ACE.read_dict(::Val{:ACEds_OnsiteOnlyMatrixModel}, D::Dict)
+            onsite = read_dict(D["onsite"])
+            #Dict(zz=>read_dict(val) for (zz,val) in D["onsite"])
+            id = Symbol(D["id"])
+    return OnsiteOnlyMatrixModel(onsite, id)
 end

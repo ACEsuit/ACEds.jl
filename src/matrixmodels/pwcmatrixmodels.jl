@@ -1,9 +1,9 @@
 struct PWCMatrixModel{O3S,CUTOFF,Z2S,SC} <: MatrixModel{O3S}
-    offsite::OffSiteModels{O3S,TM2,Z2S,CUTOFF} where {TM2, Z2S, CUTOFF}
+    offsite::OffSiteModels{O3S,Z2S,CUTOFF} where {Z2S, CUTOFF}
     n_rep::Int
     inds::SiteInds
     id::Symbol
-    function PWCMatrixModel(offsite::OffSiteModels{O3S,TM2,Z2S,CUTOFF}, id::Symbol) where {O3S,TM2,Z2S,CUTOFF}
+    function PWCMatrixModel(offsite::OffSiteModels{O3S,Z2S,CUTOFF}, id::Symbol) where {O3S,Z2S,CUTOFF}
         #_assert_offsite_keys(offsite, SpeciesCoupled())
         SC = typeof(_species_symmetry(keys(offsite)))
         @assert length(unique([_n_rep(mo) for mo in values(offsite)])) == 1
@@ -136,4 +136,17 @@ function basis!(B, M::PWCMatrixModel{O3S,<:EllipsoidCutoff,Z2S,CUTOFF}, at::Atom
             end
         end
     end
+end
+
+function ACE.write_dict(M::PWCMatrixModel{O3S,CUTOFF,COUPLING}) where {O3S,CUTOFF,COUPLING}
+    return Dict("__id__" => "ACEds_PWCMatrixModel",
+            "offsite" => write_dict(M.offsite),
+            #Dict(zz=>write_dict(val) for (zz,val) in M.offsite),
+            "id" => string(M.id))         
+end
+function ACE.read_dict(::Val{:ACEds_PWCMatrixModel}, D::Dict)
+            offsite = read_dict(D["offsite"])
+            #Dict(zz=>read_dict(val) for (zz,val) in D["offsite"])
+            id = Symbol(D["id"])
+    return PWCMatrixModel(offsite, id)
 end

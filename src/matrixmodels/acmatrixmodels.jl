@@ -1,19 +1,41 @@
 # Z2S<:Uncoupled, SPSYM<:SpeciesUnCoupled, CUTOFF<:SphericalCutoff
 struct ACMatrixModel{O3S,CUTOFF,COUPLING} <: MatrixModel{O3S}
-    onsite::Dict{AtomicNumber,OnSiteModel{O3S,TM1}} where {TM1}
-    offsite::Dict{Tuple{AtomicNumber, AtomicNumber},OffSiteModel{O3S,TM2,Z2S,CUTOFF}} where {TM2, Z2S}#, CUTOFF<:SphericalCutoff}
+    onsite::OnSiteModels{O3S}
+    offsite::OffSiteModels{O3S,Z2S,CUTOFF} where {Z2S}#, CUTOFF<:SphericalCutoff}
     n_rep::Int
     inds::SiteInds
     id::Symbol
-    function ACMatrixModel(onsite::OnSiteModels{O3S,TM1}, offsite::OffSiteModels{O3S,TM2,Z2S,CUTOFF}, id::Symbol, ::COUPLING) where {O3S,TM1, TM2,Z2S, CUTOFF<:SphericalCutoff, COUPLING<:Union{RowCoupling,ColumnCoupling}}
+    function ACMatrixModel(onsite::OnSiteModels{O3S}, offsite::OffSiteModels{O3S,Z2S,CUTOFF}, id::Symbol, ::COUPLING) where {O3S,Z2S, CUTOFF<:SphericalCutoff, COUPLING<:Union{RowCoupling,ColumnCoupling}}
         _assert_offsite_keys(offsite, SpeciesUnCoupled())
         @assert _n_rep(onsite) ==  _n_rep(offsite)
         @assert length(unique([mo.cutoff for mo in values(offsite)])) == 1 
         @assert length(unique([mo.cutoff for mo in values(onsite)])) == 1 
         #@assert all([z1 in keys(onsite), z2 in keys(offsite)  for (z1,z2) in zzkeys])
+        @show typeof(onsite)
         return new{O3S,CUTOFF,COUPLING}(onsite, offsite, _n_rep(onsite), SiteInds(_get_basisinds(onsite), _get_basisinds(offsite)), id)
     end
 end #TODO: Add proper constructor that checks for correct Species coupling
+
+function ACE.write_dict(M::ACMatrixModel{O3S,CUTOFF,COUPLING}) where {O3S,CUTOFF,COUPLING}
+    return Dict("__id__" => "ACEds_ACMatrixModel",
+            "onsite" => ACE.write_dict(M.onsite),
+            #Dict(zz=>write_dict(val) for (zz,val) in M.onsite),
+            "offsite"  => ACE.write_dict(M.offsite),
+            # => Dict(zz=>write_dict(val) for (zz,val) in M.offsite),
+            "id" => string(M.id),
+            "O3S" => write_dict(O3S),
+            "CUTOFF" => write_dict(CUTOFF),
+            "COUPLING" => write_dict(COUPLING()))         
+end
+function ACE.read_dict(::Val{:ACEds_ACMatrixModel}, D::Dict)
+            onsite = ACE.read_dict(D["onsite"])
+            offsite = ACE.read_dict(D["offsite"])
+            #Dict(zz=>read_dict(val) for (zz,val) in D["onsite"])
+            #offsite = Dict(zz=>read_dict(val) for (zz,val) in D["offsite"])
+            id = Symbol(D["id"])
+            coupling = read_dict(D["COUPLING"])
+    return ACMatrixModel(onsite, offsite, id, coupling)
+end
 
 function ACE.set_params!(mb::ACMatrixModel, θ::NamedTuple)
     ACE.set_params!(mb, :onsite,  θ.onsite)

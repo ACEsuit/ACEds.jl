@@ -56,12 +56,12 @@ function ACE.write_dict(cutoff::SphericalCutoff{T}) where {T}
     return Dict("__id__" => "ACEds_SphericalCutoff",
           "rcut" => cutoff.rcut,
              "T" => T)         
- end 
+end 
 
- function ACE.read_dict(::Val{:ACEds_SphericalCutoff}, D::Dict)
-    rcut = D["rcut"]
-    T = D["T"]
-    return SphericalCutoff{T}(rcut)
- end
+function ACE.read_dict(::Val{:ACEds_SphericalCutoff}, D::Dict)
+    T = getfield(Base, Symbol(D["T"]))
+    rcut = T(D["rcut"])
+    return SphericalCutoff(rcut)
+end
 
 end

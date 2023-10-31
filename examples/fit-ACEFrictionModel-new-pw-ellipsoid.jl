@@ -157,20 +157,6 @@ println("Epoch: $epoch, Avg Training Loss: $(loss_traj["train"][end]/n_train), T
 c_fit = params(ffm)
 set_params!(fm, c_fit)
 
-
-using FluxOptTools
-using Optim
-using Zygote
-
-loss() = weighted_l2_loss(ffm,train)
-pars   = Flux.params(ffm)
-loss()
-lossfun, gradfun, fg!, p0 = optfuns(loss, pars)
-# copy the optimal parameters back into pars (not that this simulatenously modifies the flux model parameters `ffm.c``) 
-using Plots
-Plots.contourf(() -> log10(1 + loss()), pars, color=:turbo, npoints=50, lnorm=1)
-
-
 # Evaluate different error statistics 
 
 using ACEds.Analytics: error_stats, plot_error, plot_error_all,friction_entries

@@ -11,7 +11,8 @@ using JuLIP
 using ACEds.FrictionModels
 using ACEds.AtomCutoffs
 using ACEbonds.BondCutoffs
-
+using ACE.Testing
+using LinearAlgebra
 
 #using ACE: write_dict, read_dict
 #using ACE: write_dict
@@ -22,12 +23,12 @@ using ACEbonds.BondCutoffs
 #ACE.read_dict(ACE.write_dict(NoZ2Sym()))
 #ACE.read_dict(ACE.write_dict(RowCoupling()))
 
-#%%
 
 using Test
 using JuLIP
 using Distributions: Categorical
 
+tol = 1E-10
 species_friction = [:H]
 species_env = [:Cu]
 function gen_config(species; n_min=2,n_max=2, species_prop = Dict(z=>1.0/length(species) for z in species), species_min = Dict(z=>1 for z in keys(species_prop)),  maxnit = 1000)
@@ -77,11 +78,24 @@ m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_env
 );
 
 fm= FrictionModel((m_cov,m_equ));
+@info "Testing write_dict and read_dict for ACMatrixModel with SphericalCutoff"
 fm2 = ACE.read_dict(ACE.write_dict(fm));
 for _ in 1:5
     at = gen_config([:H,:Cu], n_min=2,n_max=2, species_prop = Dict(:H=>.5, :Cu=>.5), species_min = Dict(:H=>1, :Cu=>1),  maxnit = 1000)
-    @test Gamma(fm,at) == Gamma(fm2,at)
+    print_tf(@test Gamma(fm,at) == Gamma(fm2,at))
 end
+println()
+
+@info "Testing save_dict and load_dict for ACMatrixModel with SphericalCutoff"
+tmpname = tempname()
+save_dict(tmpname, write_dict(fm))
+fm2 = read_dict(load_dict(tmpname))
+for _ in 1:5
+    at = gen_config([:H,:Cu], n_min=2,n_max=2, species_prop = Dict(:H=>.5, :Cu=>.5), species_min = Dict(:H=>1, :Cu=>1),  maxnit = 1000)
+    print_tf(@test norm(Gamma(fm,at) - Gamma(fm2,at))< tol)
+end
+println()
+
 
 #%%
 z2sym= NoZ2Sym()
@@ -135,13 +149,23 @@ m_equ0 = onsiteonly_matrixmodel(ACE.EuclideanMatrix(Float64), species_friction, 
 
 
 fm= FrictionModel((m_cov,m_equ, m_cov0, m_equ0)); 
-
+@info "Testing write_dict and read_dict for PWCMatrixModel with SphericalCutoff"
 fm2 = ACE.read_dict(ACE.write_dict(fm));
 for _ in 1:5
     at = gen_config([:H,:Cu], n_min=2,n_max=2, species_prop = Dict(:H=>.5, :Cu=>.5), species_min = Dict(:H=>1, :Cu=>1),  maxnit = 1000)
-    @test Gamma(fm,at) == Gamma(fm2,at)
+    print_tf(@test Gamma(fm,at) == Gamma(fm2,at))
 end
+println()
 
+@info "Testing save_dict and load_dict for PWCMatrixModel with SphericalCutoff"
+tmpname = tempname()
+save_dict(tmpname, write_dict(fm))
+fm2 = read_dict(load_dict(tmpname))
+for _ in 1:5
+    at = gen_config([:H,:Cu], n_min=2,n_max=2, species_prop = Dict(:H=>.5, :Cu=>.5), species_min = Dict(:H=>1, :Cu=>1),  maxnit = 1000)
+    print_tf(@test norm(Gamma(fm,at) - Gamma(fm2,at))< tol)
+end
+println()
 
 #%%
 z2sym= NoZ2Sym()
@@ -195,9 +219,20 @@ m_equ0 = onsiteonly_matrixmodel(ACE.EuclideanMatrix(Float64), species_friction, 
     );
 
 fm= FrictionModel((m_cov,m_equ, m_cov0, m_equ0)); 
-ACE.write_dict(fm)
+@info "Testing write_dict and read_dict for PWCMatrixModel with EllipsoidCutoff"
 fm2 = ACE.read_dict(ACE.write_dict(fm));
 for _ in 1:5
     at = gen_config([:H,:Cu], n_min=2,n_max=2, species_prop = Dict(:H=>.5, :Cu=>.5), species_min = Dict(:H=>1, :Cu=>1),  maxnit = 1000)
-    @test Gamma(fm,at) == Gamma(fm2,at)
+    print_tf(@test Gamma(fm,at) == Gamma(fm2,at))
 end
+println()
+
+@info "Testing save_dict and load_dict for PWCMatrixModel with EllipsoidCutoff"
+tmpname = tempname()
+save_dict(tmpname, write_dict(fm))
+fm2 = read_dict(load_dict(tmpname))
+for _ in 1:5
+    at = gen_config([:H,:Cu], n_min=2,n_max=2, species_prop = Dict(:H=>.5, :Cu=>.5), species_min = Dict(:H=>1, :Cu=>1),  maxnit = 1000)
+    print_tf(@test norm(Gamma(fm,at) - Gamma(fm2,at))< tol)
+end
+println()

@@ -9,10 +9,10 @@ export SpeciesCoupled, SpeciesUnCoupled
 export PairCoupling, RowCoupling, ColumnCoupling
 export matrix, basis, params, nparams, set_params!, get_id
 
+using LinearAlgebra: Diagonal
 using JuLIP, ACE, ACEbonds
 using JuLIP: chemical_symbol
 using ACE: SymmetricBasis, LinearACEModel, evaluate
-import ACE: nparams, params, set_params!
 using ACEbonds: bonds, env_cutoff
 using ACEbonds.BondCutoffs: EllipsoidCutoff
 using LinearAlgebra
@@ -21,13 +21,26 @@ using SparseArrays
 using ACEds.Utils: reinterpret
 using ACEds.AtomCutoffs
 using ACEds.PWMatrix
+using ACEds.Utils: reinterpret
 
 import ACEbase: evaluate, evaluate!
-
 import ACE: scaling
+import ACE: nparams, params, set_params!
+import ACE: write_dict, read_dict
+import ACEbonds: env_cutoff
 
 using ACEbonds.BondCutoffs 
 using ACEbonds.BondCutoffs: AbstractBondCutoff
+
+using ACEds.AtomCutoffs: SphericalCutoff
+using ACE
+using ACEds.MatrixModels
+import ACEbonds: SymmetricEllipsoidBondBasis
+using ACEds
+using JuLIP: AtomicNumber
+
+ACE.write_dict(v::SVector{N,T}) where {N,T} = v
+ACE.read_dict(v::SVector{N,T}) where {N,T} = v
 
 #ACE.scaling(m::SiteModel,p::Int) = ACE.scaling(m.model.basis,p)
 abstract type O3Symmetry end 
@@ -41,6 +54,13 @@ struct Odd <: Z2Symmetry end
 struct Even <: Z2Symmetry end
 struct NoZ2Sym <: Z2Symmetry end
 
+function ACE.write_dict(z2s::Z2S) where {Z2S<:Z2Symmetry}
+    return Dict("__id__" => string("ACEds_Z2Symmetry"), "z2s"=>typeof(z2s)) 
+end
+function ACE.read_dict(::Val{:ACEds_Z2Symmetry}, D::Dict) 
+    z2s = getfield(ACEds.MatrixModels, Symbol(D["z2s"]))
+    return z2s()
+end
 abstract type SpeciesCoupling end 
 
 struct SpeciesCoupled <: SpeciesCoupling end
@@ -51,6 +71,14 @@ abstract type NoiseCoupling end
 struct PairCoupling <: NoiseCoupling end
 struct RowCoupling <: NoiseCoupling end
 struct ColumnCoupling <: NoiseCoupling end
+
+function ACE.write_dict(coupling::COUPLING) where {COUPLING<:NoiseCoupling}
+    return Dict("__id__" => string("ACEds_NoiseCoupling"), "coupling"=>typeof(coupling)) 
+end
+function ACE.read_dict(::Val{:ACEds_NoiseCoupling}, D::Dict) 
+    coupling = getfield(ACEds.MatrixModels, Symbol(D["coupling"]))
+    return coupling()
+end
 
 _mreduce(z1,z2, ::SpeciesUnCoupled) = (z1,z2)
 _mreduce(z1,z2, ::SpeciesCoupled) = _msort(z1,z2)
@@ -79,6 +107,7 @@ _o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanMatrix}) where {PIB} = Equiv
 _o3symmetry(m::ACE.LinearACEModel) = _o3symmetry(m.basis)
 
 _n_rep(::ACE.LinearACEModel{TB, SVector{N,T}, TEV}) where {TB,N,T,TEV} = N
+_T(::ACE.LinearACEModel{TB, SVector{N,T}, TEV}) where {TB,N,T,TEV} = T
 
 
 _msort(z1,z2) = (z1<=z2 ? (z1,z2) : (z2,z1))
@@ -123,13 +152,40 @@ function OnSiteModel(linbasis::TM, cutoff::SphericalCutoff, n_rep::Ti) where {TM
     return OnSiteModel(linbasis, cutoff, rand(SVector{n_rep,Float64},length(linbasis)))
 end
 OnSiteModel(linbasis::TM,r_cut::T, n_rep::IT) where {TM,T<:Real,IT<:Int} = OnSiteModel(linbasis,SphericalCutoff(r_cut),n_rep)
-struct OffSiteModel{O3S,TM,Z2S,CUTOFF} <: SiteModel # where {O3S<:O3Symmetry, CUTOFF<:AbstractCutoff, Z2S<:Z2Symmetry, SPSYM<:SpeciesCoupling}
+
+function ACE.write_dict(m::OnSiteModel{O3S,TM}) where {O3S,TM}
+    T = _T(m.linmodel)
+    c_vec = reinterpret(Vector{T}, m.linmodel.c)
+    n_rep = _n_rep(m.linmodel)
+    return Dict("__id__" => "ACEds_OnSiteModel",
+          "linbasis" => ACE.write_dict(m.linmodel.basis),
+          "c_vec" => ACE.write_dict(c_vec),
+          "n_rep" => n_rep,
+          "T" => ACE.write_dict(T),
+          "cutoff" => ACE.write_dict(m.cutoff)
+          )         
+end
+
+# c_vec = reinterpret(Vector{Float64}, linmodel.c)
+# using ACEds.MatrixModels: _n_rep
+# nr = _n_rep(fm.matrixmodels.equ.offsite[(AtomicNumber(:H),AtomicNumber(:H))])
+# c = reinterpret(Vector{SVector{nr, Float64}}, c_vec) 
+
+function ACE.read_dict(::Val{:ACEds_OnSiteModel}, D::Dict) 
+    linbasis = ACE.read_dict(D["linbasis"])
+    c_vec = ACE.read_dict(D["c_vec"]) 
+    n_rep = D["n_rep"]  
+    T = ACE.read_dict(D["T"])
+    cutoff = ACE.read_dict(D["cutoff"])
+    return OnSiteModel(linbasis, cutoff, reinterpret(Vector{SVector{n_rep, T}}, c_vec))
+end
+struct OffSiteModel{O3S,Z2S,CUTOFF,TM} <: SiteModel # where {O3S<:O3Symmetry, CUTOFF<:AbstractCutoff, Z2S<:Z2Symmetry, SPSYM<:SpeciesCoupling}
     linmodel::TM
     cutoff::CUTOFF
     function OffSiteModel(bb::BondBasis{TM,Z2S},  cutoff::CUTOFF, c::Vector{SVector{N,T}}) where  {TM, CUTOFF<:AbstractCutoff, Z2S<:Z2Symmetry, N, T<:Real}
         @assert length(bb.linbasis) == length(c)
         linmodel = ACE.LinearACEModel(bb.linbasis,c)
-        return new{_o3symmetry(linmodel),typeof(linmodel),Z2S,CUTOFF}(linmodel, cutoff)
+        return new{_o3symmetry(linmodel),Z2S,CUTOFF,typeof(linmodel)}(linmodel, cutoff)
     end
 end
 
@@ -140,13 +196,49 @@ end
 OffSiteModel(bb::BondBasis{TM,Z2S},r_cut::T, n_rep::IT) where {TM,Z2S,T<:Real,IT<:Int} = OffSiteModel(bb, SphericalCutoff(r_cut), n_rep)
 OffSiteModel(bb::BondBasis{TM,Z2S}, rcutbond::T, rcutenv::T, zcutenv::T, n_rep::IT) where {TM,Z2S,T<:Real,IT<:Int} = OffSiteModel(bb, EllipsoidCutoff(rcutbond,rcutenv,zcutenv), n_rep)
 
-import ACEbonds: env_cutoff
-const OnSiteModels{O3S,TM} = Dict{AtomicNumber,OnSiteModel{O3S,TM}}
+function ACE.write_dict(m::OffSiteModel{O3S,Z2S,CUTOFF,TM}) where {O3S,TM,Z2S,CUTOFF}
+    return Dict("__id__" => "ACEds_OffSiteModel",
+        "linbasis" => write_dict(m.linmodel.basis),
+          "c" => write_dict(reinterpret(Vector{Float64},params(m.linmodel))),
+          "n_rep"=>_n_rep(m.linmodel),
+          "cutoff" => write_dict(m.cutoff),
+          "Z2S" => write_dict(Z2S()))         
+end
+
+function ACE.read_dict(::Val{:ACEds_OffSiteModel}, D::Dict) 
+    linbasis = ACE.read_dict(D["linbasis"])
+    n_rep = D["n_rep"]
+    c = reinterpret(Vector{SVector{n_rep,Float64}}, ACE.read_dict(D["c"]))   
+    cutoff = ACE.read_dict(D["cutoff"])
+    Z2S = ACE.read_dict(D["Z2S"])
+    bondbais = BondBasis(linbasis,Z2S)
+    return OffSiteModel(bondbais, cutoff, c)
+end
+
+
+const OnSiteModels{O3S} = Dict{AtomicNumber,<:OnSiteModel{O3S}}
 #linmodel_size(models::OnSiteModels) = sum(length(mo.linmodel.basis) for mo in values(models))
+function ACE.write_dict(onsite::OnSiteModels)
+    return Dict("__id__" => "ACEds_onsitemodels",
+                "zval" => Dict(string(chemical_symbol(z))=>ACE.write_dict(val) for (z,val) in onsite)
+                )
+end
+function ACE.read_dict(::Val{:ACEds_onsitemodels}, D::Dict) 
+    return Dict(AtomicNumber(Symbol(z)) => ACE.read_dict(val) for (z,val) in D["zval"])  
+end
 
-const OffSiteModels{O3S,TM,Z2S,CUTOFF} = Dict{Tuple{AtomicNumber, AtomicNumber},OffSiteModel{O3S,TM,Z2S,CUTOFF}}
+const OffSiteModels{O3S,Z2S,CUTOFF} = Dict{Tuple{AtomicNumber, AtomicNumber},<:OffSiteModel{O3S,Z2S,CUTOFF}}
 #linmodel_size(models::OffSiteModels) = sum(length(mo.linmodel.basis) for mo in values(models))
-
+function ACE.write_dict(offsite::OffSiteModels)
+    return Dict("__id__" => "ACEds_offsitemodels",
+                "vals" => Dict(i=>ACE.write_dict(val) for (i,val) in enumerate(values(offsite))),
+                "z1" => Dict(i=>string(chemical_symbol(zz[1])) for (i,zz) in enumerate(keys(offsite))),
+                "z2" => Dict(i=>string(chemical_symbol(zz[2])) for (i,zz) in enumerate(keys(offsite)))
+    )
+end
+function ACE.read_dict(::Val{:ACEds_offsitemodels}, D::Dict) 
+    return Dict( (AtomicNumber(Symbol(z1)),AtomicNumber(Symbol(z2))) => ACE.read_dict(val)   for (z1,z2,val) in zip(values(D["z1"]),values(D["z2"]),values(D["vals"])))  
+end
 const SiteModels = Union{OnSiteModels,OffSiteModels}
 
 function _n_rep(models::SiteModels)
@@ -296,18 +388,8 @@ _val2block(::MatrixModel{Equivariant}, val) = val
 
 _n_rep(M::MatrixModel) = M.n_rep
 
-using LinearAlgebra: Diagonal
-
 evaluate(sm::OnSiteModel, Rs, Zs) = evaluate(sm.linmodel, env_transform(Rs, Zs, sm.cutoff))
 evaluate(sm::OffSiteModel, rrij, zi::AtomicNumber, zj::AtomicNumber, Rs, Zs) = evaluate(sm.linmodel, env_transform(rrij, zi, zj, Rs, Zs, sm.cutoff)) 
-
-
-using ACEds.AtomCutoffs: SphericalCutoff
-using ACE
-using ACEds.MatrixModels
-import ACEbonds: SymmetricEllipsoidBondBasis
-using ACEds
-using JuLIP: AtomicNumber
 
 
 _z2couplingToString(::NoZ2Sym) = "noz2sym"

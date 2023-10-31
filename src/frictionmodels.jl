@@ -155,7 +155,7 @@ function ACE.write_dict(fm::FrictionModel)
           "matrixmodels" => Dict(id=>write_dict(fm.matrixmodels[id]) for id in keys(fm.matrixmodels)))        
 end 
 function ACE.read_dict(::Val{:ACEds_FrictionModel}, D::Dict)
-    matrixmodels = NamedTuple(Dict(id=>read_dict(val) for (id,val) in D["matrixmodels"]))
+    matrixmodels = NamedTuple(Dict(Symbol(id)=>read_dict(val) for (id,val) in D["matrixmodels"]))
     return FrictionModel(matrixmodels)
 end
 

@@ -1,10 +1,10 @@
 # Z2S<:Even, SPSYM<:SpeciesCoupled
 struct MBDPDMatrixModel{O3S} <: MatrixModel{O3S}
-    offsite::OffSiteModels{O3S,TM2,Z2S,CUTOFF} where {TM2, Z2S<:Even, CUTOFF<:EllipsoidCutoff}
+    offsite::OffSiteModels{O3S,Z2S,CUTOFF} where { Z2S<:Even, CUTOFF<:EllipsoidCutoff}
     n_rep::Int
     inds::SiteInds
     id::Symbol
-    function MBDPDMatrixModel(offsite::OffSiteModels{O3S,TM2,Z2S,CUTOFF}, id::Symbol) where {O3S, TM2,Z2S <: Even,CUTOFF}
+    function MBDPDMatrixModel(offsite::OffSiteModels{O3S,Z2S,CUTOFF}, id::Symbol) where {O3S, Z2S <: Even,CUTOFF}
         _assert_offsite_keys(offsite, SpeciesCoupled())
         @assert length(unique([mo.n_rep for mo in values(offsite)])) == 1
         @assert length(unique([mo.cutoff for mo in values(offsite)])) == 1 
