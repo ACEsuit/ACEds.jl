@@ -683,7 +683,5 @@ include("./pwcmatrixmodels.jl")
 include("./onsiteonlymatrixmodels.jl")
 # Multi-body DPD matrix models:
 include("./mbdpdmatrixmodels.jl")
-# Input-Output functions:
-include("./matrixmodels-io.jl")
 
 end
