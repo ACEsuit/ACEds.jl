@@ -25,7 +25,7 @@ path_to_data = #"/home/msachs/data"
 path_to_data = "/Users/msachs2/Documents/Projects/data/friction_tensors/H2Cu"
 fname = "/h2cu_20220713_friction"
 filename = string(path_to_data, fname,".json")
-rdata = ACEds.DataUtils.json2internal(filename);
+rdata = ACEds.DataUtils.json2internal(filename); 
 
 # Partition data into train and test set 
 rng = MersenneTwister(12)
