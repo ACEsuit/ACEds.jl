@@ -37,10 +37,11 @@ using ACEds.AtomCutoffs: SphericalCutoff
 using ACEds.MatrixModels: NoZ2Sym, SpeciesUnCoupled
 species_friction = [:H]
 species_env = [:Cu]
+species_mol = [:H]
 rcut = 8.0
 z2sym= NoZ2Sym()
 speciescoupling = SpeciesUnCoupled()
-m_inv = pwc_matrixmodel(ACE.Invariant(),species_friction,species_env, z2sym,  speciescoupling;
+m_inv = pwc_matrixmodel(ACE.Invariant(),species_friction, species_env, z2sym,  speciescoupling, species_mol;
         n_rep = 3,
         maxorder_off=2, 
         maxdeg_off=5, 
@@ -51,7 +52,7 @@ m_inv = pwc_matrixmodel(ACE.Invariant(),species_friction,species_env, z2sym,  sp
         species_weight_cat_off = Dict(:H => 1.0, :Cu=> 1.0),
         bond_weight = .5
     );
-m_cov = pwc_matrixmodel(ACE.EuclideanVector(Float64),species_friction,species_env, z2sym,  speciescoupling;
+m_cov = pwc_matrixmodel(ACE.EuclideanVector(Float64),species_friction, species_env, z2sym,  speciescoupling, species_mol;
         n_rep = 3,
         maxorder_off=2, 
         maxdeg_off=5, 
@@ -62,7 +63,7 @@ m_cov = pwc_matrixmodel(ACE.EuclideanVector(Float64),species_friction,species_en
         species_weight_cat_off = Dict(:H => 1.0, :Cu=> 1.0),
         bond_weight = .5
     );
-m_equ = pwc_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_env, z2sym,  speciescoupling;
+m_equ = pwc_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction, species_env, z2sym, speciescoupling, species_mol;
         n_rep = 3,
         maxorder_off=2, 
         maxdeg_off=5, 
@@ -74,15 +75,15 @@ m_equ = pwc_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_en
         bond_weight = .5
     );
 
-m_inv0 = onsiteonly_matrixmodel(ACE.Invariant(), species_friction, species_env; id=:inv0, n_rep = 3, rcut_on = rcut, maxorder_on=2, maxdeg_on=5,
+m_inv0 = onsiteonly_matrixmodel(ACE.Invariant(), species_friction, species_env, species_mol; id=:inv0, n_rep = 3, rcut_on = rcut, maxorder_on=2, maxdeg_on=5,
     species_maxorder_dict_on = Dict( :H => 1), 
     species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0)
     );
-m_cov0 = onsiteonly_matrixmodel(ACE.EuclideanVector(Float64), species_friction, species_env; id=:cov0, n_rep = 3, rcut_on = rcut, maxorder_on=2, maxdeg_on=5,
+m_cov0 = onsiteonly_matrixmodel(ACE.EuclideanVector(Float64), species_friction, species_env, species_mol; id=:cov0, n_rep = 3, rcut_on = rcut, maxorder_on=2, maxdeg_on=5,
     species_maxorder_dict_on = Dict( :H => 1), 
     species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0)
     );
-m_equ0 = onsiteonly_matrixmodel(ACE.EuclideanMatrix(Float64), species_friction, species_env; id=:equ0, n_rep = 3, rcut_on = rcut, maxorder_on=2, maxdeg_on=5,
+m_equ0 = onsiteonly_matrixmodel(ACE.EuclideanMatrix(Float64), species_friction, species_env, species_mol; id=:equ0, n_rep = 3, rcut_on = rcut, maxorder_on=2, maxdeg_on=5,
     species_maxorder_dict_on = Dict( :H => 1), 
     species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0)
     );

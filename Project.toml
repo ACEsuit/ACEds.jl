@@ -1,7 +1,7 @@
 name = "ACEds"
 uuid = "286ca7f0-9926-4809-930a-857c1b5bb5cd"
 authors = ["Christoph Ortner <c.ortner@warwick.ac.uk> and Matthias Sachs <e.matthias.sachs@gmail.com>"]
-version = "0.1.6"
+version = "0.1.7"
 
 [deps]
 ACE = "3e8ccfd2-c8b0-11ea-32f1-f3a5990fd77a"

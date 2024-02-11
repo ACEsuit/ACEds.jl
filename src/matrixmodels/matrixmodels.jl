@@ -35,7 +35,8 @@ using ACEbonds.BondCutoffs: AbstractBondCutoff
 using ACEds.AtomCutoffs: SphericalCutoff
 using ACE
 using ACEds.MatrixModels
-import ACEbonds: SymmetricEllipsoidBondBasis
+#import ACEbonds: SymmetricEllipsoidBondBasis
+include("../patches/acebonds_basisselectors.jl")
 using ACEds
 using JuLIP: AtomicNumber
 
@@ -399,6 +400,23 @@ _z2couplingToString(::Odd) = "Covariant"
 _cutoff(cutoff::SphericalCutoff) = cutoff.r_cut
 _cutoff(cutoff::EllipsoidCutoff) = cutoff.r_cut
 
+"""
+`NoMolOnly`: selects all basis functions which model interactions between atoms of the molecule only. Use this filter if the molecule feels only
+friction if in contact to the substrat.   
+"""
+struct NoMolOnly
+      isym::Symbol
+      categories
+end
+  
+function (f::NoMolOnly)(bb) 
+      if isempty(bb)
+            return true
+      else
+            return !all([getproperty(b, f.isym) in f.categories for b in bb])
+      end
+end
+
 function offsite_linbasis(property,species;
     z2symmetry = NoZ2Sym(), 
     maxorder = 2,
@@ -415,9 +433,16 @@ function offsite_linbasis(property,species;
     species_minorder_dict = Dict{Any, Float64}(),
     species_maxorder_dict = Dict{Any, Float64}(),
     species_weight_cat = Dict(c => 1.0 for c in species),
+    molspecies = []
     )
+    if isempty(molspecies)
+        filterfun = _ -> true
+    else
+        filterfun = NoMolOnly(:mube, vcat(molspecies,:bond))
+    end 
+
     @info "Generate offsite basis"
-    @time offsite = SymmetricEllipsoidBondBasis(property; 
+    @time offsite = SymmetricEllipsoidBondBasis2(property; 
                 r0 = r0_ratio, 
                 rin = rin_ratio, 
                 pcut = pcut, 
@@ -433,7 +458,8 @@ function offsite_linbasis(property,species;
                 bondsymmetry=_z2couplingToString(z2symmetry),
                 species=species, 
                 isym=isym, 
-                bond_weight = bond_weight,  
+                bond_weight = bond_weight,
+                filterfun = filterfun
     )
     @info "Size of offsite basis elements: $(length(offsite))"
     return BondBasis(offsite,z2symmetry)
@@ -446,7 +472,8 @@ function onsite_linbasis(property,species;
     species_minorder_dict = Dict{Any, Float64}(),
     species_maxorder_dict = Dict{Any, Float64}(),
     weight = Dict(:l => 1.0, :n => 1.0), 
-    species_weight_cat = Dict(c => 1.0 for c in species)    
+    species_weight_cat = Dict(c => 1.0 for c in species),
+    molspecies = []
     )
     @info "Generate onsite basis"
     Bsel = ACE.SparseBasis(; maxorder=maxorder, p = p_sel, default_maxdeg = maxdeg, weight=weight ) 
@@ -470,8 +497,12 @@ function onsite_linbasis(property,species;
         maxorder_dict = species_maxorder_dict, 
         weight_cat = species_weight_cat
     )
-
-    @time onsite = ACE.SymmetricBasis(property, RnYlm * Zk, Bselcat;);
+    if isempty(molspecies)
+        filter = _ -> true
+    else
+        filter = NoMolOnly(:mu, molspecies)
+    end
+    @time onsite = ACE.SymmetricBasis(property, RnYlm * Zk, Bselcat; filterfun=filter);
     @info "Size of onsite basis elements: $(length(onsite))"
     return onsite
 end

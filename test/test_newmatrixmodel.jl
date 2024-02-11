@@ -36,8 +36,9 @@ shuffle!(rng, rdata)
 n_train = 1200
 data = Dict("train" => rdata[1:n_train], "test"=> rdata[n_train+1:end]);
 
-species_friction = [:H, :Cu]
-species_env = []
+species_friction = [:H]
+species_env = [:Cu]
+molspecies = [:H]
 rcut = 8.0
 
 species = vcat(species_friction,species_env)
@@ -48,8 +49,11 @@ onsitebasis = onsite_linbasis(property,species;
     species_minorder_dict = Dict{Any, Float64}(),
     species_maxorder_dict = Dict{Any, Float64}(),
     weight = Dict(:l => 1.0, :n => 1.0), 
-    species_weight_cat = Dict(c => 1.0 for c in species)    
+    species_weight_cat = Dict(c => 1.0 for c in species),
+    molspecies = molspecies    
     );
+# fieldnames(typeof(onsitebasis.pibasis))
+# ACE.get_spec(onsitebasis.pibasis)
 offsitebasis = offsite_linbasis(property,species;
     z2symmetry = Even(), 
     maxorder = 2,
@@ -65,6 +69,7 @@ offsitebasis = offsite_linbasis(property,species;
     species_minorder_dict = Dict{Any, Float64}(),
     species_maxorder_dict = Dict{Any, Float64}(),
     species_weight_cat = Dict(c => 1.0 for c in species),
+    molspecies = molspecies 
 );
 offsitebasisNoz2Sym = offsite_linbasis(property,species;
     z2symmetry = NoZ2Sym(), 
@@ -81,6 +86,7 @@ offsitebasisNoz2Sym = offsite_linbasis(property,species;
     species_minorder_dict = Dict{Any, Float64}(),
     species_maxorder_dict = Dict{Any, Float64}(),
     species_weight_cat = Dict(c => 1.0 for c in species),
+    molspecies = molspecies 
 );
 
 env_off = EllipsoidCutoff(3.0,6.0,6.0)

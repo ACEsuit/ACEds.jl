@@ -2,7 +2,6 @@ using ACEds.AtomCutoffs: SphericalCutoff
 #using ACEds.Utils: SymmetricBondSpecies_basis
 using ACE
 using ACEds.MatrixModels
-import ACEbonds: SymmetricEllipsoidBondBasis
 using ACEds
 using JuLIP: AtomicNumber
 using ACEds.MatrixModels: _o3symmetry
@@ -11,7 +10,7 @@ using ACEds.PWMatrix: _msort
 using ACEds.MatrixModels: _default_id
 export ac_matrixmodel, mbdpd_matrixmodel, pwc_matrixmodel, onsiteonly_matrixmodel
 
-function ac_matrixmodel(property, species_friction, species_env, coupling=RowCoupling(); 
+function ac_matrixmodel(property, species_friction, species_env, coupling=RowCoupling(), species_mol=[]; 
     id=nothing, 
     n_rep = 3, 
     maxorder_on=2, 
@@ -52,7 +51,8 @@ function ac_matrixmodel(property, species_friction, species_env, coupling=RowCou
         species_minorder_dict = species_minorder_dict_on,
         species_maxorder_dict = species_maxorder_dict_on,
         weight = weight_on, 
-        species_weight_cat = species_weight_cat_on  
+        species_weight_cat = species_weight_cat_on,
+        molspecies = species_mol  
     )
     #@info "Size of onsite basis elements: $(length(onsitebasis))"
 
@@ -73,7 +73,8 @@ function ac_matrixmodel(property, species_friction, species_env, coupling=RowCou
         bond_weight = bond_weight,
         species_minorder_dict = species_minorder_dict_off,
         species_maxorder_dict = species_maxorder_dict_off,
-        species_weight_cat = species_weight_cat_off
+        species_weight_cat = species_weight_cat_off,
+        molspecies = species_mol  
     )
     @info "Size of offsite basis elements: $(length(offsitebasis))"
 
@@ -86,7 +87,7 @@ function ac_matrixmodel(property, species_friction, species_env, coupling=RowCou
     return ACMatrixModel(onsitemodels, offsitemodels, id, coupling)
 end
 
-function onsiteonly_matrixmodel(property, species_friction, species_env; 
+function onsiteonly_matrixmodel(property, species_friction, species_env, species_mol=[]; 
     id=nothing, 
     n_rep = 3, 
     maxorder_on=2, 
@@ -120,7 +121,8 @@ function onsiteonly_matrixmodel(property, species_friction, species_env;
         species_minorder_dict = species_minorder_dict_on,
         species_maxorder_dict = species_maxorder_dict_on,
         weight = weight_on, 
-        species_weight_cat = species_weight_cat_on  
+        species_weight_cat = species_weight_cat_on,
+        molspecies = species_mol  
     )
     #@info "Size of onsite basis elements: $(length(onsitebasis))"
 
@@ -133,7 +135,7 @@ function onsiteonly_matrixmodel(property, species_friction, species_env;
 end
 
 
-function mbdpd_matrixmodel(property, species_friction, species_env; 
+function mbdpd_matrixmodel(property, species_friction, species_env, species_mol=[]; 
     id=nothing, 
     n_rep = 3, 
     maxorder_off=2, 
@@ -169,7 +171,8 @@ function mbdpd_matrixmodel(property, species_friction, species_env;
         bond_weight = bond_weight,
         species_minorder_dict = species_minorder_dict_off,
         species_maxorder_dict = species_maxorder_dict_off,
-        species_weight_cat = species_weight_cat_off
+        species_weight_cat = species_weight_cat_off,
+        molspecies = species_mol
     )
 
     if typeof(cutoff_off)<:AbstractBondCutoff
@@ -184,7 +187,7 @@ function mbdpd_matrixmodel(property, species_friction, species_env;
     return MBDPDMatrixModel(offsitemodels, id)
 end
 
-function pwc_matrixmodel(property, species_friction, species_env, z2sym, speciescoupling; 
+function pwc_matrixmodel(property, species_friction, species_env, z2sym, speciescoupling,species_mol=[]; 
     id=nothing, 
     n_rep = 3, 
     maxorder_off=2, 
@@ -220,7 +223,8 @@ function pwc_matrixmodel(property, species_friction, species_env, z2sym, species
         bond_weight = bond_weight,
         species_minorder_dict = species_minorder_dict_off,
         species_maxorder_dict = species_maxorder_dict_off,
-        species_weight_cat = species_weight_cat_off
+        species_weight_cat = species_weight_cat_off,
+        molspecies = species_mol
     )
 
     if typeof(speciescoupling)<:SpeciesUnCoupled
