@@ -9,7 +9,8 @@ using Flux
 import ACE: params, set_params!
 using Random: randn!
 using Tullio
-using KernelAbstractions, CUDAKernels, CUDA
+using KernelAbstractions, CUDA
+# using KernelAbstractions, CUDAKernels, CUDA
 using ACEds.MatrixModels
 using LinearAlgebra: Diagonal
 include("./fluxmodels.jl")
