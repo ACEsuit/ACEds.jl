@@ -67,6 +67,14 @@ abstract type SpeciesCoupling end
 struct SpeciesCoupled <: SpeciesCoupling end
 struct SpeciesUnCoupled <: SpeciesCoupling end
 
+function ACE.write_dict(sc::SC) where {SC<:SpeciesCoupling}
+    return Dict("__id__" => string("ACEds_SpeciesCoupling"), "sc"=>typeof(sc)) 
+end
+function ACE.read_dict(::Val{:ACEds_SpeciesCoupling}, D::Dict) 
+    sc = getfield(ACEds.MatrixModels, Symbol(D["sc"]))
+    return sc()
+end
+
 abstract type NoiseCoupling end
 
 struct PairCoupling <: NoiseCoupling end
@@ -81,19 +89,33 @@ function ACE.read_dict(::Val{:ACEds_NoiseCoupling}, D::Dict)
     return coupling()
 end
 
+# _mreduce(z1::Symbol,z2::Symbol, sc::SpeciesCoupled) = chemical_symbol.(_mreduce(AtomicNumber(z1),AtomicNumber(z2), sc))
+# _mreduce(z1::Symbol,z2::Symbol, ::Type{SpeciesCoupled}) = chemical_symbol.(_mreduce(AtomicNumber(z1),AtomicNumber(z2), SpeciesCoupled))
 _mreduce(z1,z2, ::SpeciesUnCoupled) = (z1,z2)
 _mreduce(z1,z2, ::SpeciesCoupled) = _msort(z1,z2)
+_mreduce(z1,z2, ::Type{SpeciesUnCoupled}) = (z1,z2)
+_mreduce(z1,z2, ::Type{SpeciesCoupled}) = _msort(z1,z2)
+
+function _assert_consistency(mkeys, ::SpeciesUnCoupled)
+    return @assert all([((z2,z1) in mkeys && (z1,z2) in mkeys) for (z1,z2) in mkeys])
+end
+
+function _assert_consistency(mkeys, ::SpeciesCoupled)
+    return @assert all([ begin (z1s,z2s) = _msort(z1,z2);
+                                ((z1s,z2s) in mkeys && ((z1s==z2s) || !((z2s,z1s) in mkeys)))
+                         end for (z1,z2) in mkeys])
+end
 
 #TODO: needs to be corrected because the function will falsely return SpeciesCoupled() if only one species 
-function _species_symmetry(mkeys)
-    if all([(z2,z1)==_msort(z1,z2) for (z1,z2) in mkeys])
-        return SpeciesCoupled()
-    elseif all([(z2,z1) in mkeys  for (z1,z2) in mkeys])
-        return SpeciesUnCoupled()
-    else
-        @error "The species coupling is inconsistent." 
-    end
-end
+# function _species_symmetry(mkeys) # this function is not working!! 
+#     if all([(z2,z1)==_msort(z1,z2) for (z1,z2) in mkeys])
+#         return SpeciesCoupled()
+#     elseif all([(z2,z1) in mkeys  for (z1,z2) in mkeys])
+#         return SpeciesUnCoupled()
+#     else
+#         @error "The species coupling is inconsistent." 
+#     end
+# end
 
 function _assert_offsite_keys(offsite_dict, ::SpeciesCoupled)
     return @assert all([(z2,z1)==_msort(z1,z2) for (z1,z2) in keys(offsite_dict)])
@@ -112,6 +134,8 @@ _T(::ACE.LinearACEModel{TB, SVector{N,T}, TEV}) where {TB,N,T,TEV} = T
 
 
 _msort(z1,z2) = (z1<=z2 ? (z1,z2) : (z2,z1))
+# TODO: it may be better to base sorting on Atomic numbers instead of chemical_symbols
+_msort(z1::AtomicNumber,z2::AtomicNumber) = map(AtomicNumber,_msort(chemical_symbol(z1),chemical_symbol(z2)))
 
 NamedCollection = Union{AbstractDict,NamedTuple}
 

@@ -95,32 +95,68 @@ function Gamma(M::PWCMatrixModel, at::Atoms; kvargs...)
     return sum(_square(Σ,M) for Σ in Σ_vec)
 end
 
+# function _square(Σ::SparseMatrixCSC{Tv,Ti}, ::PWCMatrixModel) where {Tv, Ti}
+#     # if !iseven(length(Σ.nzval))
+#     #     @warn "Self-interactions of particles are present and included friction matrix."
+#     # end
+#     #@assert iseven(length(Σ.nzval))
+#     nvals = 2*length(Σ.nzval) #+ length(Σ.m)
+#     Is, Js, Vs = findnz(Σ)
+#     I, J, V = Ti[],Ti[],SMatrix{3, 3,eltype(Tv), 9}[]
+#     #Array{Ti}(undef,nvals), Array{Ti}(undef,nvals), Array{SMatrix{3, 3,eltype(Tv), 9}}(undef,nvals)
+#     sizehint!(I, nvals)
+#     sizehint!(J, nvals)
+#     sizehint!(V, nvals)
+#     #k = 1 
+#     for (i,j,σij) in zip(Is, Js, Vs)
+#         if i <= j
+#             # if i == j 
+#             #     @warn "Self-interactions of particles are present and included friction matrix."
+#             # end
+#             σji = Σ[j,i]
+#             push!(I, i)
+#             push!(J,j)
+#             push!(V, -σij * σji')
+
+#             push!(I, j)
+#             push!(J, i)
+#             push!(V, -σji * σij')
+
+#             push!(I, i)
+#             push!(J, i)
+#             push!(V, σij* σij')
+
+#             push!(I, j)
+#             push!(J, j)
+#             push!(V, σji* σji')
+#             #I[k], J[k], V[k] = i,j,-σij * σji'
+#             #I[k+1], J[k+1], V[k+1] = j,i, -σji * σij'
+#             #I[k+2], J[k+2], V[k+2] = i,i, σij* σij'
+#             #I[k+3], J[k+3], V[k+3] = j,j, σji* σji'
+#             #k+=4
+#         end
+#     end
+#     A = sparse(I, J, V, Σ.m, Σ.n)
+#     return A
+# end
+
 function _square(Σ::SparseMatrixCSC{Tv,Ti}, ::PWCMatrixModel) where {Tv, Ti}
-    # if !iseven(length(Σ.nzval))
-    #     @warn "Self-interactions of particles are present and included friction matrix."
-    # end
-    #@assert iseven(length(Σ.nzval))
     nvals = 2*length(Σ.nzval) #+ length(Σ.m)
     Is, Js, Vs = findnz(Σ)
     I, J, V = Ti[],Ti[],SMatrix{3, 3,eltype(Tv), 9}[]
-    #Array{Ti}(undef,nvals), Array{Ti}(undef,nvals), Array{SMatrix{3, 3,eltype(Tv), 9}}(undef,nvals)
-    sizehint!(I, nvals)
     sizehint!(J, nvals)
     sizehint!(V, nvals)
     #k = 1 
     for (i,j,σij) in zip(Is, Js, Vs)
         if i <= j
-            # if i == j 
-            #     @warn "Self-interactions of particles are present and included friction matrix."
-            # end
             σji = Σ[j,i]
             push!(I, i)
             push!(J,j)
-            push!(V, -σij * σji')
+            push!(V, σij * σji')
 
             push!(I, j)
             push!(J, i)
-            push!(V, -σji * σij')
+            push!(V, σji * σij')
 
             push!(I, i)
             push!(J, i)
@@ -129,17 +165,11 @@ function _square(Σ::SparseMatrixCSC{Tv,Ti}, ::PWCMatrixModel) where {Tv, Ti}
             push!(I, j)
             push!(J, j)
             push!(V, σji* σji')
-            #I[k], J[k], V[k] = i,j,-σij * σji'
-            #I[k+1], J[k+1], V[k+1] = j,i, -σji * σij'
-            #I[k+2], J[k+2], V[k+2] = i,i, σij* σij'
-            #I[k+3], J[k+3], V[k+3] = j,j, σji* σji'
-            #k+=4
         end
     end
     A = sparse(I, J, V, Σ.m, Σ.n)
     return A
 end
-
 
 
 # using Tullio

@@ -36,15 +36,27 @@ function _Gamma(B::AbstractArray{T,5}, cc::AbstractArray{T,2}, ::Type{<:ACMatrix
     return Γ
 end
 
+# function _Gamma(Bt::AbstractArray{T,4}, cc::AbstractArray{T,2}, ::Type{<:PWCMatrixModel}) where {T}
+#     @tullio Σ[d,i,j,r] := Bt[d,i,j,k] * cc[k,r]
+#     @tullio Γ[d1,d2,i,j] := - Σ[d1,i,j,r] *  Σ[d2,j,i,r]
+#     @tullio Γd[d1,d2,i,i] := Σ[d1,i,j,r] * Σ[d2,i,j,r] 
+#     return Γ + Γd
+# end
+# function _Gamma(Bt::AbstractArray{T,5}, cc::AbstractArray{T,2}, ::Type{<:PWCMatrixModel}) where {T}
+#     @tullio Σ[d1,d2,i,j,r] := Bt[d1,d2,i,j,k] * cc[k,r]
+#     @tullio Γ[d1,d2,i,j] := - Σ[d1,d,i,j,r] *  Σ[d2,d,j,i,r]
+#     @tullio Γd[d1,d2,i,i] := Σ[d1,d,i,j,r] * Σ[d2,d,i,j,r] 
+#     return Γ + Γd
+# end
 function _Gamma(Bt::AbstractArray{T,4}, cc::AbstractArray{T,2}, ::Type{<:PWCMatrixModel}) where {T}
     @tullio Σ[d,i,j,r] := Bt[d,i,j,k] * cc[k,r]
-    @tullio Γ[d1,d2,i,j] := - Σ[d1,i,j,r] *  Σ[d2,j,i,r]
+    @tullio Γ[d1,d2,i,j] :=  Σ[d1,i,j,r] *  Σ[d2,j,i,r]
     @tullio Γd[d1,d2,i,i] := Σ[d1,i,j,r] * Σ[d2,i,j,r] 
     return Γ + Γd
 end
 function _Gamma(Bt::AbstractArray{T,5}, cc::AbstractArray{T,2}, ::Type{<:PWCMatrixModel}) where {T}
     @tullio Σ[d1,d2,i,j,r] := Bt[d1,d2,i,j,k] * cc[k,r]
-    @tullio Γ[d1,d2,i,j] := - Σ[d1,d,i,j,r] *  Σ[d2,d,j,i,r]
+    @tullio Γ[d1,d2,i,j] :=  Σ[d1,d,i,j,r] *  Σ[d2,d,j,i,r]
     @tullio Γd[d1,d2,i,i] := Σ[d1,d,i,j,r] * Σ[d2,d,i,j,r] 
     return Γ + Γd
 end
