@@ -40,8 +40,8 @@ println("Epoch: $epoch, Avg Training Loss: $(loss_traj["train"][end]/n_train), T
 
 set_params!(fm_pwcec, params(ffm_pwcec))
 
-at = fdata["test"][1].atoms
-for d in fdata["test"]
+
+for d in fdata["train"]
     at = d.atoms
     Σ = Sigma(fm_pwcec, at)
 @test norm(Gamma(fm_pwcec, Σ) - Gamma(fm_pwcec, at)) < tol

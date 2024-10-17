@@ -20,11 +20,11 @@ nepochs = 300
 opt = Flux.setup(Adam(1E-3, (0.99, 0.999)),ffm_pwcsc)
 dloader = DataLoader(flux_data["train"], batchsize=batchsize, shuffle=true)
 
-
+@info "Starting training"
 for _ in 1:nepochs
     global epoch
     epoch+=1
-    @time for d in dloader
+    for d in dloader
         ∂L∂m = Flux.gradient(weighted_l2_loss,ffm_pwcsc, d)[1]
         Flux.update!(opt,ffm_pwcsc, ∂L∂m)       # method for "explicit" gradient
     end
@@ -40,8 +40,8 @@ println("Epoch: $epoch, Avg Training Loss: $(loss_traj["train"][end]/n_train), T
 
 set_params!(fm_pwcsc, params(ffm_pwcsc))
 
-at = fdata["test"][1].atoms
-for d in fdata["test"]
+
+for d in fdata["train"]
     at = d.atoms
     Σ = Sigma(fm_pwcsc, at)
 @test norm(Gamma(fm_pwcsc, Σ) - Gamma(fm_pwcsc, at)) < tol
