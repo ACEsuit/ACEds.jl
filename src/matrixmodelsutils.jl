@@ -138,8 +138,10 @@ function mbdpd_matrixmodel(property, species_friction, species_env, species_mol=
     id=nothing, 
     n_rep = 3, 
     maxorder_off=2, 
-    maxdeg_off=5, 
-    cutoff_off= EllipsoidCutoff(3.0, 4.0, 6.0), 
+    maxdeg_off=5,
+    rcutbond = 5.0, 
+    rcutenv = 3.0,
+    zcutenv = 6.0,
     r0_ratio_off=.4, 
     rin_ratio_off=.04, 
     pcut_off=2, 
@@ -152,7 +154,24 @@ function mbdpd_matrixmodel(property, species_friction, species_env, species_mol=
     species_maxorder_dict_off = Dict{Any, Float64}(),
     species_weight_cat_off = Dict(c => 1.0 for c in species_friction)
     )
-
+    return pwc_matrixmodel(property, species_friction, species_env, Odd(), SpeciesCoupled(), species_mol; 
+        id=id, 
+        n_rep = n_rep, 
+        maxorder_off=maxorder_off, 
+        maxdeg_off=maxdeg_off, 
+        cutoff_off= EllipsoidCutoff(rcutbond, rcutenv, zcutenv),
+        r0_ratio_off=r0_ratio_off, 
+        rin_ratio_off=rin_ratio_off, 
+        pcut_off=pcut_off, 
+        pin_off=pin_off, 
+        trans_off= trans_off, #warning: the polytransform acts on [0,1]
+        p_sel_off = p_sel_off,
+        weight_off = weight_off, 
+        bond_weight = bond_weight,
+        species_minorder_dict_off = species_minorder_dict_off,
+        species_maxorder_dict_off = species_maxorder_dict_off,
+        species_weight_cat_off = species_weight_cat_off
+        )
     # species = vcat(species_friction,species_env)
 
     # offsitebasis = offsite_linbasis(property,species;

@@ -88,8 +88,6 @@ function ACE.read_dict(::Val{:ACEds_NoiseCoupling}, D::Dict)
     return coupling()
 end
 
-# _mreduce(z1::Symbol,z2::Symbol, sc::SpeciesCoupled) = chemical_symbol.(_mreduce(AtomicNumber(z1),AtomicNumber(z2), sc))
-# _mreduce(z1::Symbol,z2::Symbol, ::Type{SpeciesCoupled}) = chemical_symbol.(_mreduce(AtomicNumber(z1),AtomicNumber(z2), SpeciesCoupled))
 _mreduce(z1,z2, ::SpeciesUnCoupled) = (z1,z2)
 _mreduce(z1,z2, ::SpeciesCoupled) = _msort(z1,z2)
 _mreduce(z1,z2, ::Type{SpeciesUnCoupled}) = (z1,z2)
@@ -104,17 +102,6 @@ function _assert_consistency(mkeys, ::SpeciesCoupled)
                                 ((z1s,z2s) in mkeys && ((z1s==z2s) || !((z2s,z1s) in mkeys)))
                          end for (z1,z2) in mkeys])
 end
-
-#TODO: needs to be corrected because the function will falsely return SpeciesCoupled() if only one species 
-# function _species_symmetry(mkeys) # this function is not working!! 
-#     if all([(z2,z1)==_msort(z1,z2) for (z1,z2) in mkeys])
-#         return SpeciesCoupled()
-#     elseif all([(z2,z1) in mkeys  for (z1,z2) in mkeys])
-#         return SpeciesUnCoupled()
-#     else
-#         @error "The species coupling is inconsistent." 
-#     end
-# end
 
 function _assert_offsite_keys(offsite_dict, ::SpeciesCoupled)
     return @assert all([(z2,z1)==_msort(z1,z2) for (z1,z2) in keys(offsite_dict)])

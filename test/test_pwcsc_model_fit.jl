@@ -36,7 +36,7 @@ end
 # println("Epoch: $epoch, Abs Training Loss: $(loss_traj["train"][end]), Test Loss: $(loss_traj["test"][end])")
 println("Epoch: $epoch, Avg Training Loss: $(loss_traj["train"][end]/n_train), Test Loss: $(loss_traj["test"][end]/n_test)")
 
-@test minimum(loss_traj["train"]/n_train) < 0.01
+@test minimum(loss_traj["train"]/n_train) < train_tol
 
 set_params!(fm_pwcsc, params(ffm_pwcsc))
 
