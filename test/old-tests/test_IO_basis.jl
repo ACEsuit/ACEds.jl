@@ -81,7 +81,7 @@ Attempt to replace categories in categorical basis by corresponding Atomic numbe
 #cat_basis = basis.pibasis.basis1p.bases[c_index]
 #cat_basis_new = ACE.Categorical1pBasis(AtomicNumber.(B1p.bases[c_index].categories.list); varsym = :mu, idxsym = :mu, label = "Zk")
 #B1p_new = ACE.Product1pBasis( Tuple((i == c_index ? cat_basis_new : b) for (i,b) in enumerate(B1p.bases)),
-                              B1p.indices, B1p.B_pool)
+#                              B1p.indices, B1p.B_pool)
 #basis.pibasis.basis1p = B1p_new  
 #B_val = ACE.evaluate(basis, onsite_cfg)
 

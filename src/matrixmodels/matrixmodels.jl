@@ -1,6 +1,6 @@
 module MatrixModels
 
-export MatrixModel, ACMatrixModel, OnsiteOnlyMatrixModel, MBDPDMatrixModel, PWCMatrixModel
+export MatrixModel, ACMatrixModel, OnsiteOnlyMatrixModel, PWCMatrixModel
 export SiteModel, OnSiteModel, OffSiteModel,  OnSiteModels, OffSiteModels, SiteInds
 export onsite_linbasis, offsite_linbasis, env_cutoff, basis_size
 export O3Symmetry, Invariant, Covariant, Equivariant
@@ -20,7 +20,6 @@ using StaticArrays
 using SparseArrays
 using ACEds.Utils: reinterpret
 using ACEds.AtomCutoffs
-using ACEds.PWMatrix
 using ACEds.Utils: reinterpret
 
 import ACEbase: evaluate, evaluate!
@@ -736,7 +735,5 @@ include("./acmatrixmodels.jl")
 include("./pwcmatrixmodels.jl")
 # Omsite-only matrix models:
 include("./onsiteonlymatrixmodels.jl")
-# Multi-body DPD matrix models:
-include("./mbdpdmatrixmodels.jl")
 
 end

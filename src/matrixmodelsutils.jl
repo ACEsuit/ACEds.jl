@@ -6,7 +6,6 @@ using ACEds
 using JuLIP: AtomicNumber
 using ACEds.MatrixModels: _o3symmetry
 using ACEbonds: EllipsoidCutoff, AbstractBondCutoff
-using ACEds.PWMatrix: _msort
 using ACEds.MatrixModels: _default_id, _mreduce
 export ac_matrixmodel, mbdpd_matrixmodel, pwc_matrixmodel, onsiteonly_matrixmodel
 
@@ -154,37 +153,37 @@ function mbdpd_matrixmodel(property, species_friction, species_env, species_mol=
     species_weight_cat_off = Dict(c => 1.0 for c in species_friction)
     )
 
-    species = vcat(species_friction,species_env)
+    # species = vcat(species_friction,species_env)
 
-    offsitebasis = offsite_linbasis(property,species;
-        z2symmetry = Even(), 
-        maxorder = maxorder_off,
-        maxdeg = maxdeg_off,
-        r0_ratio=r0_ratio_off,
-        rin_ratio=rin_ratio_off, 
-        trans=trans_off,
-        pcut=pcut_off, 
-        pin=pin_off, 
-        isym=:mube, 
-        weight = weight_off,
-        p_sel = p_sel_off,
-        bond_weight = bond_weight,
-        species_minorder_dict = species_minorder_dict_off,
-        species_maxorder_dict = species_maxorder_dict_off,
-        species_weight_cat = species_weight_cat_off,
-        molspecies = species_mol
-    )
+    # offsitebasis = offsite_linbasis(property,species;
+    #     z2symmetry = Even(), 
+    #     maxorder = maxorder_off,
+    #     maxdeg = maxdeg_off,
+    #     r0_ratio=r0_ratio_off,
+    #     rin_ratio=rin_ratio_off, 
+    #     trans=trans_off,
+    #     pcut=pcut_off, 
+    #     pin=pin_off, 
+    #     isym=:mube, 
+    #     weight = weight_off,
+    #     p_sel = p_sel_off,
+    #     bond_weight = bond_weight,
+    #     species_minorder_dict = species_minorder_dict_off,
+    #     species_maxorder_dict = species_maxorder_dict_off,
+    #     species_weight_cat = species_weight_cat_off,
+    #     molspecies = species_mol
+    # )
 
-    if typeof(cutoff_off)<:AbstractBondCutoff
-        offsitemodels =  Dict(AtomicNumber.(zz) => OffSiteModel(offsitebasis, cutoff_off,n_rep)  for zz in Base.Iterators.product(species_friction,species_friction) if _msort(zz...) == zz ) 
-    elseif typeof(cutoff_off) <: Dict{Tuple{AtomicNumber,AtomicNumber},<:AbstractBondCutoff}
-        offsitemodels =  Dict(AtomicNumber.(zz) => OffSiteModel(offsitebasis, cutoff_off[zz],n_rep)  for zz in Base.Iterators.product(species_friction,species_friction) if _msort(zz...) == zz ) 
-    end
+    # if typeof(cutoff_off)<:AbstractBondCutoff
+    #     offsitemodels =  Dict(AtomicNumber.(zz) => OffSiteModel(offsitebasis, cutoff_off,n_rep)  for zz in Base.Iterators.product(species_friction,species_friction) if _msort(zz...) == zz ) 
+    # elseif typeof(cutoff_off) <: Dict{Tuple{AtomicNumber,AtomicNumber},<:AbstractBondCutoff}
+    #     offsitemodels =  Dict(AtomicNumber.(zz) => OffSiteModel(offsitebasis, cutoff_off[zz],n_rep)  for zz in Base.Iterators.product(species_friction,species_friction) if _msort(zz...) == zz ) 
+    # end
 
-    S = _o3symmetry(offsitemodels)
-    id = (id === nothing ? _default_id(S) : id) 
+    # S = _o3symmetry(offsitemodels)
+    # id = (id === nothing ? _default_id(S) : id) 
 
-    return MBDPDMatrixModel(offsitemodels, id)
+    # return MBDPDMatrixModel(offsitemodels, id)
 end
 
 function pwc_matrixmodel(property, species_friction, species_env, z2sym, speciescoupling,species_mol=[]; 

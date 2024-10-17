@@ -111,7 +111,6 @@ env_cutoff(onsitemodels)
 
 m_cov0 = OnsiteOnlyMatrixModel(onsitemodels, :cov )
 
-m_cov1 = MBDPDMatrixModel(offsitemodels, :cov )
 
 m_cov2r = ACMatrixModel(onsitemodels, offsitemodelsUC, :cov, RowCoupling())
 m_cov2c = ACMatrixModel(onsitemodels, offsitemodelsUC, :cov, ColumnCoupling())

@@ -109,6 +109,8 @@ _hdf52Atoms( ag::HDF5.Group ) = JuLIP.Atoms(;
                 cell= read(ag["cell"]),
                 pbc=read(ag["pbc"])
             )
+
+        
 function _hdf52ft( ftg::HDF5.Group ) 
     spft = sparse( read(ftg["ft_I"]),read(ftg["ft_J"]), [SMatrix{3,3}(d) for d in eachslice(read(ftg["ft_val"]); dims=1)] )
     ft_mask = read(ftg["ft_mask"])
@@ -150,15 +152,19 @@ struct FrictionData{A}
     atoms::Atoms
     friction_tensor::A
     friction_indices
-    weights
     friction_tensor_ref
-    #matrix_format::Symbol # :dense_reduced, :block_reduce 
 end
 
-function FrictionData(atoms::Atoms, friction_tensor, friction_indices;   weights=Dict("diag" => 1.0, "sub_diag" => 1.0, "off_diag"=>1.0), 
-                                                                friction_tensor_ref=nothing)
-    return FrictionData(atoms, friction_tensor, friction_indices, weights, friction_tensor_ref)
+function FrictionData(d::NamedTuple{(:at, :friction_tensor, :friction_indices)})
+    return FrictionData(d.at, d.friction_tensor, d.friction_indices, nothing)
 end
+function FrictionData(d::NamedTuple{(:at, :friction_tensor, :friction_indices,:friction_indices_ref)})
+    return FrictionData(d.at, d.friction_tensor, d.friction_indices, d.friction_tensor_ref)
+end
+# function FrictionData(atoms::Atoms, friction_tensor, friction_indices;  
+#                                                                 friction_tensor_ref=nothing)
+#     return FrictionData(atoms, friction_tensor, friction_indices, weights, friction_tensor_ref)
+# end
 
 
 end
