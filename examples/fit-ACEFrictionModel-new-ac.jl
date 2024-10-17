@@ -96,7 +96,7 @@ end
 println("Epoch: $epoch, Abs Training Loss: $(loss_traj["train"][end]), Test Loss: $(loss_traj["test"][end])")
 println("Epoch: $epoch, Avg Training Loss: $(loss_traj["train"][end]/n_train), Test Loss: $(loss_traj["test"][end]/n_test)")
 
-minimum(loss_traj["train"]/n_train) <0.01 
+minimum(loss_traj["train"]/n_train) <0.01
 set_params!(fm, params(ffm))
 
 at = fdata["test"][1].atoms

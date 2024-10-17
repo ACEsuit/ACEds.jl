@@ -5,5 +5,8 @@ CurrentModule = ACEds
 ```
 
 ```@docs
-func(x)
+Gamma(fm::FrictionModel, at::Atoms; kvargs...)
+
+Gamma(fm::FrictionModel, Σ_vec)
 ```
+
