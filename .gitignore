@@ -2,6 +2,9 @@ Manifest.toml
 *.json
 *.csv
 *.jld
+*.pdf
 .ipynb_checkpoints
 scatter-detailed-equ-cov.pdf
 scatter-equ-cov.pdf
+./test/test-data-large.h5
+
