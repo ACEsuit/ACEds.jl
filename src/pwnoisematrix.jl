@@ -17,7 +17,9 @@ _N(::PWNoiseMatrix{MT,T,N}) where  {MT,T,N} = N
 _pairs(M::PWNoiseMatrix) = M.pairs[1:_n(M)]
 _vals(M::PWNoiseMatrix) = M.vals[1:_n(M)]
 
-_msort(z1,z2) = (z1<=z2 ? (z1,z2) : (z2,z1))
+_msort(i,j) = (i<=j ? (i,j) : (j,i))
+#_msort(z1::AtomicNumber,z2::AtomicNumber) = AtomicNumber._msort(chemical_symbol(z1),chemical_symbol(z2))
+
 
 function square(Σ::PWNoiseMatrix{MT,T,N}, format=:sparse) where {MT,T,N}
     """
