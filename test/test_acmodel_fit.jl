@@ -1,40 +1,33 @@
-using LinearAlgebra
-using ACEds.FrictionModels
-using ACE: scaling, params
-using ACEds
+using ACEds.DataUtils: hdf52internal
+using ACEds.DataUtils: FrictionData
 using ACEds.FrictionFit
-using ACEds.DataUtils
 using Flux
 using Flux.MLUtils
+using ACEds.MatrixModels
+using ACEds: ac_matrixmodel
 using ACE
+# using Random
+rdata =  hdf52internal("./test/test-data-100.h5");
+
+
 using ACEds: ac_matrixmodel
 using Random
 using ACEds.Analytics
 using ACEds.FrictionFit
+using ACEds.FrictionModels
 
-using ACEds.MatrixModels
 
 
-fname = "./test/test-data-large"
-filename = string(fname,".h5")
 
-rdata = ACEds.DataUtils.hdf52internal(filename); 
-
-# Partition data into train and test set and convert to 
-rng = MersenneTwister(12)
-shuffle!(rng, rdata)
-n_train = 1000
-n_test = length(rdata) - n_train
-
-fdata = Dict("train" => FrictionData.(rdata[1:n_train]), 
-            "test"=> FrictionData.(rdata[n_train+1:end]));
+# Partition data into train and test set 
+n_train = length(rdata)
+data = Dict("train" => rdata[1:n_train], "test"=> rdata[n_train:end]);
 
 species_friction = [:H]
 species_env = [:Cu]
 species_mol = [:H]
 rcut = 5.0
 coupling= RowCoupling()
-
 
 m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_env, coupling,species_mol; n_rep=1, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
         species_maxorder_dict_on = Dict( :H => 1), 
@@ -45,70 +38,76 @@ m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_env
     );
 
 
-fm= FrictionModel((m_equ,)); #fm= FrictionModel((cov=m_cov,equ=m_equ));
-model_ids = get_ids(fm)
+fm_ac= FrictionModel((m_equ,)); #fm= FrictionModel((cov=m_cov,equ=m_equ));
+model_ids = get_ids(fm_ac)
+
 
 # Create friction data in internally used format
+fdata =  Dict(
+    tt => [FrictionData(d.at,
+            d.friction_tensor, 
+            d.friction_indices; 
+            weights=Dict("diag" => 2.0, "sub_diag" => 1.0, "off_diag"=>1.0)) for d in data[tt]] for tt in ["test","train"]
+);
 
-                                            
-c = params(fm;format=:matrix, joinsites=true)
+c = params(fm_ac;format=:matrix, joinsites=true)
 
-ffm = FluxFrictionModel(c)
-set_params!(ffm; sigma=1E-8)
+ffm_ac = FluxFrictionModel(c)
 
 # Create preprocessed data including basis evaluations that can be used to fit the model
-flux_data = Dict( "train"=> flux_assemble(fdata["train"], fm, ffm),
-                  "test"=> flux_assemble(fdata["test"], fm, ffm));
+flux_data = Dict( tt=> flux_assemble(fdata[tt], fm_ac, ffm_ac; weighted=true, matrix_format=:dense_scalar) 
+            for tt in ["train","test"]);
+set_params!(ffm_ac; sigma=1E-8)
 
-
-
-
-#if CUDA is available, convert relevant arrays to cuarrays
-using CUDA
-cuda = CUDA.functional()
-
-if cuda
-    ffm = fmap(cu, ffm)
-end
 
 loss_traj = Dict("train"=>Float64[], "test" => Float64[])
-
+n_train, n_test = length(flux_data["train"]), length(flux_data["test"])
 epoch = 0
-batchsize = 10
+
+
+bsize = 1
 nepochs = 10
 
-opt = Flux.setup(Adam(1E-3, (0.99, 0.999)),ffm)
-dloader = cuda ? DataLoader(flux_data["train"] |> gpu, batchsize=bsize, shuffle=true) : DataLoader(flux_data["train"], batchsize=bsize, shuffle=true)
+opt = Flux.setup(Adam(1E-4, (0.99, 0.999)),ffm_ac)
+train = [(friction_tensor=d.friction_tensor,B=d.B,Tfm=d.Tfm, W=d.W) for d in flux_data["train"]]
+dloader = DataLoader(train, batchsize=bsize, shuffle=true)
 
 using ACEds.FrictionFit: weighted_l2_loss
+
+mloss = weighted_l2_loss
+Flux.gradient(mloss,ffm_ac, train[1:2])[1]
+
+mloss(ffm_ac,flux_data["train"])
 
 for _ in 1:nepochs
     epoch+=1
     @time for d in dloader
-        ∂L∂m = Flux.gradient(weighted_l2_loss,ffm, d)[1]
-        Flux.update!(opt,ffm, ∂L∂m)       # method for "explicit" gradient
+        ∂L∂m = Flux.gradient(mloss,ffm_ac, d)[1]
+        Flux.update!(opt,ffm_ac, ∂L∂m)       # method for "explicit" gradient
     end
     for tt in ["test","train"]
-        push!(loss_traj[tt], weighted_l2_loss(ffm,flux_data[tt]))
+        push!(loss_traj[tt], mloss(ffm_ac,flux_data[tt]))
     end
     println("Epoch: $epoch, Abs avg Training Loss: $(loss_traj["train"][end]/n_train)), Test Loss: $(loss_traj["test"][end]/n_test))")
 end
 println("Epoch: $epoch, Abs Training Loss: $(loss_traj["train"][end]), Test Loss: $(loss_traj["test"][end])")
 println("Epoch: $epoch, Avg Training Loss: $(loss_traj["train"][end]/n_train), Test Loss: $(loss_traj["test"][end]/n_test)")
 
+# The following code can be used to fit the model using the BFGS algorithm
+# include("./additional-bfgs-iterations.jl")
 
-set_params!(fm, params(ffm))
+c_fit = params(ffm_ac)
+set_params!(fm_ac, c_fit)
 
-at = fdata["test"][1].atoms
-Gamma(fm, at)
-Σ = Sigma(fm, at)
-Gamma(fm, Σ)
 
-# Evaluate different error statistics 
+
+
 using ACEds.Analytics: error_stats, plot_error, plot_error_all, friction_pairs
 
-fp_train = friction_pairs(fdata["train"], fm);
-fp_test = friction_pairs(fdata["test"], fm);
+fp_train = friction_pairs(data["train"], fm;  atoms_sym=:at);
+fp_test = friction_pairs(data["test"], fm;  atoms_sym=:at);
+
+friction_entries(fp_test; entry_types = [:diag,:subdiag,:offdiag])
 
 _, _, _, merrors =  error_stats(fp_train,fp_test; reg_epsilon = 0.01);
 
@@ -128,8 +127,5 @@ fig, ax = PyPlot.subplots()
 ax.plot(loss_traj["train"]/N_train, label="train")
 ax.plot(loss_traj["test"]/N_test, label="test")
 ax.set_yscale(:log)
-ax.set_xlabel("Epoch")
-ax.set_ylabel("Loss")
 ax.legend()
 display(fig)
-

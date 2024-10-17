@@ -1,5 +1,6 @@
 using JuLIP
 using Distributions: Categorical
+
 function gen_config(species; n_min=2,n_max=2, species_prop = Dict(z=>1.0/length(species) for z in species), species_min = Dict(z=>1 for z in keys(species_prop)),  maxnit = 1000)
     species = collect(keys(species_prop))
     n = rand(n_min:n_max)

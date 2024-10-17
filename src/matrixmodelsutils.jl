@@ -184,7 +184,7 @@ function mbdpd_matrixmodel(property, species_friction, species_env, species_mol=
     S = _o3symmetry(offsitemodels)
     id = (id === nothing ? _default_id(S) : id) 
 
-    return MBDPDMatrixModel(offsitemodels, id)
+    # return MBDPDMatrixModel(offsitemodels, id)
 end
 
 function pwc_matrixmodel(property, species_friction, species_env, z2sym, speciescoupling,species_mol=[]; 
