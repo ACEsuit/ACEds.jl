@@ -6,4 +6,4 @@ Manifest.toml
 *.h5
 .ipynb_checkpoints
 ./test/test-data-large.h5
-
+docs/build/

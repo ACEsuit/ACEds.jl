@@ -35,18 +35,32 @@ function set_zero!(fm::FrictionModel, model_ids)
         set_zero!(fm.matrixmodels[s])
     end
 end
+"""
+    Gamma(fm::FrictionModel, at::Atoms; kvargs...)
 
+Computes the friction tensor for a given Atoms object. The friction tensor is the sum of the friction tensors of all matrix models in the FrictionModel object.
+"""
 function Gamma(fm::FrictionModel, at::Atoms; kvargs...) # kvargs = {sparse=:sparse, filter=(_,_)->true, T=Float64}
     return sum(Gamma(mo, at; sparse=:sparse, kvargs... ) for mo in values(fm.matrixmodels))
     #+ Gamma(fm.inv, at; kvargs...)
 end
 
+"""
+    Gamma(fm::FrictionModel, Σ_vec)
+
+Computes the friction tensor from a pre-computed collection of diffusion coefficient matrices. 
+The friction tensor is the sum of the squares of all diffusion coefficient matrices in the collection.
+"""
 function Gamma(fm::FrictionModel, Σ_vec) # kvargs = {sparse=:sparse, filter=(_,_)->true, T=Float64}
     return sum(Gamma(mo, Σ) for (mo,Σ) in zip(values(fm.matrixmodels),Σ_vec))
     #+ Gamma(fm.inv, at; kvargs...)
 end
 
+"""
+    Sigma(fm::FrictionModel, at::Atoms; kvargs...)
 
+Computes the diffusion coefficient matrices for a given Atoms object. The diffusion coefficient matrices are computed for all matrix models in the FrictionModel object.
+"""
 function Sigma(fm::FrictionModel, at::Atoms; kvargs...)  
     return NamedTuple{fm.model_ids}(Sigma(mo, at; kvargs...) for mo in values(fm.matrixmodels))
 end
