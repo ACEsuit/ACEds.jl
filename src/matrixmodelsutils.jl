@@ -7,7 +7,7 @@ using JuLIP: AtomicNumber
 using ACEds.MatrixModels: _o3symmetry
 using ACEbonds: EllipsoidCutoff, AbstractBondCutoff
 using ACEds.PWMatrix: _msort
-using ACEds.MatrixModels: _default_id
+using ACEds.MatrixModels: _default_id, _mreduce
 export ac_matrixmodel, mbdpd_matrixmodel, pwc_matrixmodel, onsiteonly_matrixmodel
 
 function ac_matrixmodel(property, species_friction, species_env, coupling=RowCoupling(), species_mol=[]; 
@@ -230,12 +230,12 @@ function pwc_matrixmodel(property, species_friction, species_env, z2sym, species
     if typeof(speciescoupling)<:SpeciesUnCoupled
         offsitemodels =  Dict(AtomicNumber.(zz) => OffSiteModel(offsitebasis, cutoff_off,n_rep)  for zz in Base.Iterators.product(species_friction,species_friction)) 
     elseif typeof(speciescoupling)<:SpeciesCoupled
-        offsitemodels =  Dict(AtomicNumber.(zz) => OffSiteModel(offsitebasis, cutoff_off,n_rep)  for zz in Base.Iterators.product(species_friction,species_friction) if _msort(zz...) == zz ) 
+        offsitemodels =  Dict(AtomicNumber.(zz) => OffSiteModel(offsitebasis, cutoff_off,n_rep)  for zz in Base.Iterators.product(species_friction,species_friction) if _mreduce(zz...,SpeciesCoupled) == zz ) 
     end
 
     S = _o3symmetry(offsitemodels)
     id = (id === nothing ? _default_id(S) : id) 
 
-    return PWCMatrixModel(offsitemodels, id)
+    return PWCMatrixModel(offsitemodels, id, speciescoupling)
 end
 
