@@ -7,12 +7,10 @@ using ACEds.DataUtils
 using Flux
 using Flux.MLUtils
 using ACE
-using ACEds: nc_matrixmodel
 using Random
-using ACEds.Analytics
 using ACEds.FrictionFit
-using ProgressMeter
 using CUDA
+using ACEds.FrictionFit: weighted_l2_loss
 
 using ACEds, Test, Printf, LinearAlgebra, StaticArrays
 

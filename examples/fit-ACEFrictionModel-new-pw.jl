@@ -14,11 +14,7 @@ using ACEds.FrictionFit
 
 using ACEds.MatrixModels
 
-using CUDA
-
-cuda = CUDA.functional()
-
-fname = "./test/test-data-large"
+fname = "./test/test-data-100"
 filename = string(fname,".h5")
 
 rdata = ACEds.DataUtils.hdf52internal(filename); 
@@ -26,7 +22,7 @@ rdata = ACEds.DataUtils.hdf52internal(filename);
 # Partition data into train and test set and convert to 
 rng = MersenneTwister(12)
 shuffle!(rng, rdata)
-n_train = 1200
+n_train = Int(ceil(.8 * length(rdata)))
 n_test = length(rdata) - n_train
 
 fdata = Dict("train" => FrictionData.(rdata[1:n_train]), 

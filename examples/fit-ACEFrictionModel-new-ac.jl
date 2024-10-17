@@ -15,7 +15,7 @@ using ACEds.FrictionFit
 using ACEds.MatrixModels
 
 
-fname = "./test/test-data-large"
+fname = "./test/test-data-100"
 filename = string(fname,".h5")
 
 rdata = ACEds.DataUtils.hdf52internal(filename); 
@@ -23,7 +23,7 @@ rdata = ACEds.DataUtils.hdf52internal(filename);
 # Partition data into train and test set and convert to 
 rng = MersenneTwister(12)
 shuffle!(rng, rdata)
-n_train = 1000
+n_train = Int(ceil(.8 * length(rdata)))
 n_test = length(rdata) - n_train
 
 fdata = Dict("train" => FrictionData.(rdata[1:n_train]), 
@@ -75,10 +75,10 @@ loss_traj = Dict("train"=>Float64[], "test" => Float64[])
 
 epoch = 0
 batchsize = 10
-nepochs = 10
+nepochs = 100
 
 opt = Flux.setup(Adam(1E-3, (0.99, 0.999)),ffm)
-dloader = cuda ? DataLoader(flux_data["train"] |> gpu, batchsize=bsize, shuffle=true) : DataLoader(flux_data["train"], batchsize=bsize, shuffle=true)
+dloader = cuda ? DataLoader(flux_data["train"] |> gpu, batchsize=batchsize, shuffle=true) : DataLoader(flux_data["train"], batchsize=batchsize, shuffle=true)
 
 using ACEds.FrictionFit: weighted_l2_loss
 
@@ -96,7 +96,7 @@ end
 println("Epoch: $epoch, Abs Training Loss: $(loss_traj["train"][end]), Test Loss: $(loss_traj["test"][end])")
 println("Epoch: $epoch, Avg Training Loss: $(loss_traj["train"][end]/n_train), Test Loss: $(loss_traj["test"][end]/n_test)")
 
-
+minimum(loss_traj["train"]/n_train) <0.01 
 set_params!(fm, params(ffm))
 
 at = fdata["test"][1].atoms

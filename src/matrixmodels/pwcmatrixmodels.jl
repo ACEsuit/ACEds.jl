@@ -123,33 +123,6 @@ function basis!(B, M::PWCMatrixModel{O3S,<:SphericalCutoff,Z2S,SC}, at::Atoms, f
         end
     end
 end
-function basis!(B, M::ACMatrixModel{O3S,<:SphericalCutoff,COUPLING}, at::Atoms, filter=(_,_)->true) where {O3S,COUPLING} # Todo change type of B to NamedTuple{(:onsite,:offsite)} 
-    site_filter(i,at) = (haskey(M.onsite, at.Z[i]) && filter(i, at))
-    for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite))
-        if site_filter(i, at) && length(neigs) > 0
-            # evaluate basis of onsite model
-            Zs = at.Z[neigs]
-            sm = _get_model(M, at.Z[i])
-            inds = get_range(M, at.Z[i])
-            Bii = evaluate(sm.linmodel.basis, env_transform(Rs, Zs, sm.cutoff))
-            for (k,b) in zip(inds,Bii)
-                B.onsite[k][i,i] += _val2block(M, b.val)
-            end
-            for (j_loc, j) in enumerate(neigs)
-                Zi, Zj = at.Z[i],at.Z[j]
-                if haskey(M.offsite,(Zi,Zj))
-                    sm = M.offsite[(Zi,Zj)]
-                    inds = get_range(M, (Zi,Zj))
-                    cfg = env_transform(j_loc, Rs, Zs, sm.cutoff)
-                    Bij = evaluate(sm.linmodel.basis, cfg)
-                    for (k,b) in zip(inds, Bij)
-                        B.offsite[k][_index_map(i,j, M)...] += _val2block(M, b.val)
-                    end
-                end
-            end
-        end
-    end
-end
 
 
 function basis!(B, M::PWCMatrixModel{O3S,<:EllipsoidCutoff,Z2S,SC}, at::Atoms, filter=(_,_)->true) where {O3S, Z2S, SC} 

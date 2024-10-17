@@ -3,7 +3,6 @@ module Analytics
 using ProgressMeter: @showprogress
 using StatsBase
 using ACEds
-using ACEds: copy_sub
 using ACEds.FrictionModels: Gamma
 using LinearAlgebra
 using PyPlot
@@ -271,6 +270,66 @@ function plot_error_all(fp_train, fp_test; merrors=nothing, entry_types = [:diag
     #bbox=Dict(:boxstyle=>"rarrow,pad=0.3", :fc=>"cyan", :ec=>"b", :lw=>2)
     fig.tight_layout()
     return fig, ax
+end
+
+function count_observations(n_atoms::Int, symb::Symbol)
+    if symb == :diag
+        return 3 * n_atoms
+    elseif symb == :subdiag
+        return 3 * n_atoms 
+    elseif symb == :offdiag
+        return 9 * Int((n_atoms^2-n_atoms)/2)
+    end
+end
+
+function copy_sub(Γ::AbstractMatrix, symb::Symbol)
+    n_atoms = size(Γ,1)
+    y = Array{Float64}(undef, count_observations(n_atoms,symb))
+    copy_sub!(y, Γ, symb)
+    return y
+end
+
+function copy_sub!(y, Γ::AbstractMatrix, symb::Symbol)
+    if symb == :diag
+        copy_diag!(y, Γ)
+    elseif symb == :subdiag
+        copy_subdiag!(y, Γ)
+    elseif symb == :offdiag
+        copy_offdiag!(y, Γ)
+    end
+end
+
+function copy_diag!(y, Γ::AbstractMatrix) #::AbstractMatrix{SMatrix{3}}
+    n_atoms = size(Γ,1) 
+    for i in 1:n_atoms
+        for (j,g) in enumerate(diag(Γ[i,i]))
+            y[3*(i-1)+j] = g
+        end
+    end
+    #return [ g for i in 1:n_atoms for g in diag(Γ[i,i]) ]
+end
+
+function copy_subdiag!(y, Γ::AbstractMatrix) #::AbstractMatrix{SMatrix{3}}
+    n_atoms = size(Γ,1) 
+    for i in 1:n_atoms
+        y[3*(i-1)+1] = Γ[i,i][1,2]
+        y[3*(i-1)+2] = Γ[i,i][1,3]
+        y[3*(i-1)+3] = Γ[i,i][2,3]
+    end
+    #return [ g for i in 1:n_atoms for g in [Γ[i,i][1,2],Γ[i,i][1,3],Γ[i,i][2,1]]]
+end
+function copy_offdiag!(y, Γ::AbstractMatrix) #::AbstractMatrix{SMatrix{3}}
+    n_atoms = size(Γ,1) 
+    c = 1
+    for i in 1:n_atoms
+        for j in (i+1):n_atoms
+            if j > i 
+                y[(9*(c-1)+1):(9*c)] = Γ[i,j][:]
+                c+=1
+            end
+        end
+    end
+    #return [g for i in 1:n_atoms for g in Γ[i,i][:]]
 end
 
 end
