@@ -20,7 +20,6 @@ using StaticArrays
 using SparseArrays
 using ACEds.Utils: reinterpret
 using ACEds.AtomCutoffs
-using ACEds.PWMatrix
 using ACEds.Utils: reinterpret
 
 import ACEbase: evaluate, evaluate!

@@ -6,7 +6,7 @@ import ACEds.MatrixModels: basis, matrix
 using LinearAlgebra
 using JuLIP: Atoms
 using ACE
-using ACEds.PWMatrix
+
 
 import ACE: params, nparams, set_params!
 import ACEds.MatrixModels: set_zero!
