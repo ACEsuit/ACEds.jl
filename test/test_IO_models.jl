@@ -5,7 +5,7 @@ using ACEds
 using ACEds.AtomCutoffs
 using ACEds.FrictionModels
 using ACEds.MatrixModels
-using ACEds: rwc_matrixmodel
+using ACEds: RWCMatrixModel
 using Distributions: Categorical
 using JuLIP
 using LinearAlgebra

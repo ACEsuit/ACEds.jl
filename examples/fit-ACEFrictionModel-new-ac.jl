@@ -7,7 +7,7 @@ using ACEds.DataUtils
 using Flux
 using Flux.MLUtils
 using ACE
-using ACEds: rwc_matrixmodel
+using ACEds: RWCMatrixModel
 using Random
 using ACEds.Analytics
 using ACEds.FrictionFit
@@ -36,7 +36,7 @@ rcut = 5.0
 evalcenter= NeighborCentered()
 #evalcenter= AtomCentered()
 
-m_equ = rwc_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_env, evalcenter,species_mol; n_rep=1, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
+m_equ = RWCMatrixModel(ACE.EuclideanMatrix(Float64),species_friction,species_env, evalcenter,species_mol; n_rep=1, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         species_maxorder_dict_off = Dict( :H => 0), 
