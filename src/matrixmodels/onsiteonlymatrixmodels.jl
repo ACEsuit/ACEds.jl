@@ -24,7 +24,7 @@ function ACE.set_params!(mb::OnsiteOnlyMatrixModel, θ::NamedTuple)
     ACE.set_params!(mb, :onsite,  θ.onsite)
 end
 
-function allocate_matrix(M::OnsiteOnlyMatrixModel, at::Atoms, sparse=:sparse, T=Float64) 
+function allocate_matrix(M::OnsiteOnlyMatrixModel, at::Atoms,  T=Float64) 
     N = length(at)
     return [Diagonal(zeros(_block_type(M,T),N)) for _ = 1:M.n_rep]
 end
@@ -43,13 +43,13 @@ function matrix!(M::OnsiteOnlyMatrixModel{O3S}, at::Atoms, Σ, filter=(_,_)->tru
     end
 end
 
-function basis(M::OnsiteOnlyMatrixModel, at::Atoms; join_sites=false, sparsity= :sparse, filter=(_,_)->true, T=Float64) 
-    B = allocate_B(M, at, sparsity, T)
+function basis(M::OnsiteOnlyMatrixModel, at::Atoms; join_sites=false, filter=(_,_)->true, T=Float64) 
+    B = allocate_B(M, at, T)
     basis!(B, M, at, filter)
     return (join_sites ? B[1] : B)
 end
 
-function allocate_B(M::OnsiteOnlyMatrixModel, at::Atoms, sparsity= :sparse, T=Float64)
+function allocate_B(M::OnsiteOnlyMatrixModel, at::Atoms, T=Float64)
     N = length(at)
     B_onsite = [Diagonal( zeros(_block_type(M,T),N)) for _ = 1:length(M.inds,:onsite)]
     return (onsite=B_onsite,)

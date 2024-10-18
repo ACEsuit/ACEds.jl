@@ -676,41 +676,30 @@ end
 # end
 
 
-function matrix(M::MatrixModel, at::Atoms; sparse=:sparse, filter=(_,_)->true, T=Float64) 
-    A = allocate_matrix(M, at, sparse, T)
+function matrix(M::MatrixModel, at::Atoms;  filter=(_,_)->true, T=Float64) 
+    A = allocate_matrix(M, at, T)
     matrix!(M, at, A, filter)
     return A
 end
 
-
-function allocate_matrix(M::MatrixModel, at::Atoms, sparse=:sparse, T=Float64) 
+# TODO: most matrix and basis allocation and assembly methods use bad practice. They should be rewritten for efficiency purposes. 
+function allocate_matrix(M::MatrixModel, at::Atoms,  T=Float64) 
     N = length(at)
-    if sparse == :sparse
-        # Γ = repeat([spzeros(_block_type(M,T),N,N)], M.n_rep)
-        A = [spzeros(_block_type(M,T),N,N) for _ = 1:M.n_rep]
-    else
-        # Γ = repeat([zeros(_block_type(M,T),N,N)], M.n_rep)
-        A = [zeros(_block_type(M,T),N,N) for _ = 1:M.n_rep]
-    end
+    A = [spzeros(_block_type(M,T),N,N) for _ = 1:M.n_rep]
     return A
 end
 
-function basis(M::MatrixModel, at::Atoms; join_sites=false, sparsity= :sparse, filter=(_,_)->true, T=Float64) 
-    B = allocate_B(M, at, sparsity, T)
+function basis(M::MatrixModel, at::Atoms; join_sites=false, filter=(_,_)->true, T=Float64) 
+    B = allocate_B(M, at, T)
     basis!(B, M, at, filter)
     return (join_sites ? _join_sites(B.onsite,B.offsite) : B)
 end
 
 
-function allocate_B(M::MatrixModel, at::Atoms, sparsity= :sparse, T=Float64)
+function allocate_B(M::MatrixModel, at::Atoms, T=Float64)
     N = length(at)
     B_onsite = [Diagonal( zeros(_block_type(M,T),N)) for _ = 1:length(M.inds,:onsite)]
-    @assert sparsity in [:sparse, :dense]
-    if sparsity == :sparse
-        B_offsite = [spzeros(_block_type(M,T),N,N) for _ =  1:length(M.inds,:offsite)]
-    else
-        B_offsite = [zeros(_block_type(M,T),N,N) for _ = 1:length(M.inds,:offsite)]
-    end
+    B_offsite = [spzeros(_block_type(M,T),N,N) for _ =  1:length(M.inds,:offsite)]
     return (onsite=B_onsite, offsite=B_offsite)
 end
 

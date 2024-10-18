@@ -30,11 +30,11 @@ function set_zero!(fm::FrictionModel, model_ids)
     end
 end
 
-function Gamma(fm::FrictionModel, at::Atoms; kvargs...) # kvargs = {sparse=:sparse, filter=(_,_)->true, T=Float64}
-    return sum(Gamma(mo, at; sparse=:sparse, kvargs... ) for mo in values(fm.matrixmodels))
+function Gamma(fm::FrictionModel, at::Atoms; kvargs...) # kvargs = { filter=(_,_)->true, T=Float64}
+    return sum(Gamma(mo, at; kvargs... ) for mo in values(fm.matrixmodels))
 end
 
-function Gamma(fm::FrictionModel{MODEL_IDS}, Σ_vec::NamedTuple{MODEL_IDS}) where {MODEL_IDS} # kvargs = {sparse=:sparse, filter=(_,_)->true, T=Float64}
+function Gamma(fm::FrictionModel{MODEL_IDS}, Σ_vec::NamedTuple{MODEL_IDS}) where {MODEL_IDS} # kvargs = { filter=(_,_)->true, T=Float64}
     return sum(Gamma(mo, Σ) for (mo,Σ) in zip(values(fm.matrixmodels),Σ_vec))
     #+ Gamma(fm.inv, at; kvargs...)
 end
