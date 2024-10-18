@@ -30,8 +30,8 @@ function set_zero!(fm::FrictionModel, model_ids)
     end
 end
 
-function Gamma(fm::FrictionModel, at::Atoms; kvargs...) # kvargs = { filter=(_,_)->true, T=Float64}
-    return sum(Gamma(mo, at; kvargs... ) for mo in values(fm.matrixmodels))
+function Gamma(fm::FrictionModel, at::Atoms; filter=(_,_)->true, T=Float64) # kvargs = { filter=(_,_)->true, T=Float64}
+    return sum(Gamma(mo, at; filter=filter, T=T) for mo in values(fm.matrixmodels))
 end
 
 function Gamma(fm::FrictionModel{MODEL_IDS}, Σ_vec::NamedTuple{MODEL_IDS}) where {MODEL_IDS} # kvargs = { filter=(_,_)->true, T=Float64}
@@ -40,12 +40,12 @@ function Gamma(fm::FrictionModel{MODEL_IDS}, Σ_vec::NamedTuple{MODEL_IDS}) wher
 end
 
 
-function Sigma(fm::FrictionModel{MODEL_IDS}, at::Atoms; kvargs...) where {MODEL_IDS}
-    return NamedTuple{MODEL_IDS}(Sigma(mo, at; kvargs...) for mo in values(fm.matrixmodels))
+function Sigma(fm::FrictionModel{MODEL_IDS}, at::Atoms; filter=(_,_)->true, T=Float64) where {MODEL_IDS}
+    return NamedTuple{MODEL_IDS}(Sigma(mo, at; filter=filter, T=T) for mo in values(fm.matrixmodels))
 end
 
-function basis(fm::FrictionModel{MODEL_IDS}, at::Atoms; kvargs...) where {MODEL_IDS}
-    return NamedTuple{MODEL_IDS}(basis(mo, at; kvargs...) for mo in values(fm.matrixmodels))
+function basis(fm::FrictionModel{MODEL_IDS}, at::Atoms; join_sites=false, filter=(_,_)->true, T=Float64) where {MODEL_IDS}
+    return NamedTuple{MODEL_IDS}(basis(mo, at; join_sites=join_sites, filter=filter, T=T) for mo in values(fm.matrixmodels))
     #return Dict(key => basis(mo, at; kvargs...) for (key,mo) in fm.matrixmodels)
 end
 
