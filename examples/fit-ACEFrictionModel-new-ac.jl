@@ -15,7 +15,7 @@ using ACEds.FrictionFit
 using ACEds.MatrixModels
 
 
-fname = "./test/test-data-large"
+fname = "./test/test-data-100"
 filename = string(fname,".h5")
 
 rdata = ACEds.DataUtils.hdf52internal(filename); 

@@ -8,7 +8,6 @@ using LinearAlgebra
 using PyPlot
 using Printf
 using DataFrames
-
 function friction_pairs(fdata, mb)
     a = length(fdata)
     println("Conpute Friction tensors for $a configurations.")

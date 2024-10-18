@@ -1,6 +1,6 @@
 
 
-using ACEds, Test, Printf, LinearAlgebra, StaticArrays
+using ACEds, Test, LinearAlgebra, StaticArrays
 
 using ACEds.DataUtils: FrictionData
 using ACEds.FrictionFit
