@@ -7,7 +7,7 @@ using ACEds.DataUtils
 using Flux
 using Flux.MLUtils
 using ACE
-using ACEds: ac_matrixmodel
+using ACEds: RWCMatrixModel
 using Random
 using ACEds.Analytics
 using ACEds.FrictionFit
@@ -33,10 +33,10 @@ species_friction = [:H]
 species_env = [:Cu]
 species_mol = [:H]
 rcut = 5.0
-coupling= RowCoupling()
+evalcenter= NeighborCentered()
+#evalcenter= AtomCentered()
 
-
-m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_env, coupling,species_mol; n_rep=1, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
+m_equ = RWCMatrixModel(ACE.EuclideanMatrix(Float64),species_friction,species_env, evalcenter,species_mol; n_rep=1, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
         species_maxorder_dict_on = Dict( :H => 1), 
         species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
         species_maxorder_dict_off = Dict( :H => 0), 
@@ -44,8 +44,7 @@ m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_env
         bond_weight = .5
     );
 
-
-fm= FrictionModel((m_equ,)); #fm= FrictionModel((cov=m_cov,equ=m_equ));
+fm= FrictionModel((mequ=m_equ,)); #fm= FrictionModel((cov=m_cov,equ=m_equ));
 model_ids = get_ids(fm)
 
 # Create friction data in internally used format
@@ -62,7 +61,6 @@ flux_data = Dict( "train"=> flux_assemble(fdata["train"], fm, ffm),
 
 
 
-
 #if CUDA is available, convert relevant arrays to cuarrays
 using CUDA
 cuda = CUDA.functional()
@@ -75,7 +73,7 @@ loss_traj = Dict("train"=>Float64[], "test" => Float64[])
 
 epoch = 0
 batchsize = 10
-nepochs = 100
+nepochs = 200
 
 opt = Flux.setup(Adam(1E-3, (0.99, 0.999)),ffm)
 dloader = cuda ? DataLoader(flux_data["train"] |> gpu, batchsize=batchsize, shuffle=true) : DataLoader(flux_data["train"], batchsize=batchsize, shuffle=true)
@@ -104,7 +102,7 @@ Gamma(fm, at)
 Σ = Sigma(fm, at)
 Gamma(fm, Σ)
 
-# Evaluate different error statistics 
+#%% Evaluate different error statistics 
 using ACEds.Analytics: error_stats, plot_error, plot_error_all, friction_pairs
 
 fp_train = friction_pairs(fdata["train"], fm);

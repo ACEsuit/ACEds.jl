@@ -1,5 +1,4 @@
 using ACEds.AtomCutoffs: SphericalCutoff
-#using ACEds.Utils: SymmetricBondSpecies_basis
 using ACE
 using ACEds.MatrixModels
 using ACEds
@@ -7,9 +6,12 @@ using JuLIP: AtomicNumber
 using ACEds.MatrixModels: _o3symmetry
 using ACEbonds: EllipsoidCutoff, AbstractBondCutoff
 using ACEds.MatrixModels: _default_id, _mreduce
-export ac_matrixmodel, mbdpd_matrixmodel, pwc_matrixmodel, onsiteonly_matrixmodel
+import ACEds.MatrixModels: RWCMatrixModel, PWCMatrixModel, OnsiteOnlyMatrixModel
+export RWCMatrixModel, PWCMatrixModel, OnsiteOnlyMatrixModel, mbdpd_matrixmodel
 
-function ac_matrixmodel(property, species_friction, species_env, coupling=RowCoupling(), species_mol=[]; 
+# Outer convenience constructors for subtypes of MatrixModels
+
+function RWCMatrixModel(property, species_friction, species_env, evalcenter=NeighborCentered(), species_mol=[]; 
     id=nothing, 
     n_rep = 3, 
     maxorder_on=2, 
@@ -83,10 +85,10 @@ function ac_matrixmodel(property, species_friction, species_env, coupling=RowCou
     S = _o3symmetry(onsitemodels, offsitemodels)
     id = (id === nothing ? _default_id(S) : id) 
 
-    return ACMatrixModel(onsitemodels, offsitemodels, id, coupling)
+    return RWCMatrixModel(onsitemodels, offsitemodels, id, evalcenter)
 end
 
-function onsiteonly_matrixmodel(property, species_friction, species_env, species_mol=[]; 
+function OnsiteOnlyMatrixModel(property, species_friction, species_env, species_mol=[]; 
     id=nothing, 
     n_rep = 3, 
     maxorder_on=2, 
@@ -154,7 +156,7 @@ function mbdpd_matrixmodel(property, species_friction, species_env, species_mol=
     species_maxorder_dict_off = Dict{Any, Float64}(),
     species_weight_cat_off = Dict(c => 1.0 for c in species_friction)
     )
-    return pwc_matrixmodel(property, species_friction, species_env, Odd(), SpeciesCoupled(), species_mol; 
+    return PWCMatrixModel(property, species_friction, species_env, Odd(), SpeciesCoupled(), species_mol; 
         id=id, 
         n_rep = n_rep, 
         maxorder_off=maxorder_off, 
@@ -205,7 +207,7 @@ function mbdpd_matrixmodel(property, species_friction, species_env, species_mol=
     # return MBDPDMatrixModel(offsitemodels, id)
 end
 
-function pwc_matrixmodel(property, species_friction, species_env, z2sym, speciescoupling,species_mol=[]; 
+function PWCMatrixModel(property, species_friction, species_env, z2sym, speciescoupling,species_mol=[]; 
     id=nothing, 
     n_rep = 3, 
     maxorder_off=2, 

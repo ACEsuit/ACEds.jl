@@ -1,7 +1,7 @@
 import ACE: read_dict, write_dict
 
 using ACEds.AtomCutoffs: SphericalCutoff
-using ACEds.MatrixModels: ACMatrixModel
+using ACEds.MatrixModels: RWCMatrixModel
 
 
 

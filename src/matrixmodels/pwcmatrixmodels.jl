@@ -30,15 +30,9 @@ function ACE.set_params!(mb::PWCMatrixModel, θ::NamedTuple)
     ACE.set_params!(mb, :offsite, θ.offsite)
 end
 
-function allocate_matrix(M::PWCMatrixModel, at::Atoms, sparse=:sparse, T=Float64) 
+function allocate_matrix(M::PWCMatrixModel, at::Atoms,  T=Float64) 
     N = length(at)
-    if sparse == :sparse
-        # Γ = repeat([spzeros(_block_type(M,T),N,N)], M.n_rep)
-        A = [spzeros(_block_type(M,T),N,N) for _ = 1:M.n_rep]
-    else
-        # Γ = repeat([zeros(_block_type(M,T),N,N)], M.n_rep)
-        A = [zeros(_block_type(M,T),N,N) for _ = 1:M.n_rep]
-    end
+    A = [spzeros(_block_type(M,T),N,N) for _ = 1:M.n_rep]
     return A
 end
 
@@ -83,20 +77,15 @@ function matrix!(M::PWCMatrixModel{O3S,<:EllipsoidCutoff,Z2S,SC}, at::Atoms, A, 
 end
 
 #TODO: this is a bit of a hack. We need to find a better way to handle the different types of basis.
-function basis(M::PWCMatrixModel, at::Atoms; join_sites=false, sparsity= :sparse, filter=(_,_)->true, T=Float64) 
-    B = allocate_B(M, at, sparsity, T)
+function basis(M::PWCMatrixModel, at::Atoms; join_sites=false, filter=(_,_)->true, T=Float64) 
+    B = allocate_B(M, at, T)
     basis!(B, M, at, filter)
     return (join_sites ? B[1] : B)
 end
 
-function allocate_B(M::PWCMatrixModel, at::Atoms, sparsity= :sparse, T=Float64)
+function allocate_B(M::PWCMatrixModel, at::Atoms, T=Float64)
     N = length(at)
-    @assert sparsity in [:sparse, :dense]
-    if sparsity == :sparse
-        B_offsite = [spzeros(_block_type(M,T),N,N) for _ =  1:length(M.inds,:offsite)]
-    else
-        B_offsite = [zeros(_block_type(M,T),N,N) for _ = 1:length(M.inds,:offsite)]
-    end
+    B_offsite = [spzeros(_block_type(M,T),N,N) for _ =  1:length(M.inds,:offsite)]
     return (offsite=B_offsite,)
 end
 

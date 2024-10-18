@@ -7,7 +7,7 @@ using ACEds.DataUtils
 using Flux
 using Flux.MLUtils
 using ACE
-using ACEds: pwc_matrixmodel
+using ACEds: PWCMatrixModel
 using Random
 using ACEds.Analytics
 using ACEds.FrictionFit
@@ -40,7 +40,7 @@ z2sym= NoZ2Sym()
 speciescoupling = SpeciesUnCoupled()
 cutoff = EllipsoidCutoff(5.0,4.0,6.0)
 
-m_equ = pwc_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_env, z2sym,  speciescoupling, species_mol;
+m_equ = PWCMatrixModel(ACE.EuclideanMatrix(Float64),species_friction,species_env, z2sym,  speciescoupling, species_mol;
         n_rep = 1,
         maxorder_off=2, 
         maxdeg_off=5, 
@@ -52,13 +52,13 @@ m_equ = pwc_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_en
         bond_weight = .25
     );
 
-m_equ0 = onsiteonly_matrixmodel(ACE.EuclideanMatrix(Float64), species_friction, species_env, species_mol; id=:equ0, n_rep = 1, rcut_on = rcut, maxorder_on=2, maxdeg_on=5,
+m_equ0 = OnsiteOnlyMatrixModel(ACE.EuclideanMatrix(Float64), species_friction, species_env, species_mol; id=:equ0, n_rep = 1, rcut_on = rcut, maxorder_on=2, maxdeg_on=5,
     species_maxorder_dict_on = Dict( :H => 1), 
     species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0)
     );
 
 
-fm= FrictionModel((m_equ, m_equ0)); 
+fm= FrictionModel((mequ_off=m_equ, mequ_on=m_equ0)); 
 model_ids = get_ids(fm)
 
 c = params(fm;format=:matrix, joinsites=true)
@@ -85,7 +85,7 @@ batchsize = 10
 nepochs = 10
 
 opt = Flux.setup(Adam(1E-3, (0.99, 0.999)),ffm)
-dloader = cuda ? DataLoader(flux_data["train"] |> gpu, batchsize=bsize, shuffle=true) : DataLoader(flux_data["train"], batchsize=bsize, shuffle=true)
+dloader = cuda ? DataLoader(flux_data["train"] |> gpu, batchsize=batchsize, shuffle=true) : DataLoader(flux_data["train"], batchsize=batchsize, shuffle=true)
 
 using ACEds.FrictionFit: weighted_l2_loss
 

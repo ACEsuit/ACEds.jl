@@ -21,7 +21,7 @@ function _tensor_Gamma(A::SparseMatrixCSC{SMatrix{3,3,T,9},Ti},fi) where {T<:Rea
     end
     return Γt
 end
-function _tensor_basis(B::Vector{<:AbstractMatrix{SVector{3,T}}}, fi, ::Type{TM}) where {T<:Real, TM<:ACMatrixModel}
+function _tensor_basis(B::Vector{<:AbstractMatrix{SVector{3,T}}}, fi, ::Type{TM}) where {T<:Real, TM<:RWCMatrixModel}
     K = length(B)
     Bt = zeros(T,3,length(fi),length(fi),K)
     for (k,b) in enumerate(B)
@@ -34,7 +34,7 @@ function _tensor_basis(B::Vector{<:AbstractMatrix{SVector{3,T}}}, fi, ::Type{TM}
     return Bt
 end
 
-function _tensor_basis(B::Vector{<:AbstractMatrix{SMatrix{3,3,T,9}}}, fi, ::Type{TM}) where {T<:Real, TM<:ACMatrixModel}
+function _tensor_basis(B::Vector{<:AbstractMatrix{SMatrix{3,3,T,9}}}, fi, ::Type{TM}) where {T<:Real, TM<:RWCMatrixModel}
     K = length(B)
     Bt = zeros(T,3,3,length(fi),length(fi),K)
     for (k,b) in enumerate(B)
@@ -117,7 +117,6 @@ function flux_assemble(data::Array{DATA}, fm::FrictionModel, transforms::NamedTu
     weights = Dict("observations" => ones(length(data)), "diag" => 2.0, "sub_diag" => 1.0, "off_diag"=>1.0),
     join_sites=true) where {DATA<:FrictionData}
     #model_ids = (isempty(model_ids) ? keys(fm.matrixmodels) : model_ids)
-    #feature_data = Array{Float64}(undef, ACEfit.count_observations(d))
     return @showprogress [  begin
                                 W = weight_matrix(length(d.friction_indices), weights["observations"][i],weights["diag"],weights["sub_diag"],weights["off_diag"] )
                                 flux_data(d,fm, transforms, W, join_sites)
@@ -139,72 +138,3 @@ function weight_matrix(n::Ti, obs_weight = 1.0, diag_weight = 2.0, sub_diag_weig
     end
     return obs_weight.*W
 end
-
-# function weight_matrix(d::FrictionData, ::Val{:dense_scalar}, T=Float64)
-#     n = length(d.friction_indices)
-#     dw, sdw, odw = d.weights["diag"],d.weights["sub_diag"] ,d.weights["off_diag"]
-#     W = Array{T}(undef, 3*n,3*n)
-#     for i=1:n
-#         for j=1:n
-#             if i==j
-#                 _fill_diag_block!(view(W,(3*(i-1)+1):(3*i), (3*(j-1)+1):(3*j)), dw, sdw)
-#             else
-#                 _fill_offdiag_block!(view(W,(3*(i-1)+1):(3*i), (3*(j-1)+1):(3*j)),  odw)
-#             end
-#         end
-#     end
-#     return W
-# end
-
-# function weight_matrix(d::FrictionData, ::Val{:dense_block}, T=Float64)
-#     n = length(d.friction_indices)
-#     dw, sdw, odw = d.weights["diag"],d.weights["sub_diag"] ,d.weights["off_diag"]
-#     ondiag = SMatrix{3,3,T,9}(dw, sdw,sdw,sdw, dw,sdw, sdw, sdw,dw)
-#     offdiag = SMatrix{3,3,T,9}(odw,odw,odw,odw,odw,odw,odw,odw,odw)
-#     W = Array{SMatrix{3,3,T,9}}(undef, n,n)
-#     for i=1:n
-#         for j=1:n
-#             if i==j
-#                 W[i,i] = ondiag
-#             else
-#                 W[i,j] = offdiag
-#             end
-#         end
-#     end
-#     return W
-# end
-
-# function weight_matrix(d::FrictionData, ::Val{:sparse_block}, T=Float64)
-#     n = length(d.friction_indices)
-#     dw, sdw, odw = d.weights["diag"],d.weights["sub_diag"] ,d.weights["off_diag"]
-#     ondiag = SMatrix{3,3,T,9}(dw, sdw,sdw,sdw, dw,sdw, sdw, sdw,dw)
-#     offdiag = SMatrix{3,3,T,9}(odw,odw,odw,odw,odw,odw,odw,odw,odw)
-#     W = spzeros(SMatrix{3,3,T,9}, n, n)
-#     for i=1:n
-#         for j=1:n
-#             if i==j
-#                 W[i,i] = ondiag
-#             else
-#                 W[i,j] = offdiag
-#             end
-#         end
-#     end
-#     return W
-# end
-
-# function weight_matrix(::FrictionData, ::Val{s}, T=Float64) where {s}
-#     @error "Weights with format $s not support (yet). "
-# end
-
-
-# function _fill_diag_block!(A::AbstractMatrix{T}, diag_weight::T, sub_diag_weight::T) where {T<:Real} 
-#     fill!(A, sub_diag_weight)
-#     diff = diag_weight - sub_diag_weight
-#     for i=1:3
-#         A[i,i]+=diff
-#     end
-# end
-
-# function _fill_offdiag_block!(A::AbstractMatrix{T}, offdiag_weight::T) where {T<:Real} 
-#     fill!(A,  offdiag_weight)
-# end

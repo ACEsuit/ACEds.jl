@@ -18,17 +18,11 @@ export basis, matrix, Gamma, Sigma
 export FrictionModel
 
 abstract type AbstractFrictionModel end
-# TODO: field model_ids is renundant and my lead to inconsistencies. Remove or all model_ids to allow usage of subsets of models 
-struct FrictionModel <: AbstractFrictionModel
-    matrixmodels # can be of the form ::Dict{Symbol,MatrixModel} or similar NamedTuple
-    model_ids
-    FrictionModel(matrixmodels::Union{Dict{Symbol,<:MatrixModel},NamedTuple}) = new(matrixmodels,Tuple(map(Symbol,(s for s in keys(matrixmodels)))))
+
+struct FrictionModel{MODEL_IDS} <: AbstractFrictionModel
+    matrixmodels::NamedTuple{MODEL_IDS} 
 end
 
-function FrictionModel(matrixmodels)
-    model_ids = Tuple(map(Symbol,(get_id(mo) for mo in matrixmodels)))
-    FrictionModel(NamedTuple{model_ids}(matrixmodels))
-end
 
 function set_zero!(fm::FrictionModel, model_ids)
     for s in model_ids
@@ -38,11 +32,11 @@ end
 """
     Gamma(fm::FrictionModel, at::Atoms; kvargs...)
 
+
 Computes the friction tensor for a given Atoms object. The friction tensor is the sum of the friction tensors of all matrix models in the FrictionModel object.
 """
-function Gamma(fm::FrictionModel, at::Atoms; kvargs...) # kvargs = {sparse=:sparse, filter=(_,_)->true, T=Float64}
-    return sum(Gamma(mo, at; sparse=:sparse, kvargs... ) for mo in values(fm.matrixmodels))
-    #+ Gamma(fm.inv, at; kvargs...)
+function Gamma(fm::FrictionModel, at::Atoms; filter=(_,_)->true, T=Float64) # kvargs = { filter=(_,_)->true, T=Float64}
+    return sum(Gamma(mo, at; filter=filter, T=T) for mo in values(fm.matrixmodels))
 end
 
 """
@@ -51,7 +45,7 @@ end
 Computes the friction tensor from a pre-computed collection of diffusion coefficient matrices. 
 The friction tensor is the sum of the squares of all diffusion coefficient matrices in the collection.
 """
-function Gamma(fm::FrictionModel, Σ_vec) # kvargs = {sparse=:sparse, filter=(_,_)->true, T=Float64}
+function Gamma(fm::FrictionModel{MODEL_IDS}, Σ_vec::NamedTuple{MODEL_IDS}) where {MODEL_IDS} # kvargs = { filter=(_,_)->true, T=Float64}
     return sum(Gamma(mo, Σ) for (mo,Σ) in zip(values(fm.matrixmodels),Σ_vec))
     #+ Gamma(fm.inv, at; kvargs...)
 end
@@ -61,17 +55,17 @@ end
 
 Computes the diffusion coefficient matrices for a given Atoms object. The diffusion coefficient matrices are computed for all matrix models in the FrictionModel object.
 """
-function Sigma(fm::FrictionModel, at::Atoms; kvargs...)  
-    return NamedTuple{fm.model_ids}(Sigma(mo, at; kvargs...) for mo in values(fm.matrixmodels))
+function Sigma(fm::FrictionModel, at::Atoms; filter=(_,_)->true, T=Float64)
+    return NamedTuple{MODEL_IDS}(Sigma(mo, at; filter=filter, T=T) for mo in values(fm.matrixmodels))
 end
 
-function basis(fm::FrictionModel, at::Atoms; kvargs...)
-    return NamedTuple{fm.model_ids}(basis(mo, at; kvargs...) for mo in values(fm.matrixmodels))
+function basis(fm::FrictionModel{MODEL_IDS}, at::Atoms; join_sites=false, filter=(_,_)->true, T=Float64) where {MODEL_IDS}
+    return NamedTuple{MODEL_IDS}(basis(mo, at; join_sites=join_sites, filter=filter, T=T) for mo in values(fm.matrixmodels))
     #return Dict(key => basis(mo, at; kvargs...) for (key,mo) in fm.matrixmodels)
 end
 
-function matrix(fm::FrictionModel, at::Atoms; kvargs...) 
-    return NamedTuple{fm.model_ids}(matrix(mo, at; kvargs...) for mo in values(fm.matrixmodels))
+function matrix(fm::FrictionModel{MODEL_IDS}, at::Atoms; kvargs...) where {MODEL_IDS}
+    return NamedTuple{MODEL_IDS}(matrix(mo, at; kvargs...) for mo in values(fm.matrixmodels))
 end
 
 function Base.length(fm::FrictionModel, args...)
@@ -79,12 +73,12 @@ function Base.length(fm::FrictionModel, args...)
 end
 
 # site_zzz = site::Symbol or zzz::Union{AtomicNumber,Tuple{AtomicNumber,AtomicNumber}}
-function ACE.params(fm::FrictionModel; model_ids=fm.model_ids, kvargs... ) 
+function ACE.params(fm::FrictionModel{MODEL_IDS}; model_ids=MODEL_IDS, kvargs... ) where {MODEL_IDS}
     #model_ids = map(Symbol,(s for s in keys(fm.matrixmodels)))
-    return NamedTuple{fm.model_ids}(params(fm.matrixmodels[s]; kvargs...) for s in model_ids)
+    return NamedTuple{MODEL_IDS}(params(fm.matrixmodels[s]; kvargs...) for s in model_ids)
 end
 
-function ACE.nparams(fm::FrictionModel; model_ids=fm.model_ids, kvargs... ) 
+function ACE.nparams(fm::FrictionModel{MODEL_IDS}; model_ids=MODEL_IDS, kvargs... ) where {MODEL_IDS}
     return sum(ACE.nparams(fm.matrixmodels[s]; kvargs...) for s in model_ids)
 end
 
@@ -94,10 +88,10 @@ function ACE.set_params!(fm::FrictionModel, θ::NamedTuple)
     end
 end
 
-get_ids(fm::FrictionModel) = fm.model_ids
+get_ids(fm::FrictionModel{MODEL_IDS})  where {MODEL_IDS} = MODEL_IDS
 
-function ACE.scaling(fm::FrictionModel, p::Int)
-    return NamedTuple{fm.model_ids}( ACE.scaling(mo,p) for mo in values(fm.matrixmodels))
+function ACE.scaling(fm::FrictionModel{MODEL_IDS}, p::Int) where {MODEL_IDS}
+    return NamedTuple{MODEL_IDS}( ACE.scaling(mo,p) for mo in values(fm.matrixmodels))
 end
 
 function Gamma(M::MatrixModel, at::Atoms; kvargs...) 
@@ -145,7 +139,7 @@ end
 
 
 # using Tullio
-# function Gamma(M::MatrixModel{Covariant}, at::Atoms; kvargs...) 
+# function Gamma(M::MatrixModel{VectorEquivariant}, at::Atoms; kvargs...) 
 #     Σ_vec = Sigma(M, at; kvargs...) 
 #     return sum(@tullio Γ[i,j] :=  Σ[i,k] * transpose(Σ[j,k]) for Σ in Σ_vec)
 # end

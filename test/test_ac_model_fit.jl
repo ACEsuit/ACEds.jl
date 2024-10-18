@@ -42,9 +42,8 @@ set_params!(fm_ac, params(ffm_ac))
 
 
 for d in fdata["train"]
-    at = d.atoms
-    Σ = Sigma(fm_ac, at)
-@test norm(Gamma(fm_ac, Σ) - Gamma(fm_ac, at)) < tol
+    Σ = Sigma(fm_ac, d.atoms)
+@test norm(Gamma(fm_ac, Σ) - Gamma(fm_ac, d.atoms)) < tol
 end
 
 

@@ -1,21 +1,21 @@
 # Z2S<:Uncoupled, SPSYM<:SpeciesUnCoupled, CUTOFF<:SphericalCutoff
-struct ACMatrixModel{O3S,CUTOFF,COUPLING} <: MatrixModel{O3S}
+struct RWCMatrixModel{O3S,CUTOFF,EVALCENTER} <: MatrixModel{O3S}
     onsite::OnSiteModels{O3S}
     offsite::OffSiteModels{O3S,Z2S,CUTOFF} where {Z2S}#, CUTOFF<:SphericalCutoff}
     n_rep::Int
     inds::SiteInds
     id::Symbol
-    function ACMatrixModel(onsite::OnSiteModels{O3S}, offsite::OffSiteModels{O3S,Z2S,CUTOFF}, id::Symbol, ::COUPLING) where {O3S,Z2S, CUTOFF<:SphericalCutoff, COUPLING<:Union{RowCoupling,ColumnCoupling}}
+    function RWCMatrixModel(onsite::OnSiteModels{O3S}, offsite::OffSiteModels{O3S,Z2S,CUTOFF}, id::Symbol, ::EVALCENTER) where {O3S,Z2S, CUTOFF<:SphericalCutoff, EVALCENTER<:Union{NeighborCentered,AtomCentered}}
         _assert_offsite_keys(offsite, SpeciesUnCoupled())
         @assert _n_rep(onsite) ==  _n_rep(offsite)
         @assert length(unique([mo.cutoff for mo in values(offsite)])) == 1 
         @assert length(unique([mo.cutoff for mo in values(onsite)])) == 1 
         #@assert all([z1 in keys(onsite), z2 in keys(offsite)  for (z1,z2) in zzkeys])
-        return new{O3S,CUTOFF,COUPLING}(onsite, offsite, _n_rep(onsite), SiteInds(_get_basisinds(onsite), _get_basisinds(offsite)), id)
+        return new{O3S,CUTOFF,EVALCENTER}(onsite, offsite, _n_rep(onsite), SiteInds(_get_basisinds(onsite), _get_basisinds(offsite)), id)
     end
-end #TODO: Add proper constructor that checks for correct Species coupling
+end #TODO: Add proper constructor that checks for correct Species evalcenter
 
-function ACE.write_dict(M::ACMatrixModel{O3S,CUTOFF,COUPLING}) where {O3S,CUTOFF,COUPLING}
+function ACE.write_dict(M::RWCMatrixModel{O3S,CUTOFF,EVALCENTER}) where {O3S,CUTOFF,EVALCENTER}
     return Dict("__id__" => "ACEds_ACMatrixModel",
             "onsite" => ACE.write_dict(M.onsite),
             #Dict(zz=>write_dict(val) for (zz,val) in M.onsite),
@@ -24,7 +24,7 @@ function ACE.write_dict(M::ACMatrixModel{O3S,CUTOFF,COUPLING}) where {O3S,CUTOFF
             "id" => string(M.id),
             "O3S" => write_dict(O3S),
             "CUTOFF" => write_dict(CUTOFF),
-            "COUPLING" => write_dict(COUPLING()))         
+            "EVALCENTER" => write_dict(EVALCENTER()))         
 end
 function ACE.read_dict(::Val{:ACEds_ACMatrixModel}, D::Dict)
             onsite = ACE.read_dict(D["onsite"])
@@ -32,21 +32,21 @@ function ACE.read_dict(::Val{:ACEds_ACMatrixModel}, D::Dict)
             #Dict(zz=>read_dict(val) for (zz,val) in D["onsite"])
             #offsite = Dict(zz=>read_dict(val) for (zz,val) in D["offsite"])
             id = Symbol(D["id"])
-            coupling = read_dict(D["COUPLING"])
-    return ACMatrixModel(onsite, offsite, id, coupling)
+            evalcenter = read_dict(D["EVALCENTER"])
+    return RWCMatrixModel(onsite, offsite, id, evalcenter)
 end
 
-function ACE.set_params!(mb::ACMatrixModel, θ::NamedTuple)
+function ACE.set_params!(mb::RWCMatrixModel, θ::NamedTuple)
     ACE.set_params!(mb, :onsite,  θ.onsite)
     ACE.set_params!(mb, :offsite, θ.offsite)
 end
 
-function ACE.set_params!(mb::ACMatrixModel, θ)
+function ACE.set_params!(mb::RWCMatrixModel, θ)
     θt = _split_sites(mb, θ) 
-    ACE.set_params!(mb::ACMatrixModel, θt)
+    ACE.set_params!(mb::RWCMatrixModel, θt)
 end
 
-function set_params!(mb::ACMatrixModel, site::Symbol, θ)
+function set_params!(mb::RWCMatrixModel, site::Symbol, θ)
     θt = _rev_transform(θ, mb.n_rep)
     sitedict = getfield(mb, site)
     for z in keys(sitedict)
@@ -54,10 +54,10 @@ function set_params!(mb::ACMatrixModel, site::Symbol, θ)
     end
 end
 
-_index_map(i,j, ::ACMatrixModel{O3S,CUTOFF,ColumnCoupling}) where {O3S,CUTOFF} = i,j
-_index_map(i,j, ::ACMatrixModel{O3S,CUTOFF,RowCoupling}) where {O3S,CUTOFF} = j,i 
+_index_map(i,j, ::RWCMatrixModel{O3S,CUTOFF,AtomCentered}) where {O3S,CUTOFF} = i,j
+_index_map(i,j, ::RWCMatrixModel{O3S,CUTOFF,NeighborCentered}) where {O3S,CUTOFF} = j,i 
 
-function matrix!(M::ACMatrixModel{O3S,<:SphericalCutoff,COUPLING}, at::Atoms, Σ, filter=(_,_)->true) where {O3S,COUPLING}
+function matrix!(M::RWCMatrixModel{O3S,<:SphericalCutoff,EVALCENTER}, at::Atoms, Σ, filter=(_,_)->true) where {O3S,EVALCENTER}
     site_filter(i,at) = (haskey(M.onsite, at.Z[i]) && filter(i, at))
     for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite))
         if site_filter(i, at) && length(neigs) > 0
@@ -85,7 +85,7 @@ function matrix!(M::ACMatrixModel{O3S,<:SphericalCutoff,COUPLING}, at::Atoms, Σ
     end
 end
 
-function basis!(B, M::ACMatrixModel{O3S,<:SphericalCutoff,COUPLING}, at::Atoms, filter=(_,_)->true) where {O3S,COUPLING} # Todo change type of B to NamedTuple{(:onsite,:offsite)} 
+function basis!(B, M::RWCMatrixModel{O3S,<:SphericalCutoff,EVALCENTER}, at::Atoms, filter=(_,_)->true) where {O3S,EVALCENTER} # Todo change type of B to NamedTuple{(:onsite,:offsite)} 
     site_filter(i,at) = (haskey(M.onsite, at.Z[i]) && filter(i, at))
     for (i, neigs, Rs) in sites(at, env_cutoff(M.onsite))
         if site_filter(i, at) && length(neigs) > 0

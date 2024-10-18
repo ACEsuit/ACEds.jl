@@ -1,36 +1,18 @@
-using ACEds
-using ACEds: ac_matrixmodel
 using ACE
-using ACEds.MatrixModels
-#using ACEds.MatrixModels: _n_rep, OnSiteModel, OffSiteModel, BondBasis
-using JuLIP
-#using StaticArrays, SparseArrays
-#using ACEds.MatrixModels: NoZ2Sym, Even, Odd, Z2Symmetry, NoiseCoupling, RowCoupling, ColumnCoupling
-#using ACEbonds: EllipsoidCutoff
-
-using ACEds.FrictionModels
-using ACEds.AtomCutoffs
-using ACEbonds.BondCutoffs
 using ACE.Testing
-using LinearAlgebra
-
-#using ACE: write_dict, read_dict
-#using ACE: write_dict
-# ACE patch
-
-
-
-#ACE.read_dict(ACE.write_dict(NoZ2Sym()))
-#ACE.read_dict(ACE.write_dict(RowCoupling()))
-
-
-using Test
-using JuLIP
+using ACEbonds.BondCutoffs
+using ACEds
+using ACEds.AtomCutoffs
+using ACEds.FrictionModels
+using ACEds.MatrixModels
+using ACEds: RWCMatrixModel
 using Distributions: Categorical
+using JuLIP
+using LinearAlgebra
+using Test
 
-tol = 1E-10
 
-@info "Testing write_dict and read_dict for ACMatrixModel with SphericalCutoff"
+@info "Testing write_dict and read_dict for RWCMatrixModel with SphericalCutoff"
 fm_ac2 = ACE.read_dict(ACE.write_dict(fm_ac));
 for _ in 1:5
     at = gen_config([:H,:Cu], n_min=2,n_max=2, species_prop = Dict(:H=>.5, :Cu=>.5), species_min = Dict(:H=>1, :Cu=>1),  maxnit = 1000)
@@ -38,7 +20,7 @@ for _ in 1:5
 end
 println()
 
-@info "Testing save_dict and load_dict for ACMatrixModel with SphericalCutoff"
+@info "Testing save_dict and load_dict for RWCMatrixModel with SphericalCutoff"
 tmpname = tempname()
 save_dict(tmpname, write_dict(fm_ac))
 fm_ac2 = read_dict(load_dict(tmpname))

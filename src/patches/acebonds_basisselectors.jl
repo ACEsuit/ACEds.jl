@@ -63,10 +63,10 @@ end
 
 function SymmetricEllipsoidBondBasis2(ϕ::ACE.AbstractProperty, BondSelector::EllipsoidBondBasis, B1p::ACE.Product1pBasis; bondsymmetry=nothing, filterfun = _->true)
    filterfun_sym = _->true
-   if bondsymmetry == "Invariant"
+   if bondsymmetry == "Even"
       filterfun_sym = ACE.EvenL(:mube, [:bond])
    end
-   if bondsymmetry == "Covariant"
+   if bondsymmetry == "Odd"
       filterfun_sym = x -> !(ACE.EvenL(:mube, [:bond])(x))
    end
    filterfun_comb = x -> filterfun(x) && filterfun_sym(x)

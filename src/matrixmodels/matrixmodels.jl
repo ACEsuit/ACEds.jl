@@ -1,12 +1,12 @@
 module MatrixModels
 
-export MatrixModel, ACMatrixModel, OnsiteOnlyMatrixModel, PWCMatrixModel
+export MatrixModel, RWCMatrixModel, OnsiteOnlyMatrixModel, PWCMatrixModel
 export SiteModel, OnSiteModel, OffSiteModel,  OnSiteModels, OffSiteModels, SiteInds
 export onsite_linbasis, offsite_linbasis, env_cutoff, basis_size
-export O3Symmetry, Invariant, Covariant, Equivariant
+export O3Symmetry, Invariant, VectorEquivariant, MatrixEquivariant
 export Odd, Even, NoZ2Sym
 export SpeciesCoupled, SpeciesUnCoupled
-export PairCoupling, RowCoupling, ColumnCoupling
+export NeighborCentered, AtomCentered
 export matrix, basis, params, nparams, set_params!, get_id
 
 using LinearAlgebra: Diagonal
@@ -45,8 +45,8 @@ ACE.read_dict(v::SVector{N,T}) where {N,T} = v
 #ACE.scaling(m::SiteModel,p::Int) = ACE.scaling(m.model.basis,p)
 abstract type O3Symmetry end 
 struct Invariant <: O3Symmetry end
-struct Covariant <: O3Symmetry end
-struct Equivariant <: O3Symmetry end
+struct VectorEquivariant <: O3Symmetry end
+struct MatrixEquivariant <: O3Symmetry end
 
 abstract type Z2Symmetry end 
 
@@ -74,18 +74,17 @@ function ACE.read_dict(::Val{:ACEds_SpeciesCoupling}, D::Dict)
     return sc()
 end
 
-abstract type NoiseCoupling end
+abstract type EvaluationCenter end
 
-struct PairCoupling <: NoiseCoupling end
-struct RowCoupling <: NoiseCoupling end
-struct ColumnCoupling <: NoiseCoupling end
+struct NeighborCentered <: EvaluationCenter end
+struct AtomCentered <: EvaluationCenter end
 
-function ACE.write_dict(coupling::COUPLING) where {COUPLING<:NoiseCoupling}
-    return Dict("__id__" => string("ACEds_NoiseCoupling"), "coupling"=>typeof(coupling)) 
+function ACE.write_dict(evalcenter::EVALCENTER) where {EVALCENTER<:EvaluationCenter}
+    return Dict("__id__" => string("ACEds_EvaluationMode"), "evalcenter"=>typeof(evalcenter)) 
 end
-function ACE.read_dict(::Val{:ACEds_NoiseCoupling}, D::Dict) 
-    coupling = getfield(ACEds.MatrixModels, Symbol(D["coupling"]))
-    return coupling()
+function ACE.read_dict(::Val{:ACEds_EvaluationMode}, D::Dict) 
+    evalcenter = getfield(ACEds.MatrixModels, Symbol(D["evalcenter"]))
+    return evalcenter()
 end
 
 _mreduce(z1,z2, ::SpeciesUnCoupled) = (z1,z2)
@@ -111,8 +110,8 @@ function _assert_offsite_keys(offsite_dict, ::SpeciesUnCoupled)
 end
 
 _o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.Invariant}) where {PIB} = Invariant
-_o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanVector}) where {PIB} = Covariant
-_o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanMatrix}) where {PIB} = Equivariant
+_o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanVector}) where {PIB} = VectorEquivariant
+_o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanMatrix}) where {PIB} = MatrixEquivariant
 _o3symmetry(m::ACE.LinearACEModel) = _o3symmetry(m.basis)
 
 _n_rep(::ACE.LinearACEModel{TB, SVector{N,T}, TEV}) where {TB,N,T,TEV} = N
@@ -386,16 +385,16 @@ end
 abstract type MatrixModel{S} end
 
 _default_id(::Type{Invariant}) = :inv
-_default_id(::Type{Covariant}) = :cov
-_default_id(::Type{Equivariant}) = :equ 
+_default_id(::Type{VectorEquivariant}) = :cov
+_default_id(::Type{MatrixEquivariant}) = :equ 
 
 _block_type(::MatrixModel{Invariant},T=Float64) = SMatrix{3, 3, T, 9}
-_block_type(::MatrixModel{Covariant},T=Float64) =  SVector{3,T}
-_block_type(::MatrixModel{Equivariant},T=Float64) = SMatrix{3, 3, T, 9}
+_block_type(::MatrixModel{VectorEquivariant},T=Float64) =  SVector{3,T}
+_block_type(::MatrixModel{MatrixEquivariant},T=Float64) = SMatrix{3, 3, T, 9}
 
 _val2block(::MatrixModel{Invariant}, val::T) where {T<:Number}= SMatrix{3,3,T,9}(Diagonal([val,val,val]))
-_val2block(::MatrixModel{Covariant}, val) = val
-_val2block(::MatrixModel{Equivariant}, val) = val
+_val2block(::MatrixModel{VectorEquivariant}, val) = val
+_val2block(::MatrixModel{MatrixEquivariant}, val) = val
 
 _n_rep(M::MatrixModel) = M.n_rep
 
@@ -404,8 +403,8 @@ evaluate(sm::OffSiteModel, rrij, zi::AtomicNumber, zj::AtomicNumber, Rs, Zs) = e
 
 
 _z2couplingToString(::NoZ2Sym) = "noz2sym"
-_z2couplingToString(::Even) = "Invariant"
-_z2couplingToString(::Odd) = "Covariant"
+_z2couplingToString(::Even) = "Even"
+_z2couplingToString(::Odd) = "Odd"
 
 _cutoff(cutoff::SphericalCutoff) = cutoff.r_cut
 _cutoff(cutoff::EllipsoidCutoff) = cutoff.r_cut
@@ -676,41 +675,30 @@ end
 # end
 
 
-function matrix(M::MatrixModel, at::Atoms; sparse=:sparse, filter=(_,_)->true, T=Float64) 
-    A = allocate_matrix(M, at, sparse, T)
+function matrix(M::MatrixModel, at::Atoms;  filter=(_,_)->true, T=Float64) 
+    A = allocate_matrix(M, at, T)
     matrix!(M, at, A, filter)
     return A
 end
 
-
-function allocate_matrix(M::MatrixModel, at::Atoms, sparse=:sparse, T=Float64) 
+# TODO: most matrix and basis allocation and assembly methods use bad practice. They should be rewritten for efficiency purposes. 
+function allocate_matrix(M::MatrixModel, at::Atoms,  T=Float64) 
     N = length(at)
-    if sparse == :sparse
-        # Γ = repeat([spzeros(_block_type(M,T),N,N)], M.n_rep)
-        A = [spzeros(_block_type(M,T),N,N) for _ = 1:M.n_rep]
-    else
-        # Γ = repeat([zeros(_block_type(M,T),N,N)], M.n_rep)
-        A = [zeros(_block_type(M,T),N,N) for _ = 1:M.n_rep]
-    end
+    A = [spzeros(_block_type(M,T),N,N) for _ = 1:M.n_rep]
     return A
 end
 
-function basis(M::MatrixModel, at::Atoms; join_sites=false, sparsity= :sparse, filter=(_,_)->true, T=Float64) 
-    B = allocate_B(M, at, sparsity, T)
+function basis(M::MatrixModel, at::Atoms; join_sites=false, filter=(_,_)->true, T=Float64) 
+    B = allocate_B(M, at, T)
     basis!(B, M, at, filter)
     return (join_sites ? _join_sites(B.onsite,B.offsite) : B)
 end
 
 
-function allocate_B(M::MatrixModel, at::Atoms, sparsity= :sparse, T=Float64)
+function allocate_B(M::MatrixModel, at::Atoms, T=Float64)
     N = length(at)
     B_onsite = [Diagonal( zeros(_block_type(M,T),N)) for _ = 1:length(M.inds,:onsite)]
-    @assert sparsity in [:sparse, :dense]
-    if sparsity == :sparse
-        B_offsite = [spzeros(_block_type(M,T),N,N) for _ =  1:length(M.inds,:offsite)]
-    else
-        B_offsite = [zeros(_block_type(M,T),N,N) for _ = 1:length(M.inds,:offsite)]
-    end
+    B_offsite = [spzeros(_block_type(M,T),N,N) for _ =  1:length(M.inds,:offsite)]
     return (onsite=B_onsite, offsite=B_offsite)
 end
 
