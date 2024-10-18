@@ -117,7 +117,6 @@ function flux_assemble(data::Array{DATA}, fm::FrictionModel, transforms::NamedTu
     weights = Dict("observations" => ones(length(data)), "diag" => 2.0, "sub_diag" => 1.0, "off_diag"=>1.0),
     join_sites=true) where {DATA<:FrictionData}
     #model_ids = (isempty(model_ids) ? keys(fm.matrixmodels) : model_ids)
-    #feature_data = Array{Float64}(undef, ACEfit.count_observations(d))
     return @showprogress [  begin
                                 W = weight_matrix(length(d.friction_indices), weights["observations"][i],weights["diag"],weights["sub_diag"],weights["off_diag"] )
                                 flux_data(d,fm, transforms, W, join_sites)
