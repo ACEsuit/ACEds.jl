@@ -61,7 +61,7 @@ m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_env
     bond_weight = .5
 );
 
-fm_ac= FrictionModel((m_equ,));
+fm_ac= FrictionModel((mequ=m_equ,));
 
 
 #%%
@@ -100,7 +100,7 @@ m_equ = pwc_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_en
         species_weight_cat_off = Dict(:H => 1.0, :Cu=> 1.0),
         bond_weight = .5
     );
-fm_pwcsc= FrictionModel((m_equ,)); 
+fm_pwcsc= FrictionModel((mequ_off=m_equ,)); 
 
 
 # m_inv0 = onsiteonly_matrixmodel(ACE.Invariant(), species_friction, species_env, species_mol; id=:inv0, n_rep = 3, rcut_on = rcut, maxorder_on=2, maxdeg_on=3,
@@ -169,5 +169,5 @@ m_equ0 = onsiteonly_matrixmodel(ACE.EuclideanMatrix(Float64), species_friction, 
     species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0)
     );
 
-fm_pwcec= FrictionModel((m_equ, m_equ0)); 
+fm_pwcec= FrictionModel((mequ_off=m_equ, mequ_on= m_equ0)); 
 

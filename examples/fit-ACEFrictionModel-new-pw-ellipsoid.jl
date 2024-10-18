@@ -58,7 +58,7 @@ m_equ0 = onsiteonly_matrixmodel(ACE.EuclideanMatrix(Float64), species_friction, 
     );
 
 
-fm= FrictionModel((m_equ, m_equ0)); 
+fm= FrictionModel((mequ_off=m_equ, mequ_on=m_equ0)); 
 model_ids = get_ids(fm)
 
 c = params(fm;format=:matrix, joinsites=true)

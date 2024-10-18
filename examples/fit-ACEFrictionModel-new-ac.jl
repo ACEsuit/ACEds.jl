@@ -44,8 +44,7 @@ m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_env
         bond_weight = .5
     );
 
-
-fm= FrictionModel((m_equ,)); #fm= FrictionModel((cov=m_cov,equ=m_equ));
+fm= FrictionModel((mequ=m_equ,)); #fm= FrictionModel((cov=m_cov,equ=m_equ));
 model_ids = get_ids(fm)
 
 # Create friction data in internally used format
@@ -59,7 +58,6 @@ set_params!(ffm; sigma=1E-8)
 # Create preprocessed data including basis evaluations that can be used to fit the model
 flux_data = Dict( "train"=> flux_assemble(fdata["train"], fm, ffm),
                   "test"=> flux_assemble(fdata["test"], fm, ffm));
-
 
 
 

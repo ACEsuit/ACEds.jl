@@ -3,7 +3,7 @@ module MatrixModels
 export MatrixModel, ACMatrixModel, OnsiteOnlyMatrixModel, PWCMatrixModel
 export SiteModel, OnSiteModel, OffSiteModel,  OnSiteModels, OffSiteModels, SiteInds
 export onsite_linbasis, offsite_linbasis, env_cutoff, basis_size
-export O3Symmetry, Invariant, Covariant, Equivariant
+export O3Symmetry, Invariant, VectorEquivariant, MatrixEquivariant
 export Odd, Even, NoZ2Sym
 export SpeciesCoupled, SpeciesUnCoupled
 export PairCoupling, RowCoupling, ColumnCoupling
@@ -45,8 +45,8 @@ ACE.read_dict(v::SVector{N,T}) where {N,T} = v
 #ACE.scaling(m::SiteModel,p::Int) = ACE.scaling(m.model.basis,p)
 abstract type O3Symmetry end 
 struct Invariant <: O3Symmetry end
-struct Covariant <: O3Symmetry end
-struct Equivariant <: O3Symmetry end
+struct VectorEquivariant <: O3Symmetry end
+struct MatrixEquivariant <: O3Symmetry end
 
 abstract type Z2Symmetry end 
 
@@ -111,8 +111,8 @@ function _assert_offsite_keys(offsite_dict, ::SpeciesUnCoupled)
 end
 
 _o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.Invariant}) where {PIB} = Invariant
-_o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanVector}) where {PIB} = Covariant
-_o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanMatrix}) where {PIB} = Equivariant
+_o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanVector}) where {PIB} = VectorEquivariant
+_o3symmetry(::ACE.SymmetricBasis{PIB,<:ACE.EuclideanMatrix}) where {PIB} = MatrixEquivariant
 _o3symmetry(m::ACE.LinearACEModel) = _o3symmetry(m.basis)
 
 _n_rep(::ACE.LinearACEModel{TB, SVector{N,T}, TEV}) where {TB,N,T,TEV} = N
@@ -386,16 +386,16 @@ end
 abstract type MatrixModel{S} end
 
 _default_id(::Type{Invariant}) = :inv
-_default_id(::Type{Covariant}) = :cov
-_default_id(::Type{Equivariant}) = :equ 
+_default_id(::Type{VectorEquivariant}) = :cov
+_default_id(::Type{MatrixEquivariant}) = :equ 
 
 _block_type(::MatrixModel{Invariant},T=Float64) = SMatrix{3, 3, T, 9}
-_block_type(::MatrixModel{Covariant},T=Float64) =  SVector{3,T}
-_block_type(::MatrixModel{Equivariant},T=Float64) = SMatrix{3, 3, T, 9}
+_block_type(::MatrixModel{VectorEquivariant},T=Float64) =  SVector{3,T}
+_block_type(::MatrixModel{MatrixEquivariant},T=Float64) = SMatrix{3, 3, T, 9}
 
 _val2block(::MatrixModel{Invariant}, val::T) where {T<:Number}= SMatrix{3,3,T,9}(Diagonal([val,val,val]))
-_val2block(::MatrixModel{Covariant}, val) = val
-_val2block(::MatrixModel{Equivariant}, val) = val
+_val2block(::MatrixModel{VectorEquivariant}, val) = val
+_val2block(::MatrixModel{MatrixEquivariant}, val) = val
 
 _n_rep(M::MatrixModel) = M.n_rep
 
@@ -404,8 +404,8 @@ evaluate(sm::OffSiteModel, rrij, zi::AtomicNumber, zj::AtomicNumber, Rs, Zs) = e
 
 
 _z2couplingToString(::NoZ2Sym) = "noz2sym"
-_z2couplingToString(::Even) = "Invariant"
-_z2couplingToString(::Odd) = "Covariant"
+_z2couplingToString(::Even) = "Even"
+_z2couplingToString(::Odd) = "Odd"
 
 _cutoff(cutoff::SphericalCutoff) = cutoff.r_cut
 _cutoff(cutoff::EllipsoidCutoff) = cutoff.r_cut

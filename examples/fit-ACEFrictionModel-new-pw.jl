@@ -55,15 +55,9 @@ m_equ0 = onsiteonly_matrixmodel(ACE.EuclideanMatrix(Float64), species_friction, 
     );
 
 
-# fm= FrictionModel((m_cov,m_equ, m_cov0, m_equ0)); 
-fm= FrictionModel((m_equ,m_equ0)); 
-
-model_ids = get_ids(fm)
-
-
 # Create friction data in internally used format
 
-fm= FrictionModel((m_equ, m_equ0)); 
+fm= FrictionModel((mequ_off = m_equ, mequ_on=m_equ0)); 
 model_ids = get_ids(fm)
 
 c = params(fm;format=:matrix, joinsites=true)
@@ -90,7 +84,7 @@ batchsize = 10
 nepochs = 10
 
 opt = Flux.setup(Adam(1E-3, (0.99, 0.999)),ffm)
-dloader = cuda ? DataLoader(flux_data["train"] |> gpu, batchsize=bsize, shuffle=true) : DataLoader(flux_data["train"], batchsize=bsize, shuffle=true)
+dloader = cuda ? DataLoader(flux_data["train"] |> gpu, batchsize=batchsize, shuffle=true) : DataLoader(flux_data["train"], batchsize=batchsize, shuffle=true)
 
 using ACEds.FrictionFit: weighted_l2_loss
 

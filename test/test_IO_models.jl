@@ -28,7 +28,6 @@ using Test
 using JuLIP
 using Distributions: Categorical
 
-tol = 1E-10
 
 @info "Testing write_dict and read_dict for ACMatrixModel with SphericalCutoff"
 fm_ac2 = ACE.read_dict(ACE.write_dict(fm_ac));
