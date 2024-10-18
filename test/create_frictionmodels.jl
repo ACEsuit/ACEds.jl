@@ -1,5 +1,5 @@
 using ACEds
-using ACEds: ac_matrixmodel
+using ACEds: rwc_matrixmodel
 using ACE
 using ACEds.MatrixModels
 using JuLIP
@@ -38,22 +38,22 @@ species_env = [:Cu]
 species_mol = [:H]
 rcut = 5.0
 
-coupling= RowCoupling()
-m_inv = ac_matrixmodel(ACE.Invariant(),species_friction,species_env, coupling, species_mol; n_rep = 1, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=3,
+evalcenter= NeighborCentered()
+m_inv = rwc_matrixmodel(ACE.Invariant(),species_friction,species_env, evalcenter, species_mol; n_rep = 1, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=3,
     species_maxorder_dict_on = Dict( :H => 1), 
     species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
     species_maxorder_dict_off = Dict( :H => 0), 
     species_weight_cat_off = Dict(:H => 1.0, :Cu=> 1.0),
     bond_weight = .5
 );
-m_cov = ac_matrixmodel(ACE.EuclideanVector(Float64),species_friction,species_env, coupling, species_mol; n_rep=1, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=3,
+m_cov = rwc_matrixmodel(ACE.EuclideanVector(Float64),species_friction,species_env, evalcenter, species_mol; n_rep=1, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=3,
     species_maxorder_dict_on = Dict( :H => 1), 
     species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
     species_maxorder_dict_off = Dict( :H => 0), 
     species_weight_cat_off = Dict(:H => 1.0, :Cu=> 1.0),
     bond_weight = .5
 );
-m_equ = ac_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_env, coupling, species_mol; n_rep=1, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=3,
+m_equ = rwc_matrixmodel(ACE.EuclideanMatrix(Float64),species_friction,species_env, evalcenter, species_mol; n_rep=1, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=3,
     species_maxorder_dict_on = Dict( :H => 1), 
     species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
     species_maxorder_dict_off = Dict( :H => 0), 

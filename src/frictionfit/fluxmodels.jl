@@ -25,12 +25,12 @@ function _msum(A::AbstractArray{T,N}, B::AbstractArray{T,N}) where {T,N}
     return C
 end
 
-function _Gamma(B::AbstractArray{T,4}, cc::AbstractArray{T,2}, ::Type{<:ACMatrixModel}) where {T}
+function _Gamma(B::AbstractArray{T,4}, cc::AbstractArray{T,2}, ::Type{<:RWCMatrixModel}) where {T}
     @tullio Σ[d,i,j,r] := B[d,i,j,k] * cc[k,r]
     @tullio Γ[d1,d2,i,j] := Σ[d1,i,k,r]  * Σ[d2,j,k,r] 
     return Γ
 end
-function _Gamma(B::AbstractArray{T,5}, cc::AbstractArray{T,2}, ::Type{<:ACMatrixModel}) where {T}
+function _Gamma(B::AbstractArray{T,5}, cc::AbstractArray{T,2}, ::Type{<:RWCMatrixModel}) where {T}
     @tullio Σ[d1,d2,i,j,r] := B[d1,d2,i,j,k] * cc[k,r]
     @tullio Γ[d1,d2,i,j] := Σ[d1,d,i,k,r] * Σ[d2,d,j,k,r] 
     return Γ

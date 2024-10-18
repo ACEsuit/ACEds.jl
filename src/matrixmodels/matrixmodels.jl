@@ -1,12 +1,12 @@
 module MatrixModels
 
-export MatrixModel, ACMatrixModel, OnsiteOnlyMatrixModel, PWCMatrixModel
+export MatrixModel, RWCMatrixModel, OnsiteOnlyMatrixModel, PWCMatrixModel
 export SiteModel, OnSiteModel, OffSiteModel,  OnSiteModels, OffSiteModels, SiteInds
 export onsite_linbasis, offsite_linbasis, env_cutoff, basis_size
 export O3Symmetry, Invariant, VectorEquivariant, MatrixEquivariant
 export Odd, Even, NoZ2Sym
 export SpeciesCoupled, SpeciesUnCoupled
-export PairCoupling, RowCoupling, ColumnCoupling
+export NeighborCentered, AtomCentered
 export matrix, basis, params, nparams, set_params!, get_id
 
 using LinearAlgebra: Diagonal
@@ -74,18 +74,17 @@ function ACE.read_dict(::Val{:ACEds_SpeciesCoupling}, D::Dict)
     return sc()
 end
 
-abstract type NoiseCoupling end
+abstract type EvaluationCenter end
 
-struct PairCoupling <: NoiseCoupling end
-struct RowCoupling <: NoiseCoupling end
-struct ColumnCoupling <: NoiseCoupling end
+struct NeighborCentered <: EvaluationCenter end
+struct AtomCentered <: EvaluationCenter end
 
-function ACE.write_dict(coupling::COUPLING) where {COUPLING<:NoiseCoupling}
-    return Dict("__id__" => string("ACEds_NoiseCoupling"), "coupling"=>typeof(coupling)) 
+function ACE.write_dict(evalcenter::EVALCENTER) where {EVALCENTER<:EvaluationCenter}
+    return Dict("__id__" => string("ACEds_EvaluationMode"), "evalcenter"=>typeof(evalcenter)) 
 end
-function ACE.read_dict(::Val{:ACEds_NoiseCoupling}, D::Dict) 
-    coupling = getfield(ACEds.MatrixModels, Symbol(D["coupling"]))
-    return coupling()
+function ACE.read_dict(::Val{:ACEds_EvaluationMode}, D::Dict) 
+    evalcenter = getfield(ACEds.MatrixModels, Symbol(D["evalcenter"]))
+    return evalcenter()
 end
 
 _mreduce(z1,z2, ::SpeciesUnCoupled) = (z1,z2)

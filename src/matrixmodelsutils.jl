@@ -7,9 +7,9 @@ using JuLIP: AtomicNumber
 using ACEds.MatrixModels: _o3symmetry
 using ACEbonds: EllipsoidCutoff, AbstractBondCutoff
 using ACEds.MatrixModels: _default_id, _mreduce
-export ac_matrixmodel, mbdpd_matrixmodel, pwc_matrixmodel, onsiteonly_matrixmodel
+export rwc_matrixmodel, mbdpd_matrixmodel, pwc_matrixmodel, onsiteonly_matrixmodel
 
-function ac_matrixmodel(property, species_friction, species_env, coupling=RowCoupling(), species_mol=[]; 
+function rwc_matrixmodel(property, species_friction, species_env, evalcenter=NeighborCentered(), species_mol=[]; 
     id=nothing, 
     n_rep = 3, 
     maxorder_on=2, 
@@ -83,7 +83,7 @@ function ac_matrixmodel(property, species_friction, species_env, coupling=RowCou
     S = _o3symmetry(onsitemodels, offsitemodels)
     id = (id === nothing ? _default_id(S) : id) 
 
-    return ACMatrixModel(onsitemodels, offsitemodels, id, coupling)
+    return RWCMatrixModel(onsitemodels, offsitemodels, id, evalcenter)
 end
 
 function onsiteonly_matrixmodel(property, species_friction, species_env, species_mol=[]; 

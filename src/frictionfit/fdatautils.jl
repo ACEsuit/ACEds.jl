@@ -21,7 +21,7 @@ function _tensor_Gamma(A::SparseMatrixCSC{SMatrix{3,3,T,9},Ti},fi) where {T<:Rea
     end
     return Γt
 end
-function _tensor_basis(B::Vector{<:AbstractMatrix{SVector{3,T}}}, fi, ::Type{TM}) where {T<:Real, TM<:ACMatrixModel}
+function _tensor_basis(B::Vector{<:AbstractMatrix{SVector{3,T}}}, fi, ::Type{TM}) where {T<:Real, TM<:RWCMatrixModel}
     K = length(B)
     Bt = zeros(T,3,length(fi),length(fi),K)
     for (k,b) in enumerate(B)
@@ -34,7 +34,7 @@ function _tensor_basis(B::Vector{<:AbstractMatrix{SVector{3,T}}}, fi, ::Type{TM}
     return Bt
 end
 
-function _tensor_basis(B::Vector{<:AbstractMatrix{SMatrix{3,3,T,9}}}, fi, ::Type{TM}) where {T<:Real, TM<:ACMatrixModel}
+function _tensor_basis(B::Vector{<:AbstractMatrix{SMatrix{3,3,T,9}}}, fi, ::Type{TM}) where {T<:Real, TM<:RWCMatrixModel}
     K = length(B)
     Bt = zeros(T,3,3,length(fi),length(fi),K)
     for (k,b) in enumerate(B)

@@ -7,7 +7,7 @@ using ACEds.FrictionFit
 using Flux
 using Flux.MLUtils
 using ACEds.MatrixModels
-using ACEds: ac_matrixmodel
+using ACEds: rwc_matrixmodel
 using ACE
 
 include("./helper_functions.jl")
