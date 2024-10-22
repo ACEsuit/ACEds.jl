@@ -15,7 +15,7 @@ using ACEds.FrictionFit
 using ACEds.MatrixModels
 
 
-fname = "./test/test-data-100"
+fname = "./test/test-data-large"
 filename = string(fname,".h5")
 
 rdata = ACEds.DataUtils.hdf52internal(filename); 
@@ -31,16 +31,15 @@ fdata = Dict("train" => FrictionData.(rdata[1:n_train]),
 
 species_friction = [:H]
 species_env = [:Cu]
-species_mol = [:H]
-rcut = 5.0
-evalcenter= NeighborCentered()
 #evalcenter= AtomCentered()
 
-m_equ = RWCMatrixModel(ACE.EuclideanMatrix(Float64),species_friction,species_env, evalcenter,species_mol; n_rep=1, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
-        species_maxorder_dict_on = Dict( :H => 1), 
-        species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
-        species_maxorder_dict_off = Dict( :H => 0), 
-        species_weight_cat_off = Dict(:H => 1.0, :Cu=> 1.0),
+m_equ = RWCMatrixModel(ACE.EuclideanMatrix(Float64), species_friction, species_env;
+        evalcenter= AtomCentered(),
+        species_mol = [:H],
+        n_rep=1, 
+        rcut = 5.0, 
+        maxorder=2, 
+        maxdeg=5,
         bond_weight = .5
     );
 
@@ -50,7 +49,7 @@ model_ids = get_ids(fm)
 # Create friction data in internally used format
 
                                             
-c = params(fm;format=:matrix, joinsites=true)
+c = params(fm)
 
 ffm = FluxFrictionModel(c)
 set_params!(ffm; sigma=1E-8)
@@ -73,7 +72,7 @@ loss_traj = Dict("train"=>Float64[], "test" => Float64[])
 
 epoch = 0
 batchsize = 10
-nepochs = 200
+nepochs = 100
 
 opt = Flux.setup(Adam(1E-3, (0.99, 0.999)),ffm)
 dloader = cuda ? DataLoader(flux_data["train"] |> gpu, batchsize=batchsize, shuffle=true) : DataLoader(flux_data["train"], batchsize=batchsize, shuffle=true)
@@ -98,9 +97,9 @@ minimum(loss_traj["train"]/n_train) <0.01
 set_params!(fm, params(ffm))
 
 at = fdata["test"][1].atoms
-Gamma(fm, at)
-Σ = Sigma(fm, at)
-Gamma(fm, Σ)
+@time Gamma(fm, at)
+@time Σ = Sigma(fm, at)
+@time Gamma(fm, Σ)
 
 #%% Evaluate different error statistics 
 using ACEds.Analytics: error_stats, plot_error, plot_error_all, friction_pairs

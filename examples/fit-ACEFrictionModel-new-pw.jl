@@ -14,7 +14,7 @@ using ACEds.FrictionFit
 
 using ACEds.MatrixModels
 
-fname = "./test/test-data-100"
+fname = "./test/test-data-large"
 filename = string(fname,".h5")
 
 rdata = ACEds.DataUtils.hdf52internal(filename); 
@@ -37,21 +37,30 @@ rcut = 5.0
 z2sym= NoZ2Sym()
 speciescoupling = SpeciesUnCoupled()
 
-m_equ = PWCMatrixModel(ACE.EuclideanMatrix(Float64),species_friction, species_env, z2sym, speciescoupling, species_mol;
+m_equ = PWCMatrixModel(ACE.EuclideanMatrix(Float64),species_friction, species_env;
+        z2sym = NoZ2Sym(), 
+        speciescoupling = SpeciesUnCoupled(),
+        species_mol = species_mol,
         n_rep = 1,
-        maxorder_off=2, 
-        maxdeg_off=5, 
-        cutoff_off= SphericalCutoff(rcut), 
-        r0_ratio_off=.4, 
-        rin_ratio_off=.04, 
-        species_maxorder_dict_off = Dict( :H => 0), 
-        species_weight_cat_off = Dict(:H => 1.0, :Cu=> 1.0),
+        maxorder=2, 
+        maxdeg=5, 
+        cutoff= SphericalCutoff(rcut), 
+        r0_ratio=.4, 
+        rin_ratio=.04, 
+        species_maxorder_dict = Dict( :H => 0), 
+        species_weight_cat = Dict(:H => 1.0, :Cu=> 1.0),
         bond_weight = .5
     );
 
-m_equ0 = OnsiteOnlyMatrixModel(ACE.EuclideanMatrix(Float64), species_friction, species_env, species_mol; id=:equ0, n_rep = 1, rcut_on = rcut, maxorder_on=2, maxdeg_on=5,
-    species_maxorder_dict_on = Dict( :H => 1), 
-    species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0)
+m_equ0 = OnsiteOnlyMatrixModel(ACE.EuclideanMatrix(Float64), species_friction, species_env; 
+    species_mol=species_mol, 
+    id=:equ0, 
+    n_rep = 1, 
+    rcut = rcut, 
+    maxorder=2, 
+    maxdeg=5,
+    species_maxorder_dict = Dict( :H => 1), 
+    species_weight_cat = Dict(:H => .75, :Cu=> 1.0)
     );
 
 
@@ -81,7 +90,7 @@ loss_traj = Dict("train"=>Float64[], "test" => Float64[])
 
 epoch = 0
 batchsize = 10
-nepochs = 10
+nepochs = 100
 
 opt = Flux.setup(Adam(1E-3, (0.99, 0.999)),ffm)
 dloader = cuda ? DataLoader(flux_data["train"] |> gpu, batchsize=batchsize, shuffle=true) : DataLoader(flux_data["train"], batchsize=batchsize, shuffle=true)

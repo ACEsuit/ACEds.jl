@@ -36,25 +36,31 @@ species_friction = [:H]
 species_env = [:Cu]
 species_mol = [:H]
 
-z2sym= NoZ2Sym()
-speciescoupling = SpeciesUnCoupled()
-cutoff = EllipsoidCutoff(5.0,4.0,6.0)
-
-m_equ = PWCMatrixModel(ACE.EuclideanMatrix(Float64),species_friction,species_env, z2sym,  speciescoupling, species_mol;
+#property, species_friction, species_env, z2sym=NoZ2Sym(), speciescoupling=SpeciesUnCoupled()
+m_equ = PWCMatrixModel(ACE.EuclideanMatrix(Float64),species_friction,species_env;
+        z2sym= NoZ2Sym(),
+        speciescoupling = SpeciesUnCoupled(),
+        species_mol = species_mol,
         n_rep = 1,
-        maxorder_off=2, 
-        maxdeg_off=5, 
-        cutoff_off= cutoff, 
-        r0_ratio_off=.2, 
-        rin_ratio_off=.00, 
-        species_maxorder_dict_off = Dict( :H => 0), 
-        species_weight_cat_off = Dict(:H => 1.0, :Cu=> 1.0),
-        bond_weight = .25
+        maxorder=2, 
+        maxdeg=5, 
+        cutoff= EllipsoidCutoff(5.0,4.0,6.0), 
+        r0_ratio=.2, 
+        rin_ratio=.00, 
+        species_maxorder_dict = Dict( :H => 0), 
+        species_weight_cat = Dict(:H => 1.0, :Cu=> 1.0),
+        bond_weight = 1.0
     );
 
-m_equ0 = OnsiteOnlyMatrixModel(ACE.EuclideanMatrix(Float64), species_friction, species_env, species_mol; id=:equ0, n_rep = 1, rcut_on = rcut, maxorder_on=2, maxdeg_on=5,
-    species_maxorder_dict_on = Dict( :H => 1), 
-    species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0)
+m_equ0 = OnsiteOnlyMatrixModel(ACE.EuclideanMatrix(Float64), species_friction, species_env; 
+    species_mol=species_mol, 
+    id=:equ0, 
+    n_rep = 1, 
+    rcut = 5.0, 
+    maxorder=2, 
+    maxdeg=5,
+    species_maxorder_dict = Dict( :H => 1), 
+    species_weight_cat = Dict(:H => .75, :Cu=> 1.0)
     );
 
 
