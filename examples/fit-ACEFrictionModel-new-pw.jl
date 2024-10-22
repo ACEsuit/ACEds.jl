@@ -32,7 +32,7 @@ using ACEds.AtomCutoffs: SphericalCutoff
 using ACEds.MatrixModels: NoZ2Sym, SpeciesUnCoupled
 species_friction = [:H]
 species_env = [:Cu]
-species_mol = [:H]
+species_substrat = [:Cu]
 rcut = 5.0
 z2sym= NoZ2Sym()
 speciescoupling = SpeciesUnCoupled()
@@ -40,7 +40,7 @@ speciescoupling = SpeciesUnCoupled()
 m_equ = PWCMatrixModel(ACE.EuclideanMatrix(Float64),species_friction, species_env;
         z2sym = NoZ2Sym(), 
         speciescoupling = SpeciesUnCoupled(),
-        species_mol = species_mol,
+        species_substrat = species_substrat,
         n_rep = 1,
         maxorder=2, 
         maxdeg=5, 
@@ -53,7 +53,7 @@ m_equ = PWCMatrixModel(ACE.EuclideanMatrix(Float64),species_friction, species_en
     );
 
 m_equ0 = OnsiteOnlyMatrixModel(ACE.EuclideanMatrix(Float64), species_friction, species_env; 
-    species_mol=species_mol, 
+    species_substrat=species_substrat, 
     id=:equ0, 
     n_rep = 1, 
     rcut = rcut, 

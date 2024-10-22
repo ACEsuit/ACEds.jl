@@ -35,11 +35,11 @@ fdata = Dict("train" => FrictionData.(rdata[1:n_train]),
 evalcenter= AtomCentered()
 species_friction = [:H]
 species_env = [:Cu]
-species_mol = [:H]
+species_substrat = [:Cu]
 rcut = 5.0
 
 m_inv = RWCMatrixModel(ACE.Invariant(),species_friction,species_env,evalcenter;
-    species_mol = [:H],
+    species_substrat = [:Cu],
     n_rep = 1, 
     rcut_on = rcut, 
     rcut_off = rcut,
@@ -52,7 +52,7 @@ m_inv = RWCMatrixModel(ACE.Invariant(),species_friction,species_env,evalcenter;
     bond_weight = .5
 );
 m_cov = RWCMatrixModel(ACE.EuclideanVector(Float64),species_friction,species_env,evalcenter;
-    species_mol = [:H],
+    species_substrat = [:Cu],
     n_rep=1, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=3,
     species_maxorder_dict_on = Dict( :H => 1), 
     species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
@@ -61,7 +61,7 @@ m_cov = RWCMatrixModel(ACE.EuclideanVector(Float64),species_friction,species_env
     bond_weight = .5
 );
 m_equ = RWCMatrixModel(ACE.EuclideanMatrix(Float64),species_friction,species_env,evalcenter;
-    species_mol = [:H],
+    species_substrat = [:Cu],
     n_rep=1, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=3,
     species_maxorder_dict_on = Dict( :H => 1), 
     species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
@@ -79,7 +79,7 @@ speciescoupling = SpeciesUnCoupled()
 m_inv = PWCMatrixModel(ACE.Invariant(),species_friction,species_env;
         z2sym= NoZ2Sym(),
         speciescoupling = SpeciesUnCoupled(),
-        species_mol =species_mol,
+        species_substrat =species_substrat,
         n_rep = 3,
         maxorder=2, 
         maxdeg=5, 
@@ -93,7 +93,7 @@ m_inv = PWCMatrixModel(ACE.Invariant(),species_friction,species_env;
 m_cov = PWCMatrixModel(ACE.EuclideanVector(Float64),species_friction,species_env;
         z2sym= NoZ2Sym(),
         speciescoupling = SpeciesUnCoupled(),
-        species_mol = species_mol,
+        species_substrat = species_substrat,
         n_rep = 3,
         maxorder=2, 
         maxdeg=5, 
@@ -107,7 +107,7 @@ m_cov = PWCMatrixModel(ACE.EuclideanVector(Float64),species_friction,species_env
 m_equ = PWCMatrixModel(ACE.EuclideanMatrix(Float64),species_friction,species_env;
         z2sym= NoZ2Sym(),
         speciescoupling = SpeciesUnCoupled(),
-        species_mol = species_mol,
+        species_substrat = species_substrat,
         n_rep = 3,
         maxorder=2, 
         maxdeg=5, 
@@ -121,15 +121,15 @@ m_equ = PWCMatrixModel(ACE.EuclideanMatrix(Float64),species_friction,species_env
 fm_pwcsc= FrictionModel((mequ_off=m_equ,)); 
 
 
-# m_inv0 = OnsiteOnlyMatrixModel(ACE.Invariant(), species_friction, species_env, species_mol; id=:inv0, n_rep = 3, rcut_on = rcut, maxorder_on=2, maxdeg_on=3,
+# m_inv0 = OnsiteOnlyMatrixModel(ACE.Invariant(), species_friction, species_env, species_substrat; id=:inv0, n_rep = 3, rcut_on = rcut, maxorder_on=2, maxdeg_on=3,
 #     species_maxorder_dict_on = Dict( :H => 1), 
 #     species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0)
 #     );
-# m_cov0 = OnsiteOnlyMatrixModel(ACE.EuclideanVector(Float64), species_friction, species_env, species_mol; id=:cov0, n_rep = 3, rcut_on = rcut, maxorder_on=2, maxdeg_on=3,
+# m_cov0 = OnsiteOnlyMatrixModel(ACE.EuclideanVector(Float64), species_friction, species_env, species_substrat; id=:cov0, n_rep = 3, rcut_on = rcut, maxorder_on=2, maxdeg_on=3,
 #     species_maxorder_dict_on = Dict( :H => 1), 
 #     species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0)
 #     );
-# m_equ0 = OnsiteOnlyMatrixModel(ACE.EuclideanMatrix(Float64), species_friction, species_env, species_mol; id=:equ0, n_rep = 3, rcut_on = rcut, maxorder_on=2, maxdeg_on=3,
+# m_equ0 = OnsiteOnlyMatrixModel(ACE.EuclideanMatrix(Float64), species_friction, species_env, species_substrat; id=:equ0, n_rep = 3, rcut_on = rcut, maxorder_on=2, maxdeg_on=3,
 #     species_maxorder_dict_on = Dict( :H => 1), 
 #     species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0)
 #     );
@@ -142,7 +142,7 @@ mcutoff = EllipsoidCutoff(3.5,4.0,6.0)
 m_inv = PWCMatrixModel(ACE.Invariant(),species_friction,species_env;
         z2sym= NoZ2Sym(),
         speciescoupling = SpeciesUnCoupled(),
-        species_mol = species_mol,
+        species_substrat = species_substrat,
         n_rep = 3,
         maxorder=2, 
         maxdeg=5, 
@@ -156,7 +156,7 @@ m_inv = PWCMatrixModel(ACE.Invariant(),species_friction,species_env;
 m_cov = PWCMatrixModel(ACE.EuclideanVector(Float64),species_friction,species_env;
         z2sym= NoZ2Sym(),
         speciescoupling = SpeciesUnCoupled(),
-        species_mol = species_mol,
+        species_substrat = species_substrat,
         n_rep = 3,
         maxorder=2, 
         maxdeg=5, 
@@ -170,7 +170,7 @@ m_cov = PWCMatrixModel(ACE.EuclideanVector(Float64),species_friction,species_env
 m_equ = PWCMatrixModel(ACE.EuclideanMatrix(Float64),species_friction,species_env;
         z2sym= NoZ2Sym(),
         speciescoupling = SpeciesUnCoupled(),
-        species_mol=species_mol,
+        species_substrat=species_substrat,
         n_rep = 3,
         maxorder=2, 
         maxdeg=5, 
@@ -183,15 +183,15 @@ m_equ = PWCMatrixModel(ACE.EuclideanMatrix(Float64),species_friction,species_env
     );
 
 
-m_inv0 = OnsiteOnlyMatrixModel(ACE.Invariant(), species_friction, species_env; species_mol=species_mol, id=:inv0, n_rep = 3, rcut = rcut, maxorder=2, maxdeg=3,
+m_inv0 = OnsiteOnlyMatrixModel(ACE.Invariant(), species_friction, species_env; species_substrat=species_substrat, id=:inv0, n_rep = 3, rcut = rcut, maxorder=2, maxdeg=3,
     species_maxorder_dict = Dict( :H => 1), 
     species_weight_cat = Dict(:H => .75, :Cu=> 1.0)
     );
-m_cov0 = OnsiteOnlyMatrixModel(ACE.EuclideanVector(Float64), species_friction, species_env; species_mol=species_mol, id=:cov0, n_rep = 3, rcut = rcut, maxorder=2, maxdeg=3,
+m_cov0 = OnsiteOnlyMatrixModel(ACE.EuclideanVector(Float64), species_friction, species_env; species_substrat=species_substrat, id=:cov0, n_rep = 3, rcut = rcut, maxorder=2, maxdeg=3,
     species_maxorder_dict = Dict( :H => 1), 
     species_weight_cat = Dict(:H => .75, :Cu=> 1.0)
     );
-m_equ0 = OnsiteOnlyMatrixModel(ACE.EuclideanMatrix(Float64), species_friction, species_env; species_mol=species_mol, id=:equ0, n_rep = 3, rcut = rcut, maxorder=2, maxdeg=3,
+m_equ0 = OnsiteOnlyMatrixModel(ACE.EuclideanMatrix(Float64), species_friction, species_env; species_substrat=species_substrat, id=:equ0, n_rep = 3, rcut = rcut, maxorder=2, maxdeg=3,
     species_maxorder_dict = Dict( :H => 1), 
     species_weight_cat = Dict(:H => .75, :Cu=> 1.0)
     );

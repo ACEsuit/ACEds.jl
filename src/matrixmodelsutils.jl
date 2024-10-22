@@ -13,7 +13,7 @@ export RWCMatrixModel, PWCMatrixModel, OnsiteOnlyMatrixModel, mbdpd_matrixmodel
 
 function RWCMatrixModel(property, species_friction, species_env;
     evalcenter=NeighborCentered(),
-    species_mol=[],
+    species_substrat=[],
     id=nothing, 
     n_rep = 3, 
     maxorder=2, 
@@ -28,7 +28,7 @@ function RWCMatrixModel(property, species_friction, species_env;
     bond_weight = 1.0
     )
     return RWCMatrixModel(property, species_friction, species_env, evalcenter;
-        species_mol = species_mol,
+        species_substrat = species_substrat,
         id=id, 
         n_rep = n_rep, 
         maxorder_on=maxorder, 
@@ -45,7 +45,7 @@ function RWCMatrixModel(property, species_friction, species_env;
 end
 
 function RWCMatrixModel(property, species_friction, species_env, evalcenter::EC;
-    species_mol=species_mol,
+    species_substrat=species_substrat,
     id=nothing, 
     n_rep = 3, 
     maxorder_on=2, 
@@ -88,7 +88,7 @@ function RWCMatrixModel(property, species_friction, species_env, evalcenter::EC;
         species_maxorder_dict = species_maxorder_dict_on,
         weight = weight_on, 
         species_weight_cat = species_weight_cat_on,
-        species_mol = species_mol  
+        species_substrat = species_substrat  
     )
     #@info "Size of onsite basis elements: $(length(onsitebasis))"
 
@@ -110,7 +110,7 @@ function RWCMatrixModel(property, species_friction, species_env, evalcenter::EC;
         species_minorder_dict = species_minorder_dict_off,
         species_maxorder_dict = species_maxorder_dict_off,
         species_weight_cat = species_weight_cat_off,
-        species_mol = species_mol  
+        species_substrat = species_substrat  
     )
     @info "Size of offsite basis elements: $(length(offsitebasis))"
 
@@ -124,7 +124,7 @@ function RWCMatrixModel(property, species_friction, species_env, evalcenter::EC;
 end
 
 function OnsiteOnlyMatrixModel(property, species_friction, species_env;
-    species_mol=[], 
+    species_substrat=[], 
     id=nothing, 
     n_rep = 3, 
     maxorder=2, 
@@ -159,7 +159,7 @@ function OnsiteOnlyMatrixModel(property, species_friction, species_env;
         species_maxorder_dict = species_maxorder_dict,
         weight = weight, 
         species_weight_cat = species_weight_cat,
-        species_mol = species_mol  
+        species_substrat = species_substrat  
     )
     #@info "Size of onsite basis: $(length(onsitebasis))"
 
@@ -172,7 +172,7 @@ end
 
 
 function mbdpd_matrixmodel(property, species_friction, species_env;
-    species_mol=[], 
+    species_substrat=[], 
     id=nothing, 
     n_rep = 3, 
     maxorder_off=2, 
@@ -193,7 +193,7 @@ function mbdpd_matrixmodel(property, species_friction, species_env;
     species_weight_cat_off = Dict(c => 1.0 for c in species_friction)
     )
     return PWCMatrixModel(property, species_friction, species_env, Odd(), SpeciesCoupled();
-        species_mol = species_mol, 
+        species_substrat = species_substrat, 
         id=id, 
         n_rep = n_rep, 
         maxorder_off=maxorder_off, 
@@ -229,7 +229,7 @@ function mbdpd_matrixmodel(property, species_friction, species_env;
     #     species_minorder_dict = species_minorder_dict_off,
     #     species_maxorder_dict = species_maxorder_dict_off,
     #     species_weight_cat = species_weight_cat_off,
-    #     species_mol = species_mol
+    #     species_substrat = species_substrat
     # )
 
     # if typeof(cutoff_off)<:AbstractBondCutoff
@@ -247,7 +247,7 @@ end
 function PWCMatrixModel(property, species_friction, species_env;
     z2sym=NoZ2Sym(), 
     speciescoupling=SpeciesUnCoupled(),
-    species_mol=[],
+    species_substrat=[],
     id=nothing, 
     n_rep = 1, 
     maxorder=2, 
@@ -284,7 +284,7 @@ function PWCMatrixModel(property, species_friction, species_env;
         species_minorder_dict = species_minorder_dict,
         species_maxorder_dict = species_maxorder_dict,
         species_weight_cat = species_weight_cat,
-        species_mol = species_mol
+        species_substrat = species_substrat
     )
 
     if typeof(speciescoupling)<:SpeciesUnCoupled

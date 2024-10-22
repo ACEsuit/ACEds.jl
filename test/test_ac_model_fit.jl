@@ -1,6 +1,6 @@
 
                                             
-c = params(fm_ac;format=:matrix, joinsites=true)
+c = params(fm_ac)
 
 ffm_ac = FluxFrictionModel(c)
 set_params!(ffm_ac; sigma=1E-8)

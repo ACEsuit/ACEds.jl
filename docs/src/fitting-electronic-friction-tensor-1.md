@@ -1,3 +1,50 @@
+### Fitting an Electronic Friction Tensor
+
+In this workflow example we demonstrate how `ACEfriction.jl` can be used to fit a simple 6 x 6 Electronic friction tensor modeling the non-adiabitic interactions of a hydrogen-atom on a copper surface. 
+
+
+We first use the function [hdf52internal]() to load the data of friction tensors from a [costum-formated]() hdf5 file and convert the data to the internal data format [FrictionData].
+```julia
+using ACEds
+# Load data 
+rdata = ACEds.DataUtils.hdf52internal( "./test/test-data-100.h5"); 
+# Specify size of training and test data
+n_train = Int(ceil(.8 * length(rdata)))
+n_test = length(rdata) - n_train
+# Partition data into train and test set and convert the data 
+fdata = Dict("train" => FrictionData.(rdata[1:n_train]), 
+            "test"=> FrictionData.(rdata[n_train+1:end]));
+```
+
+Next, we specify the matrix models that will make up our friction model. In this case we only specify the single matrix model `m_equ`, which is of  When definining 
+```
+species_friction = [:H] 
+species_env = [:Cu]
+species_substrat = [:Cu]
+rcut = 5.0
+evalcenter= NeighborCentered()
+#evalcenter= AtomCentered()
+
+m_equ = RWCMatrixModel(ACE.EuclideanMatrix(Float64),
+                        species_friction,
+                        species_env, 
+                        evalcenter,
+                        species_substrat; 
+                        n_rep=1, 
+                        rcut_on = rcut, 
+                        rcut_off = rcut, 
+                        maxorder_on=2, maxdeg_on=5,
+                        species_maxorder_dict_on = Dict( :H => 1), 
+                        species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
+                        species_maxorder_dict_off = Dict( :H => 0), 
+                        species_weight_cat_off = Dict(:H => 1.0, :Cu=> 1.0),
+                        bond_weight = .5
+    );
+
+fm= FrictionModel((mequ=m_equ,)); #fm= FrictionModel((cov=m_cov,equ=m_equ));
+model_ids = get_ids(fm)
+
+
 using LinearAlgebra
 using ACEds.FrictionModels
 using ACE: scaling, params
@@ -7,73 +54,29 @@ using ACEds.DataUtils
 using Flux
 using Flux.MLUtils
 using ACE
-using ACEds: PWCMatrixModel
+using ACEds: RWCMatrixModel
 using Random
 using ACEds.Analytics
 using ACEds.FrictionFit
-using ACEbonds: EllipsoidCutoff
 
 using ACEds.MatrixModels
 
-fname = "./test/test-data-large"
-filename = string(fname,".h5")
-
-rdata = ACEds.DataUtils.hdf52internal(filename); 
-
-# Partition data into train and test set and convert to 
-rng = MersenneTwister(12)
-shuffle!(rng, rdata)
-n_train = 1200
-n_test = length(rdata) - n_train
-
-fdata = Dict("train" => FrictionData.(rdata[1:n_train]), 
-            "test"=> FrictionData.(rdata[n_train+1:end]));
 
 
-using ACEds.AtomCutoffs: SphericalCutoff
-using ACEds.MatrixModels: NoZ2Sym, SpeciesUnCoupled
-species_friction = [:H]
-species_env = [:Cu]
-species_substrat = [:Cu]
 
-#property, species_friction, species_env, z2sym=NoZ2Sym(), speciescoupling=SpeciesUnCoupled()
-m_equ = PWCMatrixModel(ACE.EuclideanMatrix(Float64),species_friction,species_env;
-        z2sym= NoZ2Sym(),
-        speciescoupling = SpeciesUnCoupled(),
-        species_substrat = species_substrat,
-        n_rep = 1,
-        maxorder=2, 
-        maxdeg=5, 
-        cutoff= EllipsoidCutoff(5.0,4.0,6.0), 
-        r0_ratio=.2, 
-        rin_ratio=.00, 
-        species_maxorder_dict = Dict( :H => 0), 
-        species_weight_cat = Dict(:H => 1.0, :Cu=> 1.0),
-        bond_weight = 1.0
-    );
+# Create friction data in internally used format
 
-m_equ0 = OnsiteOnlyMatrixModel(ACE.EuclideanMatrix(Float64), species_friction, species_env; 
-    species_substrat=species_substrat, 
-    id=:equ0, 
-    n_rep = 1, 
-    rcut = 5.0, 
-    maxorder=2, 
-    maxdeg=5,
-    species_maxorder_dict = Dict( :H => 1), 
-    species_weight_cat = Dict(:H => .75, :Cu=> 1.0)
-    );
-
-
-fm= FrictionModel((mequ_off=m_equ, mequ_on=m_equ0)); 
-model_ids = get_ids(fm)
-
+                                            
 c = params(fm;format=:matrix, joinsites=true)
+
 ffm = FluxFrictionModel(c)
 set_params!(ffm; sigma=1E-8)
 
 # Create preprocessed data including basis evaluations that can be used to fit the model
 flux_data = Dict( "train"=> flux_assemble(fdata["train"], fm, ffm),
                   "test"=> flux_assemble(fdata["test"], fm, ffm));
+
+
 
 #if CUDA is available, convert relevant arrays to cuarrays
 using CUDA
@@ -83,12 +86,11 @@ if cuda
     ffm = fmap(cu, ffm)
 end
 
-
 loss_traj = Dict("train"=>Float64[], "test" => Float64[])
 
 epoch = 0
 batchsize = 10
-nepochs = 10
+nepochs = 200
 
 opt = Flux.setup(Adam(1E-3, (0.99, 0.999)),ffm)
 dloader = cuda ? DataLoader(flux_data["train"] |> gpu, batchsize=batchsize, shuffle=true) : DataLoader(flux_data["train"], batchsize=batchsize, shuffle=true)
@@ -109,10 +111,7 @@ end
 println("Epoch: $epoch, Abs Training Loss: $(loss_traj["train"][end]), Test Loss: $(loss_traj["test"][end])")
 println("Epoch: $epoch, Avg Training Loss: $(loss_traj["train"][end]/n_train), Test Loss: $(loss_traj["test"][end]/n_test)")
 
-# The following code can be used to fit the model using the BFGS algorithm
-# include("./additional-bfgs-iterations.jl")
-
-
+minimum(loss_traj["train"]/n_train) <0.01
 set_params!(fm, params(ffm))
 
 at = fdata["test"][1].atoms
@@ -120,7 +119,7 @@ Gamma(fm, at)
 Σ = Sigma(fm, at)
 Gamma(fm, Σ)
 
-# Evaluate different error statistics 
+#%% Evaluate different error statistics 
 using ACEds.Analytics: error_stats, plot_error, plot_error_all, friction_pairs
 
 fp_train = friction_pairs(fdata["train"], fm);

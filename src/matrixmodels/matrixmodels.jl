@@ -427,19 +427,19 @@ function (f::NoMolOnly)(bb)
 end
 
 """
-`ubstratContact`: selects all basis functions which model interactions between atoms of the molecule only. Use this filter if the molecule feels only
-friction if in contact to the substrat.   
+`SubstratContactFilter`: returns true if the basis function includes at least one interactions with a substrat atom.
+
 """
-struct SubstratContact
+struct SubstratContactFilter
       isym::Symbol
-      categories
+      substrat_atoms # List or set of chemical symbols of substrats atoms 
 end
   
-function (f::SubstratContact)(bb) 
+function (f::SubstratContactFilter)(bb) 
       if isempty(bb)
             return true
       else
-            return sum([getproperty(b, f.isym) in f.categories for b in bb]) > 0
+            return sum([getproperty(b, f.isym) in f.substrat_atoms for b in bb]) > 0
       end
 end
 
@@ -460,12 +460,12 @@ function offsite_linbasis(property,species;
     species_minorder_dict = Dict{Any, Float64}(),
     species_maxorder_dict = Dict{Any, Float64}(),
     species_weight_cat = Dict(c => 1.0 for c in species),
-    species_mol = []
+    species_substrat = []
     )
-    if isempty(species_mol)
+    if isempty(species_substrat)
         filterfun = _ -> true
     else
-        filterfun = NoMolOnly(:mube, vcat(species_mol,:bond))
+        filterfun = SubstratContactFilter(:mube, species_substrat)
     end 
 
     @info "Generate offsite basis"
@@ -500,7 +500,7 @@ function onsite_linbasis(property,species;
     species_maxorder_dict = Dict{Any, Float64}(),
     weight = Dict(:l => 1.0, :n => 1.0), 
     species_weight_cat = Dict(c => 1.0 for c in species),
-    species_mol = []
+    species_substrat = []
     )
     @info "Generate onsite basis"
     Bsel = ACE.SparseBasis(; maxorder=maxorder, p = p_sel, default_maxdeg = maxdeg, weight=weight ) 
@@ -524,10 +524,10 @@ function onsite_linbasis(property,species;
         maxorder_dict = species_maxorder_dict, 
         weight_cat = species_weight_cat
     )
-    if isempty(species_mol)
+    if isempty(species_substrat)
         filter = _ -> true
     else
-        filter = NoMolOnly(:mu, species_mol)
+        filter = SubstratContactFilter(:mu, species_substrat)
     end
     @time onsite = ACE.SymmetricBasis(property, RnYlm * Zk, Bselcat; filterfun=filter);
     @info "Size of onsite basis: $(length(onsite))"
