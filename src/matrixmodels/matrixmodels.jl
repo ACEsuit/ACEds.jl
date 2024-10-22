@@ -426,6 +426,24 @@ function (f::NoMolOnly)(bb)
       end
 end
 
+"""
+`ubstratContact`: selects all basis functions which model interactions between atoms of the molecule only. Use this filter if the molecule feels only
+friction if in contact to the substrat.   
+"""
+struct SubstratContact
+      isym::Symbol
+      categories
+end
+  
+function (f::SubstratContact)(bb) 
+      if isempty(bb)
+            return true
+      else
+            return sum([getproperty(b, f.isym) in f.categories for b in bb]) > 0
+      end
+end
+
+
 function offsite_linbasis(property,species;
     z2symmetry = NoZ2Sym(), 
     maxorder = 2,
@@ -442,12 +460,12 @@ function offsite_linbasis(property,species;
     species_minorder_dict = Dict{Any, Float64}(),
     species_maxorder_dict = Dict{Any, Float64}(),
     species_weight_cat = Dict(c => 1.0 for c in species),
-    molspecies = []
+    species_mol = []
     )
-    if isempty(molspecies)
+    if isempty(species_mol)
         filterfun = _ -> true
     else
-        filterfun = NoMolOnly(:mube, vcat(molspecies,:bond))
+        filterfun = NoMolOnly(:mube, vcat(species_mol,:bond))
     end 
 
     @info "Generate offsite basis"
@@ -482,7 +500,7 @@ function onsite_linbasis(property,species;
     species_maxorder_dict = Dict{Any, Float64}(),
     weight = Dict(:l => 1.0, :n => 1.0), 
     species_weight_cat = Dict(c => 1.0 for c in species),
-    molspecies = []
+    species_mol = []
     )
     @info "Generate onsite basis"
     Bsel = ACE.SparseBasis(; maxorder=maxorder, p = p_sel, default_maxdeg = maxdeg, weight=weight ) 
@@ -506,13 +524,13 @@ function onsite_linbasis(property,species;
         maxorder_dict = species_maxorder_dict, 
         weight_cat = species_weight_cat
     )
-    if isempty(molspecies)
+    if isempty(species_mol)
         filter = _ -> true
     else
-        filter = NoMolOnly(:mu, molspecies)
+        filter = NoMolOnly(:mu, species_mol)
     end
     @time onsite = ACE.SymmetricBasis(property, RnYlm * Zk, Bselcat; filterfun=filter);
-    @info "Size of onsite basis elements: $(length(onsite))"
+    @info "Size of onsite basis: $(length(onsite))"
     return onsite
 end
 

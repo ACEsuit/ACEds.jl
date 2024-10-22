@@ -43,7 +43,7 @@ set_params!(fm_pwcec, params(ffm_pwcec))
 
 for d in fdata["train"]
     Σ = Sigma(fm_pwcec, d.atoms)
-@test norm(Gamma(fm_pwcec, Σ) - Gamma(fm_pwcec, d.atoms)) < tol
+    @test norm(Gamma(fm_pwcec, Σ) - Gamma(fm_pwcec, d.atoms)) < tol
 end
 
 

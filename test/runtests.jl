@@ -10,11 +10,11 @@ using ACEds.MatrixModels
 using ACEds: RWCMatrixModel
 using ACE
 
-include("./helper_functions.jl")
+include("./helper_functions.jl");
 ## Create friction models 
-include("./create_frictionmodels.jl")
-train_tol = .03
-tol = 1E-9
+include("./create_frictionmodels.jl");
+train_tol = .03;
+tol = 1E-9;
 ##
 @testset "ACEds.jl" begin
     # ------------------------------------------

@@ -47,17 +47,17 @@ end
     Gamma(fm::FrictionModel, at::Atoms; filter=(_,_)->true, T=Float64)
 
 
-Computes the friction tensor at an atomic configuration. The friction tensor is the sum of the friction tensors of all matrix models in the `fm::FrictionModel` object.
+Evaluates the friction tensor of the friction model `fm` at the atomic configuration `at::Atoms`. The friction tensor is the sum of the friction tensors of all matrix models in `fm.matrixmodels`.
 
 ### Arguments:
 
-    - `fm` -- the friction model of which the friction tensor is evaluated.
-    - `at` -- the atomic configuration at which the basis is evaluated
-    - `filter`  -- (optional, default: `(_,_)->true`) a filter function of the generic form `(i::Int,at::Atoms) -> Bool`. Only atoms `at[i]` for which `filter(i,at)` returns `true` are included in the evaluation of the friction tensor.  
+- `fm` -- the friction model of which the friction tensor is evaluated.
+- `at` -- the atomic configuration at which the basis is evaluated
+- `filter`  -- (optional, default: `(_,_)->true`) a filter function of the generic form `(i::Int,at::Atoms) -> Bool`. Only atoms `at[i]` for which `filter(i,at)` returns `true` are included in the evaluation of the friction tensor.  
 
 ### Output:
 
-A friction tensor in the form of a sparse 3N x 3N matrix, where N is the number of atoms in the atomic configuration `at`.  The friction tensor is the sum of the friction tensors of all matrix models in `fm.matrixmodels`.
+A friction tensor in the form of a sparse 3N x 3N matrix, where N is the number of atoms in the atomic configuration `at`.  
 """
 function Gamma(fm::FrictionModel, at::Atoms; filter=(_,_)->true, T=Float64) 
     return sum(Gamma(mo, at; filter=filter, T=T) for mo in values(fm.matrixmodels))
@@ -70,12 +70,12 @@ Computes the friction tensor from a pre-computed collection of diffusion coeffic
 The friction tensor is the sum of the squares of all diffusion coefficient matrices in the collection.
 
 ### Arguments:
-    - `fm` -- the friction model of which the friction tensor is evaluated. The friction tensor is the sum of the friction tensors of all matrix models in `fm.matrixmodels`.
-    - `Σ_vec` -- a collection of diffusion coefficient matrices. The friction tensor is the sum of the squares of all matrices in `Σ_vec`.
+- `fm` -- the friction model of which the friction tensor is evaluated. The friction tensor is the sum of the friction tensors of all matrix models in `fm.matrixmodels`.
+- `Σ_vec` -- a collection of diffusion coefficient matrices. The friction tensor is the sum of the squares of all matrices in `Σ_vec`.
 
 ### Output:
 
-A friction tensor in the form of a sparse 3N x 3N matrix, where N is the number of atoms in the atomic configuration `at`.  The friction tensor is the sum of the symmetric squares ``\Sigma\Sigma^T`` of all diffusion coefficient matrices ``\Sigma`` in `Σ_vec`.
+A friction tensor in the form of a sparse 3N x 3N matrix, where N is the number of atoms in the atomic configuration `at`.  The friction tensor is the sum of the symmetric squares ``\\Sigma\\Sigma^T`` of all diffusion coefficient matrices ``\\Sigma`` in `Σ_vec`.
 """
 function Gamma(fm::FrictionModel{MODEL_IDS}, Σ_vec::NamedTuple{MODEL_IDS}) where {MODEL_IDS} 
     return sum(Gamma(mo, Σ) for (mo,Σ) in zip(values(fm.matrixmodels),Σ_vec))
@@ -134,9 +134,9 @@ end
 
 Returns the parameters of all matrix models in the FrictionModel object as a NamedTuple.
 """
-function ACE.params(fm::FrictionModel{MODEL_IDS}) where {MODEL_IDS}
+function ACE.params(fm::FrictionModel{MODEL_IDS}; format=:matrix, joinsites=true) where {MODEL_IDS}
     #model_ids = map(Symbol,(s for s in keys(fm.matrixmodels)))
-    return NamedTuple{MODEL_IDS}(params(fm.matrixmodels[s]) for s in MODEL_IDS)
+    return NamedTuple{MODEL_IDS}(params(fm.matrixmodels[s]; joinsites=joinsites,format=format) for s in MODEL_IDS)
 end
 
 """

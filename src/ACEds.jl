@@ -18,5 +18,7 @@ export Gamma, Sigma, FrictionModel
 import JuLIP: Atoms
 export Atoms
 
+import ACEbonds: EllipsoidCutoff
+export EllipsoidCutoff, SphericalCutoff
 
 end
