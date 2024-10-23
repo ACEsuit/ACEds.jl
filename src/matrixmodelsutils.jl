@@ -51,7 +51,8 @@ function RWCMatrixModel(property, species_friction, species_env;
     trans= PolyTransform(2, r0_ratio), 
     p_sel = 2,  
     evalcenter = AtomCentered(),
-    bond_weight = 1.0
+    bond_weight = 1.0,
+    id=nothing
     )
     return RWCMatrixModel(property, species_friction, species_env, evalcenter;
         n_rep = n_rep,

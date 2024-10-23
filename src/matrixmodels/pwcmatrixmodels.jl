@@ -131,6 +131,22 @@ function basis!(B, M::PWCMatrixModel{O3S,<:EllipsoidCutoff,Z2S,SC}, at::Atoms, f
     end
 end
 
+function Base.randn(::PWCMatrixModel, Σ::SparseMatrixCSC{SMatrix{3, 3, T, 9}, TI}) where {T<: Real, TI<:Int}
+    I, J, _ = findnz(Σ)
+    Rnz = randn(SVector{3,T}, length(J))
+    R = (sparse(I,J,Rnz) .+ sparse(J,I,Rnz))./sqrt(2)
+    j = unique(J)
+    return vec(sum(Σ.* R, dims=1))
+end
+
+function Base.randn(::PWCMatrixModel, Σ::SparseMatrixCSC{SVector{3,T}, TI}) where {T<: Real, TI<:Int}
+    I, J, _ = findnz(Σ)
+    Rnz = randn(length(J))
+    R = (sparse(I,J,Rnz) .+ sparse(J,I,Rnz))./sqrt(2)
+    j = unique(J)
+    return vec(sum(Σ.* R, dims=1))
+end
+
 function ACE.write_dict(M::PWCMatrixModel{O3S,CUTOFF,Z2S,SC}) where {O3S,CUTOFF,Z2S,SC}
     return Dict("__id__" => "ACEds_PWCMatrixModel",
             "offsite" => write_dict(M.offsite),

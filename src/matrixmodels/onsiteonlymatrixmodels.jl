@@ -71,6 +71,14 @@ function basis!(B, M::OnsiteOnlyMatrixModel, at::Atoms, filter=(_,_)->true)
     end
 end
 
+function Base.randn(::OnsiteOnlyMatrixModel, Σ::Diagonal{SMatrix{3, 3, T, 9}}) where {T<:Real}
+    return Σ * randn(SVector{3,T},size(Σ,2))
+end
+
+function Base.randn(::OnsiteOnlyMatrixModel, Σ::Diagonal{SVector{3, T}}) where {T<:Real}
+    return Σ * randn(size(Σ,2))
+end
+
 function ACE.write_dict(M::OnsiteOnlyMatrixModel) 
     return Dict("__id__" => "ACEds_OnsiteOnlyMatrixModel",
             "onsite" => write_dict(M.onsite),
