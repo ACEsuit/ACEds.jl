@@ -4,27 +4,31 @@
 
 The package `ACEfriction` provides an ACE-based implementation of the size-transferrable, E(3)-equivariant models introduced in \cite{} for configuration-dependent friction or diffusion tensors. Namely, the package provides utilities to efficiently learn and evaluate E(3)-equivariant symmetric positive semi-definite matrix functions of the form
 ```math
-\begin{aligned}
-{\bm \Gamma} \left ( ({\bm r}_{i},z_i)_{i=1}^{N_{\rm at}}) \right \in \mathbb{R}^{3 N_{\rm at} \times 3N_{\rm at}}.
-\end{aligned}
+{\bm \Gamma} \left ( ({\bm r}_{i},z_i)_{i=1}^{N_{\rm at}} \right ) \in \mathbb{R}^{3 N_{\rm at} \times 3N_{\rm at}},
 ```
+where the ${\bm r}_{i}$s are the positions and the $z_{i}$s are the atomic element types of atoms in an atomic configuration comprised of $N_{\rm at}$ atoms.
+
 The underlying model is based on an equivariance-preserving matrix square root decomposition,
 ```math
-\Gamma = \Sigma \Sigma^T,
+{\bm \Gamma} = {\bm \Sigma}{\bm \Sigma}^T,
 ```
-where the matrix square root $\Sigma$ is linearly expanded using an equivariant linear atomic cluster expansion.
+where the matrix square root ${\bm \Sigma}$ is linearly expanded using an equivariant linear atomic cluster expansion.
 
-Learned models of $\Gamma$ (and the corresponding matrix root $\Sigma$) can be used to parametrize tensor-valued coefficients in an It\^o diffusions such as a configuration-dependent friction tensor in a kinetic Langevin equation,
+## Prototypical Applications
+
+Learned models of ${\bm \Gamma}$ (and the corresponding matrix root ${\bm \Sigma}$) can be used to parametrize tensor-valued coefficients in an Itô diffusion process such as a configuration-dependent friction tensor in a kinetic Langevin equation,
 ```math
-\dot{r} = - M^{-1},
-\dot{p} = - \nabla U(r) - \Gamma(r)M^{-1}p + \sqrt{2 \beta^{-1}} \Sigma \dot{W},
+\begin{aligned}
+\dot{{\bm r}} &= - M^{-1}{\bm p},\\
+\dot{{\bm p}} &= - \nabla U({\bm r}) - {\bm \Gamma}({\bm r})M^{-1}{\bm p} + \sqrt{2 \beta^{-1}} {\bm \Sigma} \dot{{\bm W}},
+\end{aligned}
 ```
-or the diffusion tensor in an overdamped Langevin equation,
+or a configuration-dependent diffusion tensor in an overdamped Langevin equation,
 ```math
-\dot{r} = - \Gamma(r) \nabla U(r)  + \sqrt{2 \beta^{-1}} \Sigma \dot{W} + \beta^{-1}{\rm div}(\Gamma(r)).
+\dot{{\bm r}} = - {\bm\Gamma}({\bm r}) \nabla U({\bm r})  + \sqrt{2 \beta^{-1}} {\bm\Sigma}\circ \dot{{\bm W}}. %+ \beta^{-1}{\rm div}({\bm \Gamma}(r)).
 ```
 
-The model and code allows imposing additional symmetry constraints on the matrix $\Gamma$. In particular, the learned friction-tensor $\Gamma$ can be specified to satisfy relevant symmetries for the dynamics (1) to be momentum-conserving, thus enabling learning and simulation Multi-Body Dissipative Particle Dynamics (MD-DPD).
+The model and code allows imposing additional symmetry constraints on the matrix ${\bm \Gamma}$. In particular, the learned friction-tensor ${\bm \Gamma}$ can be specified to satisfy relevant symmetries for the dynamics (1) to be momentum-conserving, thus enabling learning and simulation Multi-Body Dissipative Particle Dynamics (MD-DPD).
 
 
 

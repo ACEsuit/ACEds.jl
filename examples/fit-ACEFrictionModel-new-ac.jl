@@ -28,23 +28,16 @@ n_test = length(rdata) - n_train
 
 fdata = Dict("train" => FrictionData.(rdata[1:n_train]), 
             "test"=> FrictionData.(rdata[n_train+1:end]));
-
-species_friction = [:H]
-species_env = [:Cu]
-species_substrat = [:Cu]
-rcut = 5.0
-evalcenter= NeighborCentered()
-#evalcenter= AtomCentered()
-
-m_equ = RWCMatrixModel(ACE.EuclideanMatrix(Float64),species_friction,species_env,evalcenter;
-        species_substrat=species_substrat,
-        n_rep=1, rcut_on = rcut, rcut_off = rcut, maxorder_on=2, maxdeg_on=5,
-        species_maxorder_dict_on = Dict( :H => 1), 
-        species_weight_cat_on = Dict(:H => .75, :Cu=> 1.0),
-        species_maxorder_dict_off = Dict( :H => 0), 
-        species_weight_cat_off = Dict(:H => 1.0, :Cu=> 1.0),
-        bond_weight = .5
-    );
+)
+m_equ = RWCMatrixModel(ACE.EuclideanMatrix(Float64),[:H],[:Cu];
+    evalcenter = AtomCentered(),
+    species_substrat = [:Cu],
+    n_rep = 1, 
+    rcut = 5.0, 
+    maxorder = 2, 
+    maxdeg = 5,
+    bond_weight = .5
+);
 
 fm= FrictionModel((mequ=m_equ,)); #fm= FrictionModel((cov=m_cov,equ=m_equ));
 model_ids = get_ids(fm)

@@ -21,4 +21,7 @@ export Atoms
 import ACEbonds: EllipsoidCutoff
 export EllipsoidCutoff, SphericalCutoff
 
+import ACE: Invariant, EuclideanVector, EuclideanMatrix
+export Invariant, EuclideanVector, EuclideanMatrix
+
 end
