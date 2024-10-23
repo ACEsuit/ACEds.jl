@@ -82,6 +82,11 @@ function Gamma(fm::FrictionModel{MODEL_IDS}, Σ_vec::NamedTuple{MODEL_IDS}) wher
     #+ Gamma(fm.inv, at; kvargs...)
 end
 
+
+function Base.randn(fm::FrictionModel{MODEL_IDS}, Σ_vec::NamedTuple{MODEL_IDS}) where {MODEL_IDS} 
+    return sum(randn(mo,Σ) for (mo,Σ) in zip(values(fm.matrixmodels),Σ_vec))
+end
+
 """
     Sigma(fm::FrictionModel{MODEL_IDS}, at::Atoms; filter=(_,_)->true, T=Float64) where {MODEL_IDS}
 
@@ -159,7 +164,7 @@ function ACE.set_params!(fm::FrictionModel, θ::NamedTuple)
     end
 end
 
-get_ids(fm::FrictionModel{MODEL_IDS})  where {MODEL_IDS} = MODEL_IDS
+get_ids(::FrictionModel{MODEL_IDS})  where {MODEL_IDS} = MODEL_IDS
 
 function ACE.scaling(fm::FrictionModel{MODEL_IDS}, p::Int) where {MODEL_IDS}
     return NamedTuple{MODEL_IDS}( ACE.scaling(mo,p) for mo in values(fm.matrixmodels))

@@ -29,19 +29,15 @@ n_test = length(rdata) - n_train
 fdata = Dict("train" => FrictionData.(rdata[1:n_train]), 
             "test"=> FrictionData.(rdata[n_train+1:end]));
 
-species_friction = [:H]
-species_env = [:Cu]
-#evalcenter= AtomCentered()
-
-m_equ = RWCMatrixModel(ACE.EuclideanMatrix(Float64), species_friction, species_env;
-        evalcenter= AtomCentered(),
-        species_mol = [:H],
-        n_rep=1, 
-        rcut = 5.0, 
-        maxorder=2, 
-        maxdeg=5,
-        bond_weight = .5
-    );
+m_equ = RWCMatrixModel(ACE.EuclideanMatrix(Float64),[:H],[:Cu,:H];
+    evalcenter = AtomCentered(),
+    species_substrat = [:Cu],
+    n_rep = 1, 
+    rcut = 5.0, 
+    maxorder = 2, 
+    maxdeg = 5,
+    bond_weight = .5
+);
 
 fm= FrictionModel((mequ=m_equ,)); #fm= FrictionModel((cov=m_cov,equ=m_equ));
 model_ids = get_ids(fm)
@@ -72,7 +68,7 @@ loss_traj = Dict("train"=>Float64[], "test" => Float64[])
 
 epoch = 0
 batchsize = 10
-nepochs = 100
+nepochs = 10
 
 opt = Flux.setup(Adam(1E-3, (0.99, 0.999)),ffm)
 dloader = cuda ? DataLoader(flux_data["train"] |> gpu, batchsize=batchsize, shuffle=true) : DataLoader(flux_data["train"], batchsize=batchsize, shuffle=true)
@@ -100,6 +96,7 @@ at = fdata["test"][1].atoms
 @time Gamma(fm, at)
 @time Σ = Sigma(fm, at)
 @time Gamma(fm, Σ)
+@time randn(fm, Σ)
 
 #%% Evaluate different error statistics 
 using ACEds.Analytics: error_stats, plot_error, plot_error_all, friction_pairs

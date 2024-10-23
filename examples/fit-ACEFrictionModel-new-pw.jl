@@ -31,8 +31,8 @@ fdata = Dict("train" => FrictionData.(rdata[1:n_train]),
 using ACEds.AtomCutoffs: SphericalCutoff
 using ACEds.MatrixModels: NoZ2Sym, SpeciesUnCoupled
 species_friction = [:H]
-species_env = [:Cu]
-species_mol = [:H]
+species_env = [:Cu,:H]
+species_substrat = [:Cu]
 rcut = 5.0
 z2sym= NoZ2Sym()
 speciescoupling = SpeciesUnCoupled()
@@ -44,7 +44,7 @@ m_equ = PWCMatrixModel(ACE.EuclideanMatrix(Float64),species_friction, species_en
         n_rep = 1,
         maxorder=2, 
         maxdeg=5, 
-        cutoff= SphericalCutoff(rcut), 
+        rcut= rcut, 
         r0_ratio=.4, 
         rin_ratio=.04, 
         species_maxorder_dict = Dict( :H => 0), 
@@ -90,7 +90,7 @@ loss_traj = Dict("train"=>Float64[], "test" => Float64[])
 
 epoch = 0
 batchsize = 10
-nepochs = 100
+nepochs = 10
 
 opt = Flux.setup(Adam(1E-3, (0.99, 0.999)),ffm)
 dloader = cuda ? DataLoader(flux_data["train"] |> gpu, batchsize=batchsize, shuffle=true) : DataLoader(flux_data["train"], batchsize=batchsize, shuffle=true)
@@ -121,6 +121,8 @@ at = fdata["test"][1].atoms
 Gamma(fm, at)
 Σ = Sigma(fm, at)
 Gamma(fm, Σ)
+randn(fm, Σ)
+
 
 # Evaluate different error statistics 
 using ACEds.Analytics: error_stats, plot_error, plot_error_all, friction_pairs

@@ -25,7 +25,9 @@ function RWCMatrixModel(property, species_friction, species_env;
     pin=2,
     trans= PolyTransform(2, r0_ratio), #warning: the polytransform acts on [0,1]
     p_sel = 2,  
-    bond_weight = 1.0
+    evalcenter = AtomCentered(),
+    bond_weight = 1.0,
+    id=nothing
     )
     return RWCMatrixModel(property, species_friction, species_env, evalcenter;
         species_mol = species_mol,

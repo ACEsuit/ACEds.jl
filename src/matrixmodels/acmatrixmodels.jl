@@ -15,27 +15,6 @@ struct RWCMatrixModel{O3S,CUTOFF,EVALCENTER} <: MatrixModel{O3S}
     end
 end #TODO: Add proper constructor that checks for correct Species evalcenter
 
-function ACE.write_dict(M::RWCMatrixModel{O3S,CUTOFF,EVALCENTER}) where {O3S,CUTOFF,EVALCENTER}
-    return Dict("__id__" => "ACEds_ACMatrixModel",
-            "onsite" => ACE.write_dict(M.onsite),
-            #Dict(zz=>write_dict(val) for (zz,val) in M.onsite),
-            "offsite"  => ACE.write_dict(M.offsite),
-            # => Dict(zz=>write_dict(val) for (zz,val) in M.offsite),
-            "id" => string(M.id),
-            "O3S" => write_dict(O3S),
-            "CUTOFF" => write_dict(CUTOFF),
-            "EVALCENTER" => write_dict(EVALCENTER()))         
-end
-function ACE.read_dict(::Val{:ACEds_ACMatrixModel}, D::Dict)
-            onsite = ACE.read_dict(D["onsite"])
-            offsite = ACE.read_dict(D["offsite"])
-            #Dict(zz=>read_dict(val) for (zz,val) in D["onsite"])
-            #offsite = Dict(zz=>read_dict(val) for (zz,val) in D["offsite"])
-            id = Symbol(D["id"])
-            evalcenter = read_dict(D["EVALCENTER"])
-    return RWCMatrixModel(onsite, offsite, id, evalcenter)
-end
-
 function ACE.set_params!(mb::RWCMatrixModel, θ::NamedTuple)
     ACE.set_params!(mb, :onsite,  θ.onsite)
     ACE.set_params!(mb, :offsite, θ.offsite)
@@ -111,4 +90,39 @@ function basis!(B, M::RWCMatrixModel{O3S,<:SphericalCutoff,EVALCENTER}, at::Atom
             end
         end
     end
+end
+
+function Base.randn(::RWCMatrixModel, Σ::SparseMatrixCSC{SMatrix{3, 3, T, 9}, TI}) where {T<: Real, TI<:Int}
+    _, J, _ = findnz(Σ)
+    ju = unique(J)
+    R = sparsevec(ju,randn(SVector{3,T},length(ju))) 
+    return Σ * R
+end
+
+function Base.randn(::RWCMatrixModel, Σ::SparseMatrixCSC{SVector{3, T}, TI}) where {T<: Real, TI<:Int}
+    _, J, _ = findnz(Σ)
+    ju = unique(J)
+    R = sparsevec(ju,randn(length(ju))) 
+    return Σ * R
+end
+
+function ACE.write_dict(M::RWCMatrixModel{O3S,CUTOFF,EVALCENTER}) where {O3S,CUTOFF,EVALCENTER}
+    return Dict("__id__" => "ACEds_ACMatrixModel",
+            "onsite" => ACE.write_dict(M.onsite),
+            #Dict(zz=>write_dict(val) for (zz,val) in M.onsite),
+            "offsite"  => ACE.write_dict(M.offsite),
+            # => Dict(zz=>write_dict(val) for (zz,val) in M.offsite),
+            "id" => string(M.id),
+            "O3S" => write_dict(O3S),
+            "CUTOFF" => write_dict(CUTOFF),
+            "EVALCENTER" => write_dict(EVALCENTER()))         
+end
+function ACE.read_dict(::Val{:ACEds_ACMatrixModel}, D::Dict)
+            onsite = ACE.read_dict(D["onsite"])
+            offsite = ACE.read_dict(D["offsite"])
+            #Dict(zz=>read_dict(val) for (zz,val) in D["onsite"])
+            #offsite = Dict(zz=>read_dict(val) for (zz,val) in D["offsite"])
+            id = Symbol(D["id"])
+            evalcenter = read_dict(D["EVALCENTER"])
+    return RWCMatrixModel(onsite, offsite, id, evalcenter)
 end

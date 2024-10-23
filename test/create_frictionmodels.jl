@@ -34,8 +34,8 @@ fdata = Dict("train" => FrictionData.(rdata[1:n_train]),
 
 evalcenter= AtomCentered()
 species_friction = [:H]
-species_env = [:Cu]
-species_mol = [:H]
+species_env = [:Cu,:H]
+species_substrat = [:Cu]
 rcut = 5.0
 
 m_inv = RWCMatrixModel(ACE.Invariant(),species_friction,species_env,evalcenter;
@@ -83,12 +83,12 @@ m_inv = PWCMatrixModel(ACE.Invariant(),species_friction,species_env;
         n_rep = 3,
         maxorder=2, 
         maxdeg=5, 
-        cutoff= SphericalCutoff(rcut), 
+        rcut = rcut, 
         r0_ratio=.4, 
         rin_ratio=.04, 
         species_maxorder_dict = Dict( :H => 0), 
         species_weight_cat = Dict(:H => 1.0, :Cu=> 1.0),
-        bond_weight = .5
+        bond_weight = 1.0
     );
 m_cov = PWCMatrixModel(ACE.EuclideanVector(Float64),species_friction,species_env;
         z2sym= NoZ2Sym(),
@@ -97,12 +97,12 @@ m_cov = PWCMatrixModel(ACE.EuclideanVector(Float64),species_friction,species_env
         n_rep = 3,
         maxorder=2, 
         maxdeg=5, 
-        cutoff= SphericalCutoff(rcut), 
+        rcut = rcut, 
         r0_ratio=.4, 
         rin_ratio=.04, 
         species_maxorder_dict = Dict( :H => 0), 
         species_weight_cat = Dict(:H => 1.0, :Cu=> 1.0),
-        bond_weight = .5
+        bond_weight = 1.0
     );
 m_equ = PWCMatrixModel(ACE.EuclideanMatrix(Float64),species_friction,species_env;
         z2sym= NoZ2Sym(),
@@ -111,14 +111,14 @@ m_equ = PWCMatrixModel(ACE.EuclideanMatrix(Float64),species_friction,species_env
         n_rep = 3,
         maxorder=2, 
         maxdeg=5, 
-        cutoff= SphericalCutoff(rcut), 
+        rcut = rcut, 
         r0_ratio=.4, 
         rin_ratio=.04, 
         species_maxorder_dict = Dict( :H => 0), 
         species_weight_cat = Dict(:H => 1.0, :Cu=> 1.0),
-        bond_weight = .5
+        bond_weight = 1.0
     );
-fm_pwcsc= FrictionModel((mequ_off=m_equ,)); 
+fm_pwcsc= FrictionModel((mequ_off=m_equ,m_cov)); 
 
 
 # m_inv0 = OnsiteOnlyMatrixModel(ACE.Invariant(), species_friction, species_env, species_mol; id=:inv0, n_rep = 3, rcut_on = rcut, maxorder_on=2, maxdeg_on=3,
@@ -139,47 +139,44 @@ fm_pwcsc= FrictionModel((mequ_off=m_equ,));
 z2sym= NoZ2Sym()
 speciescoupling = SpeciesUnCoupled()
 mcutoff = EllipsoidCutoff(3.5,4.0,6.0)
-m_inv = PWCMatrixModel(ACE.Invariant(),species_friction,species_env;
+m_inv = PWCMatrixModel(ACE.Invariant(),species_friction,species_env, mcutoff;
         z2sym= NoZ2Sym(),
         speciescoupling = SpeciesUnCoupled(),
         species_mol = species_mol,
         n_rep = 3,
         maxorder=2, 
         maxdeg=5, 
-        cutoff= mcutoff, 
         r0_ratio=.4, 
         rin_ratio=.04, 
         species_maxorder_dict = Dict( :H => 0), 
         species_weight_cat = Dict(:H => 1.0, :Cu=> 1.0),
-        bond_weight = .25
+        bond_weight = .5
     );
-m_cov = PWCMatrixModel(ACE.EuclideanVector(Float64),species_friction,species_env;
+m_cov = PWCMatrixModel(ACE.EuclideanVector(Float64),species_friction,species_env, mcutoff;
         z2sym= NoZ2Sym(),
         speciescoupling = SpeciesUnCoupled(),
         species_mol = species_mol,
         n_rep = 3,
         maxorder=2, 
         maxdeg=5, 
-        cutoff= mcutoff, 
         r0_ratio=.2, 
         rin_ratio=.00, 
         species_maxorder_dict = Dict( :H => 0), 
         species_weight_cat = Dict(:H => 1.0, :Cu=> 1.0),
-        bond_weight = .25
+        bond_weight = .5
     );
-m_equ = PWCMatrixModel(ACE.EuclideanMatrix(Float64),species_friction,species_env;
+m_equ = PWCMatrixModel(ACE.EuclideanMatrix(Float64),species_friction,species_env, mcutoff;
         z2sym= NoZ2Sym(),
         speciescoupling = SpeciesUnCoupled(),
         species_mol=species_mol,
         n_rep = 3,
         maxorder=2, 
         maxdeg=5, 
-        cutoff= mcutoff, 
         r0_ratio=.2, 
         rin_ratio=.00, 
         species_maxorder_dict = Dict( :H => 0), 
         species_weight_cat = Dict(:H => 1.0, :Cu=> 1.0),
-        bond_weight = .25
+        bond_weight = .5
     );
 
 
@@ -198,3 +195,10 @@ m_equ0 = OnsiteOnlyMatrixModel(ACE.EuclideanMatrix(Float64), species_friction, s
 
 fm_pwcec= FrictionModel((mequ_off=m_equ, mequ_on= m_equ0)); 
 
+
+using SparseArrays, StaticArrays, Random
+
+
+
+
+at

@@ -409,6 +409,7 @@ _z2couplingToString(::Odd) = "Odd"
 _cutoff(cutoff::SphericalCutoff) = cutoff.r_cut
 _cutoff(cutoff::EllipsoidCutoff) = cutoff.r_cut
 
+
 """
 `NoMolOnly`: selects all basis functions which model interactions between atoms of the molecule only. Use this filter if the molecule feels only
 friction if in contact to the substrat.   
@@ -719,6 +720,8 @@ function allocate_B(M::MatrixModel, at::Atoms, T=Float64)
     B_offsite = [spzeros(_block_type(M,T),N,N) for _ =  1:length(M.inds,:offsite)]
     return (onsite=B_onsite, offsite=B_offsite)
 end
+
+Base.randn(M::MT, Σ_vec::Array{T,1}) where {MT<:MatrixModel, T} = sum(randn(M,Σ) for Σ in Σ_vec)
 
 get_id(M::MatrixModel) = M.id
 
