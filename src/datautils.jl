@@ -69,7 +69,7 @@ function _svector2array(c_vec::Vector{SVector{N_rep, T}}) where {N_rep,T<:Number
     return c_matrix
 end
 
-function internal2hdf5(rdata, filename )
+function save_h5fdata(rdata, filename )
     fid = h5open(filename, "w")
     try
         # iterate over each data entry
@@ -117,7 +117,7 @@ function _hdf52ft( ftg::HDF5.Group )
     return (friction_tensor = spft, mask = ft_mask)
 end
 
-function hdf52internal(filename)
+function load_h5fdata(filename)
     fid = h5open(filename, "r")
     N_data = read_attribute(fid, "N_data")
     rdata = @showprogress [begin

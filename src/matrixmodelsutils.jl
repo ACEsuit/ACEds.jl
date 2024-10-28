@@ -272,24 +272,25 @@ function mbdpd_matrixmodel(property, species_friction, species_env;
     species_maxorder_dict = Dict{Any, Float64}(),
     species_weight_cat = Dict(c => 1.0 for c in species_friction)
     )
-    return PWCMatrixModel(property, species_friction, species_env, Odd(), SpeciesCoupled();
-        n_rep = n_rep, 
-        maxorder=maxorder, 
-        maxdeg=maxdeg, 
-        cutoff= EllipsoidCutoff(rcutbond, rcutenv, zcutenv),
-        species_substrat = species_substrat, 
-        id=id, 
-        r0_ratio=r0_ratio, 
-        rin_ratio=rin_ratio, 
-        pcut=pcut, 
-        pin=pin, 
-        trans= trans, #warning: the polytransform acts on [0,1]
-        p_sel = p_sel,
-        weight = weight, 
-        bond_weight = bond_weight,
-        species_minorder_dict = species_minorder_dict,
-        species_maxorder_dict = species_maxorder_dict,
-        species_weight_cat = species_weight_cat
+    return PWCMatrixModel(property, species_friction, species_env, EllipsoidCutoff(rcutbond, rcutenv, zcutenv);
+            n_rep = n_rep, 
+            maxorder=maxorder, 
+            maxdeg=maxdeg, 
+            species_substrat = species_substrat, 
+            z2sym=Odd(), 
+            speciescoupling=SpeciesCoupled(),
+            id=id, 
+            r0_ratio=r0_ratio, 
+            rin_ratio=rin_ratio, 
+            pcut=pcut, 
+            pin=pin, 
+            trans= trans, #warning: the polytransform acts on [0,1]
+            p_sel = p_sel,
+            weight = weight, 
+            bond_weight = bond_weight,
+            species_minorder_dict = species_minorder_dict,
+            species_maxorder_dict = species_maxorder_dict,
+            species_weight_cat = species_weight_cat
         )
 
     # offsitebasis = offsite_linbasis(property,species_env;

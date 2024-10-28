@@ -7,12 +7,12 @@ using LinearAlgebra
 using JuLIP: Atoms
 using ACE, Base
 
-
+using ACEds
 import ACE: params, nparams, set_params!
-import ACEds.MatrixModels: set_zero!
+import ACEds.MatrixModels: set_zero!, randf
 import ACE: scaling, write_dict, read_dict
 
-export write_dict, read_dict, params, nparams, set_params!, randf
+export write_dict, read_dict, params, nparams, set_params!
 export params, nparams, set_params!, get_ids
 export basis, matrix, Gamma, Sigma, randf
 export FrictionModel
@@ -96,7 +96,7 @@ Generates a ``{\\rm Normal}({\\bm 0}, {\\bm \\Gamma})``-distributed Gaussian pse
 A ``{\\rm Normal}({\\bm 0}, {\\bm \\Gamma})``-distributed Gaussian vector `R::Vector{3,Float64}` of length N, where N is the number of atoms in the configuration for which `Σ` was evaluated.
 """
 function randf(fm::FrictionModel{MODEL_IDS}, Σ::NamedTuple{MODEL_IDS}) where {MODEL_IDS} 
-    return sum(randf(mo,sΣ) for (mo,sΣ) in zip(values(fm.matrixmodels),Σ))
+    return sum(ACEds.MatrixModels.randf(mo,sΣ) for (mo,sΣ) in zip(values(fm.matrixmodels),Σ))
 end
 
 """
@@ -182,14 +182,14 @@ function ACE.scaling(fm::FrictionModel{MODEL_IDS}, p::Int) where {MODEL_IDS}
     return NamedTuple{MODEL_IDS}( ACE.scaling(mo,p) for mo in values(fm.matrixmodels))
 end
 
-# function Gamma(M::MatrixModel, at::Atoms; kvargs...) 
-#     Σ_vec = Sigma(M, at; kvargs...) 
-#     return sum(_square(Σ,M) for Σ in Σ_vec)
-# end
+function Gamma(M::MatrixModel, at::Atoms; kvargs...) 
+    Σ_vec = Sigma(M, at; kvargs...) 
+    return sum(_square(Σ,M) for Σ in Σ_vec)
+end
 
-# function Gamma(M::MatrixModel, Σ_vec) 
-#     return sum(_square(Σ,M) for Σ in Σ_vec)
-# end
+function Gamma(M::MatrixModel, Σ_vec) 
+    return sum(_square(Σ,M) for Σ in Σ_vec)
+end
 
 
 _square(Σ, ::MatrixModel) = Σ*transpose(Σ)

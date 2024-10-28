@@ -5,11 +5,11 @@
 In this workflow example we demonstrate how `ACEfriction.jl` can be used to fit a simple 6 x 6 Electronic friction tensor modeling the non-adiabitic interactions of a hydrogen-atom on a copper surface. 
 
 ### Load Electronic Friction Tensor Data
-We first use the function [hdf52internal]() to load the data of friction tensors from a [costum-formated]() hdf5 file and convert the data to the internal data format [FrictionData].
+We first use the function [load_h5fdata]() to load the data of friction tensors from a [costum-formated]() hdf5 file and convert the data to the internal data format [FrictionData].
 ```julia
 using ACEds
 # Load data 
-rdata = ACEds.DataUtils.hdf52internal( "./test/test-data-100.h5"); 
+rdata = ACEds.DataUtils.load_h5fdata( "./test/test-data-100.h5"); 
 # Specify size of training and test data
 n_train = Int(ceil(.8 * length(rdata)))
 n_test = length(rdata) - n_train

@@ -15,10 +15,10 @@ using ACEds.FrictionFit
 using ACEds.MatrixModels
 
 
-fname = "./test/test-data-large"
+fname = "./test/test-data-100"
 filename = string(fname,".h5")
 
-rdata = ACEds.DataUtils.hdf52internal(filename); 
+rdata = ACEds.DataUtils.load_h5fdata(filename); 
 
 # Partition data into train and test set and convert to 
 rng = MersenneTwister(12)
