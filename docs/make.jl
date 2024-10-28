@@ -6,4 +6,4 @@
 
 using Documenter, ACEds
 
-makedocs(sitename="My Documentation")
+makedocs(sitename="ACEfriction.jl")

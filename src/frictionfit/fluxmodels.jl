@@ -168,3 +168,9 @@ function _weighted_l2(Γ_fit::Array{T,4},Γ_true::Array{T,4},W::Array{T,4}) wher
 end 
 weighted_l2_loss(fm, data) = sum(_weighted_l2(fm(d.B, d.Tfm), d.friction_tensor, d.W) for d in data)
 
+function _weighted_l1(Γ_fit::Array{T,4},Γ_true::Array{T,4},W::Array{T,4}) where {T<:Number}
+    @tullio err:= W[d1,d2,i,j] * abs(Γ_fit[d1,d2,i,j]- Γ_true[d1,d2,i,j])
+    return err
+end 
+
+weighted_l1_loss(fm, data) = sum(_weighted_l1(fm(d.B, d.Tfm), d.friction_tensor, d.W) for d in data)

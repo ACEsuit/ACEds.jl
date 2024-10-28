@@ -5,16 +5,16 @@ using ACEds.MatrixModels
 import ACEds.MatrixModels: basis, matrix
 using LinearAlgebra
 using JuLIP: Atoms
-using ACE
+using ACE, Base
 
 
 import ACE: params, nparams, set_params!
 import ACEds.MatrixModels: set_zero!
 import ACE: scaling, write_dict, read_dict
-export write_dict, read_dict
 
+export write_dict, read_dict, params, nparams, set_params!, randf
 export params, nparams, set_params!, get_ids
-export basis, matrix, Gamma, Sigma
+export basis, matrix, Gamma, Sigma, randf
 export FrictionModel
 
 abstract type AbstractFrictionModel end
@@ -47,7 +47,7 @@ end
     Gamma(fm::FrictionModel, at::Atoms; filter=(_,_)->true, T=Float64)
 
 
-Evaluates the friction tensor of the friction model `fm` at the atomic configuration `at::Atoms`. The friction tensor is the sum of the friction tensors of all matrix models in `fm.matrixmodels`.
+Evaluates the friction tensor according to the friction model `fm` at the atomic configuration `at::Atoms`. The friction tensor is the sum of the friction tensors of all matrix models in `fm.matrixmodels`.
 
 ### Arguments:
 
@@ -71,20 +71,32 @@ The friction tensor is the sum of the squares of all diffusion coefficient matri
 
 ### Arguments:
 - `fm` -- the friction model of which the friction tensor is evaluated. The friction tensor is the sum of the friction tensors of all matrix models in `fm.matrixmodels`.
-- `Σ_vec` -- a collection of diffusion coefficient matrices. The friction tensor is the sum of the squares of all matrices in `Σ_vec`.
+- `Σ` -- a collection of diffusion coefficient matrices. The friction tensor is the sum of the squares of all matrices in `Σ`.
 
 ### Output:
 
 A friction tensor in the form of a sparse 3N x 3N matrix, where N is the number of atoms in the atomic configuration `at`.  The friction tensor is the sum of the symmetric squares ``\\Sigma\\Sigma^T`` of all diffusion coefficient matrices ``\\Sigma`` in `Σ_vec`.
 """
-function Gamma(fm::FrictionModel{MODEL_IDS}, Σ_vec::NamedTuple{MODEL_IDS}) where {MODEL_IDS} 
-    return sum(Gamma(mo, Σ) for (mo,Σ) in zip(values(fm.matrixmodels),Σ_vec))
+function Gamma(fm::FrictionModel{MODEL_IDS}, Σ::NamedTuple{MODEL_IDS}) where {MODEL_IDS} 
+    return sum(Gamma(mo, sΣ) for (mo,sΣ) in zip(values(fm.matrixmodels),Σ))
     #+ Gamma(fm.inv, at; kvargs...)
 end
 
+"""
+    randf(fm::FrictionModel{MODEL_IDS}, Σ::NamedTuple{MODEL_IDS}) where {MODEL_IDS}
 
-function Base.randn(fm::FrictionModel{MODEL_IDS}, Σ_vec::NamedTuple{MODEL_IDS}) where {MODEL_IDS} 
-    return sum(randn(mo,Σ) for (mo,Σ) in zip(values(fm.matrixmodels),Σ_vec))
+Generates a ``{\\rm Normal}({\\bm 0}, {\\bm \\Gamma})``-distributed Gaussian pseudo random number from a precomputed diffusion coeffiient matrices.
+
+### Arguments:
+- `fm` -- the friction model of which the friction tensor is evaluated. The friction tensor is the sum of the friction tensors of all matrix models in `fm.matrixmodels`.
+- `Σ` -- a collection of diffusion coefficient matrices. The friction tensor is the sum of the squares of all matrices in `Σ`.
+
+### Output:
+
+A ``{\\rm Normal}({\\bm 0}, {\\bm \\Gamma})``-distributed Gaussian vector `R::Vector{3,Float64}` of length N, where N is the number of atoms in the configuration for which `Σ` was evaluated.
+"""
+function randf(fm::FrictionModel{MODEL_IDS}, Σ::NamedTuple{MODEL_IDS}) where {MODEL_IDS} 
+    return sum(randf(mo,sΣ) for (mo,sΣ) in zip(values(fm.matrixmodels),Σ))
 end
 
 """
@@ -135,26 +147,26 @@ end
 # site_zzz = site::Symbol or zzz::Union{AtomicNumber,Tuple{AtomicNumber,AtomicNumber}}
 
 """
-    ACE.params(fm::FrictionModel{MODEL_IDS}) where {MODEL_IDS}
+    params(fm::FrictionModel{MODEL_IDS}) where {MODEL_IDS}
 
 Returns the parameters of all matrix models in the FrictionModel object as a NamedTuple.
 """
-function ACE.params(fm::FrictionModel{MODEL_IDS}; format=:matrix, joinsites=true) where {MODEL_IDS}
+function params(fm::FrictionModel{MODEL_IDS}; format=:matrix, joinsites=true) where {MODEL_IDS}
     #model_ids = map(Symbol,(s for s in keys(fm.matrixmodels)))
     return NamedTuple{MODEL_IDS}(params(fm.matrixmodels[s]; joinsites=joinsites,format=format) for s in MODEL_IDS)
 end
 
 """
-    ACE.nparams(fm::FrictionModel{MODEL_IDS}) where {MODEL_IDS}
+    nparams(fm::FrictionModel{MODEL_IDS}) where {MODEL_IDS}
 
 Returns the total number of scalar parameters of all matrix models in the FrictionModel object.
 """
-function ACE.nparams(fm::FrictionModel{MODEL_IDS}) where {MODEL_IDS}
-    return sum(ACE.nparams(fm.matrixmodels[s]) for s in model_ids)
+function nparams(fm::FrictionModel{MODEL_IDS}) where {MODEL_IDS}
+    return sum(nparams(fm.matrixmodels[s]) for s in model_ids)
 end
 
 """
-    ACE.set_params!(fm::FrictionModel, θ::NamedTuple)
+    set_params!(fm::FrictionModel, θ::NamedTuple)
 
 Sets the parameters of all matrix models in the FrictionModel object whose ID is contained in `θ::NamedTuple` to the values specified therein.
 """
@@ -170,14 +182,14 @@ function ACE.scaling(fm::FrictionModel{MODEL_IDS}, p::Int) where {MODEL_IDS}
     return NamedTuple{MODEL_IDS}( ACE.scaling(mo,p) for mo in values(fm.matrixmodels))
 end
 
-function Gamma(M::MatrixModel, at::Atoms; kvargs...) 
-    Σ_vec = Sigma(M, at; kvargs...) 
-    return sum(_square(Σ,M) for Σ in Σ_vec)
-end
+# function Gamma(M::MatrixModel, at::Atoms; kvargs...) 
+#     Σ_vec = Sigma(M, at; kvargs...) 
+#     return sum(_square(Σ,M) for Σ in Σ_vec)
+# end
 
-function Gamma(M::MatrixModel, Σ_vec) 
-    return sum(_square(Σ,M) for Σ in Σ_vec)
-end
+# function Gamma(M::MatrixModel, Σ_vec) 
+#     return sum(_square(Σ,M) for Σ in Σ_vec)
+# end
 
 
 _square(Σ, ::MatrixModel) = Σ*transpose(Σ)

@@ -1,8 +1,10 @@
-### Fitting an Electronic Friction Tensor
+# Workflow Examples 
+
+## Fitting an Electronic Friction Tensor
 
 In this workflow example we demonstrate how `ACEfriction.jl` can be used to fit a simple 6 x 6 Electronic friction tensor modeling the non-adiabitic interactions of a hydrogen-atom on a copper surface. 
 
-
+### Load Electronic Friction Tensor Data
 We first use the function [hdf52internal]() to load the data of friction tensors from a [costum-formated]() hdf5 file and convert the data to the internal data format [FrictionData].
 ```julia
 using ACEds
@@ -16,6 +18,7 @@ fdata = Dict("train" => FrictionData.(rdata[1:n_train]),
             "test"=> FrictionData.(rdata[n_train+1:end]));
 ```
 
+### Specify the Friction Model
 Next, we specify the matrix models that will make up our friction model. In this case we only specify the single matrix model `m_equ`, which being of the type `RWCMatrixModel` is based on a row-wise coupling. 
 ```julia
 property = EuclideanMatrix()
@@ -39,7 +42,7 @@ Here, the `mequ` serves as the "ID" of the friction model `m_equ` within the fri
 model_ids = get_ids(fm)
 ```
 
-# Create friction data in internally used format
+### Setting up the training pipeline
 To train our model we first extract the parameters from the friction model, which we use to initialize a structure of type `FluxFrictionModel`, which serves as a wrapper for the parameters
 ```julia
 c=params(fm)                                
@@ -74,6 +77,7 @@ dloader = cuda ? DataLoader(flux_data["train"] |> gpu, batchsize=10, shuffle=tru
 using ACEds.FrictionFit: weighted_l2_loss
 ```
 
+### Running the Optimizer
 Then, we train the model taking 200 passes through the training data: 
 ```julia
 loss_traj = Dict("train"=>Float64[], "test" => Float64[])
@@ -93,12 +97,13 @@ end
 println("Epoch: $epoch, Abs Training Loss: $(loss_traj["train"][end]), Test Loss: $(loss_traj["test"][end])")
 println("Epoch: $epoch, Avg Training Loss: $(loss_traj["train"][end]/n_train), Test Loss: $(loss_traj["test"][end]/n_test)")
 ```
-
-Once trained we can extract the updated parameters from the wrapper `ffm` to parametrize the friction model. 
+Once the training is complete we can extract the updated parameters from the wrapper `ffm` to parametrize the friction model. 
 ```julia
 c = params(ffm)
 set_params!(fm, c)
 ```
+
+### Evaluating the model 
 The trained friction model can be used to evaluate the friction tensor ``{\\bm \\Gamma}`` and diffusion coeccifient matrix ``{\\bm \\Sigma}`` at configurations as follows 
 ```julia
 at = fdata["test"][1].atoms # extract atomic configuration from the test set
@@ -110,36 +115,14 @@ To simulate a Langevin equation, typically, both the friction coefficient and th
 Σ = Sigma(fm, at) # evaluate the diffusion coeffcient matrix
 Gamma(fm, Σ) # compute the friction tensor from the pre-computeed diffusion coefficient matrix.
 ```
+
 The diffusion coefficient matrix ``\\Sigma`` can also be used to efficiently generate Gaussian pseudo random numbers ``{\rm Normal}(0,{\bf \Gamma})`` as 
+```julia
+R = randf(fm,Σ)
 ```
-R = randn(fm,Σ)
-```
 
-#%% Evaluate different error statistics 
-using ACEds.Analytics: error_stats, plot_error, plot_error_all, friction_pairs
+## Fitting a Friction Tensor for Simulation of Dissipative Particle Dynamics 
 
-fp_train = friction_pairs(fdata["train"], fm);
-fp_test = friction_pairs(fdata["test"], fm);
+In this workflow example we demonstrate how `ACEfriction.jl` can be used to a friction tensor with more symmetry constraints.  
 
-_, _, _, merrors =  error_stats(fp_train,fp_test; reg_epsilon = 0.01);
-
-fig1, ax1 = plot_error(fp_train, fp_test; merrors=merrors, entry_types = [:diag,:subdiag,:offdiag]);
-display(fig1)
-fig1.savefig("./scatter-detailed-equ-cov.pdf", bbox_inches="tight")
-
-
-fig2, ax2 = plot_error_all(fp_train, fp_test; merrors=merrors,entry_types = [:diag,:subdiag,:offdiag])
-display(fig2)
-fig2.savefig("./scatter-equ-cov.pdf", bbox_inches="tight")
-
-
-using PyPlot
-N_train, N_test = length(flux_data["train"]),length(flux_data["test"])
-fig, ax = PyPlot.subplots()
-ax.plot(loss_traj["train"]/N_train, label="train")
-ax.plot(loss_traj["test"]/N_test, label="test")
-ax.set_yscale(:log)
-ax.set_xlabel("Epoch")
-ax.set_ylabel("Loss")
-ax.legend()
-display(fig)
+Electronic friction tensor modeling the non-adiabitic interactions of a hydrogen-atom on a copper surface. 

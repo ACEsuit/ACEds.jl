@@ -73,7 +73,7 @@ nepochs = 10
 opt = Flux.setup(Adam(1E-3, (0.99, 0.999)),ffm)
 dloader = cuda ? DataLoader(flux_data["train"] |> gpu, batchsize=batchsize, shuffle=true) : DataLoader(flux_data["train"], batchsize=batchsize, shuffle=true)
 
-using ACEds.FrictionFit: weighted_l2_loss
+using ACEds.FrictionFit: weighted_l2_loss, weighted_l1_loss
 
 for _ in 1:nepochs
     epoch+=1
@@ -96,7 +96,21 @@ at = fdata["test"][1].atoms
 @time Gamma(fm, at)
 @time Σ = Sigma(fm, at)
 @time Gamma(fm, Σ)
-@time randn(fm, Σ)
+@time randf(fm, Σ)
+
+weighted_l2_loss(ffm,flux_data["train"])/((36+9)*length(flux_data["train"]))
+weighted_l1_loss(ffm,flux_data["train"])/((36+9)*length(flux_data["train"]))
+
+using Plots
+using PyPlot
+d = flux_data["train"][1] 
+
+
+#fm(d.B, d.Tfm), d.friction_tensor, d.W) for d in data)
+
+
+#%%
+
 
 #%% Evaluate different error statistics 
 using ACEds.Analytics: error_stats, plot_error, plot_error_all, friction_pairs

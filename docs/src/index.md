@@ -1,25 +1,13 @@
-# ACEds.jl Documentation
+# Introduction
 
-`ACEds.jl` facilitates the creation and use of atomic cluster expansion (ACE) interatomic potentials. For a quick start, we recommend reading the installation instructions, followed by the tutorials. 
+`ACEds.jl` facilitates simulation and machine learning of configuration-dependent friction tensor models from data. The models are based on an equivariant Atomic Cluster Expansion (ACE) and as such highly efficient and size transferable. The underlying framework of model construction is described in detail in [Sachs et al., (2024)](@ref ACEFriction-paper).  
 
-ACE models are defined in terms of body-ordered invariant features of atomic environments. For mathematical details, see [installation instructions](installation.md) and the references listed below.
+For a quick start, we recommend reading the [installation instructions](installation.md) and the [Overview]() section followed by the workflow examples. Detailed documentation of front end facing functions can be found in the [function manual]().  
 
+### [References](@id ACEFriction-paper)
 
-### Overview 
+If you are using `ACEfriction.jl` in your work, please cite the following article: 
 
-`ACEpotentials.jl` ties together several Julia packages implementing different aspects of ACE modelling and fitting and provides some additional fitting and analysis tools for convenience. For example, it provides routines for parsing and manipulating the data to which interatomic potentials are fit (total energies, forces, virials, etc). Moreover, it integrates ACE potentials with the [JuliaMolSim](https://github.com/JuliaMolSim) eco-system. These pages document `ACEpotentials`together with the relevant parts of the wider ecosystem.
+* Sachs, M., Stark, W. G., Maurer, R. J., & Ortner, C. (2024). Equivariant Representation of Configuration-Dependent Friction Tensors in Langevin Heatbaths. [[arxiv]](https://doi.org/10.48550/arXiv.2407.13935)
 
-### References
-
-* Sachs, M., Stark, W. G., Maurer, R. J., & Ortner, C. (2024). Equivariant Representation of Configuration-Dependent Friction Tensors in Langevin Heatbaths. 
-[[arxiv]](https://doi.org/10.48550/arXiv.2407.13935)
-
-
-```@meta
-CurrentModule = ACEds
-```
-
-```@docs
-Gamma
-```
 

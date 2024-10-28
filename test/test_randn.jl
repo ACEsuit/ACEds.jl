@@ -6,7 +6,7 @@ a_cov = a_mat*transpose(a_mat)/n
 norm(reinterpret(Matrix,Matrix(Gamma(fm.matrixmodels.mequ_off, at)[55:56,55:56])) - a_cov)
 
 
-function Base.randn(::OnsiteOnlyMatrixModel, Σ::Diagonal{SMatrix{3, 3, T, 9}}) where {T<: Real}
+function randf(::OnsiteOnlyMatrixModel, Σ::Diagonal{SMatrix{3, 3, T, 9}}) where {T<: Real}
     return Σ * randn(SVector{3,T},size(Σ,2))
 end
 

@@ -121,7 +121,7 @@ at = fdata["test"][1].atoms
 Gamma(fm, at)
 Σ = Sigma(fm, at)
 Gamma(fm, Σ)
-randn(fm, Σ)
+randf(fm, Σ)
 
 
 # Evaluate different error statistics 

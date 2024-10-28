@@ -92,14 +92,14 @@ function basis!(B, M::RWCMatrixModel{O3S,<:SphericalCutoff,EVALCENTER}, at::Atom
     end
 end
 
-function Base.randn(::RWCMatrixModel, Σ::SparseMatrixCSC{SMatrix{3, 3, T, 9}, TI}) where {T<: Real, TI<:Int}
+function randf(::RWCMatrixModel, Σ::SparseMatrixCSC{SMatrix{3, 3, T, 9}, TI}) where {T<: Real, TI<:Int}
     _, J, _ = findnz(Σ)
     ju = unique(J)
     R = sparsevec(ju,randn(SVector{3,T},length(ju))) 
     return Σ * R
 end
 
-function Base.randn(::RWCMatrixModel, Σ::SparseMatrixCSC{SVector{3, T}, TI}) where {T<: Real, TI<:Int}
+function randf(::RWCMatrixModel, Σ::SparseMatrixCSC{SVector{3, T}, TI}) where {T<: Real, TI<:Int}
     _, J, _ = findnz(Σ)
     ju = unique(J)
     R = sparsevec(ju,randn(length(ju))) 

@@ -71,11 +71,11 @@ function basis!(B, M::OnsiteOnlyMatrixModel, at::Atoms, filter=(_,_)->true)
     end
 end
 
-function Base.randn(::OnsiteOnlyMatrixModel, Σ::Diagonal{SMatrix{3, 3, T, 9}}) where {T<:Real}
+function randf(::OnsiteOnlyMatrixModel, Σ::Diagonal{SMatrix{3, 3, T, 9}}) where {T<:Real}
     return Σ * randn(SVector{3,T},size(Σ,2))
 end
 
-function Base.randn(::OnsiteOnlyMatrixModel, Σ::Diagonal{SVector{3, T}}) where {T<:Real}
+function randf(::OnsiteOnlyMatrixModel, Σ::Diagonal{SVector{3, T}}) where {T<:Real}
     return Σ * randn(size(Σ,2))
 end
 

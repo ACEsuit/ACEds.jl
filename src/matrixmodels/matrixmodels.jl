@@ -721,7 +721,7 @@ function allocate_B(M::MatrixModel, at::Atoms, T=Float64)
     return (onsite=B_onsite, offsite=B_offsite)
 end
 
-Base.randn(M::MT, Σ_vec::Array{T,1}) where {MT<:MatrixModel, T} = sum(randn(M,Σ) for Σ in Σ_vec)
+randf(M::MT, Σ_vec::Array{T,1}) where {MT<:MatrixModel, T} = sum(randf(M,Σ) for Σ in Σ_vec)
 
 get_id(M::MatrixModel) = M.id
 
