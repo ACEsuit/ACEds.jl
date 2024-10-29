@@ -1,14 +1,15 @@
+"""
+
+"""
 struct PWCMatrixModel{O3S,CUTOFF,Z2S,SC} <: MatrixModel{O3S}
     offsite::OffSiteModels{O3S,Z2S,CUTOFF} where {Z2S, CUTOFF}
     n_rep::Int
     inds::SiteInds
     id::Symbol
     function PWCMatrixModel(offsite::OffSiteModels{O3S,Z2S,CUTOFF}, id::Symbol,sc::SC) where {O3S,Z2S,CUTOFF,SC}
-        #_assert_offsite_keys(offsite, SpeciesCoupled())
         _assert_consistency(keys(offsite),sc)
         @assert length(unique([_n_rep(mo) for mo in values(offsite)])) == 1
         @assert length(unique([mo.cutoff for mo in values(offsite)])) == 1 
-        #@assert all([z1 in keys(onsite), z2 in keys(offsite)  for (z1,z2) in zzkeys])
         return new{O3S,CUTOFF,Z2S,SC}(offsite, _n_rep(offsite), SiteInds(_get_basisinds(offsite)), id)
     end
 end

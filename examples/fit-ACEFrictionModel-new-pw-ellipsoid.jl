@@ -18,7 +18,7 @@ using ACEds.MatrixModels
 fname = "./test/test-data-large"
 filename = string(fname,".h5")
 
-rdata = ACEds.DataUtils.hdf52internal(filename); 
+rdata = ACEds.DataUtils.load_h5fdata(filename); 
 
 # Partition data into train and test set and convert to 
 rng = MersenneTwister(12)

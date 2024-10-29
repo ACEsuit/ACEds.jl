@@ -1,12 +1,13 @@
 """
-Function to convert FrictionData to a format that can be used for training with ffm::FluxFrictionModel 
+    flux_assemble(data::Array{DATA}, fm::FrictionModel, ffm::FluxFrictionModel) where {DATA<:FrictionData}
+
+Converts FrictionData into a format that can be used for training with ffm::FluxFrictionModel 
+
 """
-
-
-function flux_assemble(data::Array{DATA}, fm::FrictionModel, ffm::FluxFrictionModel) where {DATA<:FrictionData}
+function flux_assemble(fdata::Array{DATA}, fm::FrictionModel, ffm::FluxFrictionModel; weights = Dict("observations" => ones(length(data)), "diag" => 2.0, "sub_diag" => 1.0, "off_diag"=>1.0)) where {DATA<:FrictionData}
     @assert keys(fm.matrixmodels) == ffm.model_ids
     transforms = get_transform(ffm)
-    return flux_assemble(data, fm, transforms)
+    return _flux_assemble(fdata, fm, transforms; weights = weights)
 end
 
 
@@ -97,9 +98,12 @@ function _tensor_basis(B::Vector{<:Diagonal{SMatrix{3,3,T,9}}}, fi, ::Type{<:Ons
     end
     return B_diag
 end
+"""
+    _flux_data(d::FrictionData,fm::FrictionModel, transforms::NamedTuple, W, join_sites=true)
 
 
-function flux_data(d::FrictionData,fm::FrictionModel, transforms::NamedTuple, W, join_sites=true)
+"""
+function _flux_data(d::FrictionData,fm::FrictionModel, transforms::NamedTuple, W, join_sites=true)
     # TODO: in-place data manipulations
     if d.friction_tensor_ref === nothing
         friction_tensor = _tensor_Gamma(d.friction_tensor,d.friction_indices)
@@ -112,18 +116,17 @@ function flux_data(d::FrictionData,fm::FrictionModel, transforms::NamedTuple, W,
     return  (friction_tensor=friction_tensor,B=BB,Tfm=Tfm,W=W,)
 end
 
-
-function flux_assemble(data::Array{DATA}, fm::FrictionModel, transforms::NamedTuple; 
+function _flux_assemble(data::Array{DATA}, fm::FrictionModel, transforms::NamedTuple; 
     weights = Dict("observations" => ones(length(data)), "diag" => 2.0, "sub_diag" => 1.0, "off_diag"=>1.0),
     join_sites=true) where {DATA<:FrictionData}
     #model_ids = (isempty(model_ids) ? keys(fm.matrixmodels) : model_ids)
     return @showprogress [  begin
-                                W = weight_matrix(length(d.friction_indices), weights["observations"][i],weights["diag"],weights["sub_diag"],weights["off_diag"] )
-                                flux_data(d,fm, transforms, W, join_sites)
+                                W = _weight_matrix(length(d.friction_indices), weights["observations"][i],weights["diag"],weights["sub_diag"],weights["off_diag"] )
+                                _flux_data(d,fm, transforms, W, join_sites)
                             end for (i,d) in enumerate(data)]
 end
 
-function weight_matrix(n::Ti, obs_weight = 1.0, diag_weight = 2.0, sub_diag_weight=1.0, off_diag_weight=1.0, T=Float64) where {Ti<:Int}
+function _weight_matrix(n::Ti, obs_weight = 1.0, diag_weight = 2.0, sub_diag_weight=1.0, off_diag_weight=1.0, T=Float64) where {Ti<:Int}
     W = Array{T}(undef,3,3,n,n)
     for i=1:n
         for j=1:n

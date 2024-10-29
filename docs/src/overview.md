@@ -1,5 +1,3 @@
-# Getting Started
-
 ## Model Overview
 
 The package `ACEfriction` provides an ACE-based implementation of the size-transferrable, E(3)-equivariant models introduced in [Sachs et al., (2024)](@ref ACEFriction-paper) for configuration-dependent friction or diffusion tensors.
@@ -14,7 +12,7 @@ The underlying model is based on an equivariance-preserving matrix square root d
 ```math
 {\bm \Gamma} = {\bm \Sigma}{\bm \Sigma}^T,
 ```
-where block entries of the matrix square root ${\bm \Sigma}$ are linearly expanded using an equivariant linear atomic cluster expansion.
+where block entries of the matrix square root ${\bm \Sigma}\left ( ({\bm r}_{i},z_i)_{i=1}^{N_{\rm at}} \right ) \in \mathbb{R}^{3 N_{\rm at} \times m}$ with some $m \in \mathbb{N}$, are linearly expanded using an equivariant linear atomic cluster expansion.
 
 ## Code Overview
 

@@ -32,15 +32,15 @@ using ACEds.MatrixModels: NoZ2Sym, SpeciesUnCoupled
 
 
 m_cov = mbdpd_matrixmodel(EuclideanVector(), [:X], [:X];
-    maxorder=2, 
-    maxdeg=5,    
+    maxorder=1, 
+    maxdeg=8,    
     rcutbond = 5.0, 
     rcutenv = 5.0,
     zcutenv = 5.0,
     n_rep = 1, 
     species_substrat=[], 
     # Not documented:   
-    r0_ratio=0.2, 
+    r0_ratio=0.4, 
     rin_ratio=.00, 
     )
 
@@ -71,7 +71,7 @@ epoch = 0
 batchsize = 10
 nepochs = 100
 
-opt = Flux.setup(Adam(1E-2, (0.99, 0.999)),ffm)
+opt = Flux.setup(Adam(1E-2, (0.999, 0.999)),ffm)
 dloader = cuda ? DataLoader(flux_data["train"] |> gpu, batchsize=batchsize, shuffle=true) : DataLoader(flux_data["train"], batchsize=batchsize, shuffle=true)
 
 using ACEds.FrictionFit: weighted_l2_loss, weighted_l1_loss
@@ -117,7 +117,7 @@ display(fig1)
 
 fig2, ax2 = plot_error_all(fp_train, fp_test; merrors=merrors,entry_types = [:diag,:subdiag,:offdiag])
 display(fig2)
-#fig2.savefig("./scatter-equ-cov.pdf", bbox_inches="tight")
+fig2.savefig("./scatter-equ-cov.jpg", bbox_inches="tight")
 
 
 using PyPlot

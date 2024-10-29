@@ -1,11 +1,9 @@
-# Workflow Examples 
-
-## Fitting an Electronic Friction Tensor
+# Fitting an Electronic Friction Tensor
 
 In this workflow example we demonstrate how `ACEfriction.jl` can be used to fit a simple 6 x 6 Electronic friction tensor modeling the non-adiabitic interactions of a hydrogen-atom on a copper surface. 
 
-### Load Electronic Friction Tensor Data
-We first use the function [load_h5fdata]() to load the data of friction tensors from a [costum-formated]() hdf5 file and convert the data to the internal data format [FrictionData].
+## Load Electronic Friction Tensor Data
+We first use the function [load_h5fdata]() to load the data of friction tensors from a [custom-formated]() hdf5 file and convert the data to the internal data format [FrictionData].
 ```julia
 using ACEds
 # Load data 
@@ -18,7 +16,7 @@ fdata = Dict("train" => FrictionData.(rdata[1:n_train]),
             "test"=> FrictionData.(rdata[n_train+1:end]));
 ```
 
-### Specify the Friction Model
+## Specify the Friction Model
 Next, we specify the matrix models that will make up our friction model. In this case we only specify the single matrix model `m_equ`, which being of the type `RWCMatrixModel` is based on a row-wise coupling. 
 ```julia
 property = EuclideanMatrix()
@@ -42,7 +40,7 @@ Here, the `mequ` serves as the "ID" of the friction model `m_equ` within the fri
 model_ids = get_ids(fm)
 ```
 
-### Setting up the training pipeline
+## Set up the Training Pipeline
 To train our model we first extract the parameters from the friction model, which we use to initialize a structure of type `FluxFrictionModel`, which serves as a wrapper for the parameters
 ```julia
 c=params(fm)                                
@@ -77,7 +75,7 @@ dloader = cuda ? DataLoader(flux_data["train"] |> gpu, batchsize=10, shuffle=tru
 using ACEds.FrictionFit: weighted_l2_loss
 ```
 
-### Running the Optimizer
+## Running the Optimizer
 Then, we train the model taking 200 passes through the training data: 
 ```julia
 loss_traj = Dict("train"=>Float64[], "test" => Float64[])
@@ -103,7 +101,7 @@ c = params(ffm)
 set_params!(fm, c)
 ```
 
-### Evaluating the model 
+## Evaluating the Friction Model 
 The trained friction model can be used to evaluate the friction tensor ``{\\bm \\Gamma}`` and diffusion coeccifient matrix ``{\\bm \\Sigma}`` at configurations as follows 
 ```julia
 at = fdata["test"][1].atoms # extract atomic configuration from the test set
@@ -121,8 +119,4 @@ The diffusion coefficient matrix ``\\Sigma`` can also be used to efficiently gen
 R = randf(fm,Σ)
 ```
 
-## Fitting a Friction Tensor for Simulation of Dissipative Particle Dynamics 
 
-In this workflow example we demonstrate how `ACEfriction.jl` can be used to a friction tensor with more symmetry constraints.  
-
-Electronic friction tensor modeling the non-adiabitic interactions of a hydrogen-atom on a copper surface. 

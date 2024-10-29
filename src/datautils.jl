@@ -7,7 +7,7 @@ using JuLIP
 using ACEds.Utils: reinterpret
 using StaticArrays, SparseArrays
 export FrictionData, BlockDenseArray 
-
+export save_h5fdata, load_h5fdata
 using HDF5
 
 function json2internal(filename )

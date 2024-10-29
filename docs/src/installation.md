@@ -1,7 +1,4 @@
-
-# Installation Guide
-
-### Prerequisites
+## Prerequisites
 
 You will need to have Julia (v1.7 or newer) installed. The latest release and installation instruction for Julia are available here [here](https://julialang.org).
 
@@ -12,7 +9,7 @@ You will need to have Julia (v1.7 or newer) installed. The latest release and in
     Pkg.Registry.add("General")  
     ```
 
-### Installation
+## Installation
 
 The package `ACEfriction` and some required dependencies can be downloaded from [ACEregistry](https://github.com/ACEsuit/ACEregistry). To add this registry and install `ACEfriction` execute the following steps from within a Julia REPL. 
 
