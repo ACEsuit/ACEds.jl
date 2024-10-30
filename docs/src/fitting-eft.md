@@ -102,7 +102,7 @@ set_params!(fm, c)
 ```
 
 ## Evaluating the Friction Model 
-The trained friction model can be used to evaluate the friction tensor ``{\\bm \\Gamma}`` and diffusion coeccifient matrix ``{\\bm \\Sigma}`` at configurations as follows 
+The trained friction model can be used to evaluate the friction tensor ${\bm \Gamma}$ and diffusion coeccifient matrix ${\bm \Sigma}$ at configurations as follows 
 ```julia
 at = fdata["test"][1].atoms # extract atomic configuration from the test set
 Gamma(fm, at) # evaluate the friction tensor
@@ -114,7 +114,7 @@ To simulate a Langevin equation, typically, both the friction coefficient and th
 Gamma(fm, Σ) # compute the friction tensor from the pre-computeed diffusion coefficient matrix.
 ```
 
-The diffusion coefficient matrix ``\\Sigma`` can also be used to efficiently generate Gaussian pseudo random numbers ``{\rm Normal}(0,{\bf \Gamma})`` as 
+The diffusion coefficient matrix $\Sigma$ can also be used to efficiently generate Gaussian pseudo random numbers ${\rm Normal}(0,{\bf \Gamma})$ as 
 ```julia
 R = randf(fm,Σ)
 ```
