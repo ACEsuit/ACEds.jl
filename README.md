@@ -1,6 +1,6 @@
 <p align="right">
   <a href="https://acesuit.github.io/ACEds.jl/dev/">
-    <img src="https://github.com/ACEsuit/ACEds.jl/docs/src/assets/logo.png" alt="ACEds.jl logo"
+    <img src="https://github.com/ACEsuit/ACEds.jl/blob/main/docs/src/assets/logo.png" alt="ACEds.jl logo"
          title="ACEds.jl" align="right" height="60"/>
   </a>
 </p>
