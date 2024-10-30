@@ -1,8 +1,9 @@
 # Introduction
 
-`ACEds.jl` facilitates simulation and machine learning of configuration-dependent friction tensor models from data. The models are based on an equivariant Atomic Cluster Expansion (ACE) and as such highly efficient and size transferable. The underlying framework of model construction is described in detail in [Sachs et al., (2024)](@ref ACEds-paper).  
+The julia package `ACEds.jl` facilitates simulation and machine learning of configuration-dependent friction tensor models from data. The models are based on an equivariant Atomic Cluster Expansion (ACE) and, as such, are computationally highly efficient and size transferable. The underlying framework of model construction is described in detail in [Sachs et al., (2024)](@ref ACEds-paper).  
 
-For a quick start, we recommend reading the [installation instructions](installation.md) and the [Overview]() section followed by the workflow examples. Detailed documentation of front end facing functions can be found in the [function manual]().  
+For a quick start, we recommend reading the [Installation Instructions](installation.md) and the [Overview](overview.md) section, followed by the workflow examples. Detailed documentation of front-end-facing functions can be found in the [function manual](@ref Function-Manual).  
+
 
 ### [References](@id ACEds-paper)
 
