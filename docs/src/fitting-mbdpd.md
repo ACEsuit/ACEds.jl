@@ -83,7 +83,7 @@ end
 After training for 2000 epochs, the resulting model is almost a perfect fit:
 
 ![True vs fitted entries of the friction tensor](./assets/scatter-equ-cov.jpg)
-
+            True vs fitted entries of the friction tensor.
 
 ## Multi-Body Dissipative Particle Dynamics
 
