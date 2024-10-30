@@ -39,4 +39,4 @@ or a configuration-dependent diffusion tensor in an overdamped Langevin equation
 \dot{{\bm r}} = - {\bm\Gamma}({\bm r}) \nabla U({\bm r})  + \sqrt{2 \beta^{-1}} {\bm\Sigma}\circ \dot{{\bm W}}. %+ \beta^{-1}{\rm div}({\bm \Gamma}(r)).
 ```
 
-The model and code allows imposing additional symmetry constraints on the matrix ${\bm \Gamma}$. In particular, the learned friction-tensor ${\bm \Gamma}$ can be specified to satisfy relevant symmetries for the dynamics (1) to be momentum-conserving, thus enabling learning and simulation Multi-Body Dissipative Particle Dynamics (MD-DPD).
+The model and code allows imposing additional symmetry constraints on the matrix ${\bm \Gamma}$. In particular, the learned friction-tensor ${\bm \Gamma}$ can be specified to satisfy relevant symmetries for the dynamics (1) to be momentum-conserving, thus enabling learning and simulation of Multi-Body Dissipative Particle Dynamics (MD-DPD).

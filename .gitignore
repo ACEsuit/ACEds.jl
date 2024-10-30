@@ -4,6 +4,7 @@ Manifest.toml
 *.jld
 *.pdf
 *.h5
+./data/*
 .ipynb_checkpoints
 ./test/test-data-large.h5
 docs/build/

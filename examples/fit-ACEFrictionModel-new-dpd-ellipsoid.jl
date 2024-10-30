@@ -19,8 +19,8 @@ cuda = CUDA.functional()
 
 
 
-rdata_train = ACEds.DataUtils.load_h5fdata("./data/input/dpd-train-x.h5"); 
-rdata_test = ACEds.DataUtils.load_h5fdata("./data/input/dpd-test-x.h5"); 
+rdata_train = ACEds.DataUtils.load_h5fdata("./examples/data/dpd-train-x.h5"); 
+rdata_test = ACEds.DataUtils.load_h5fdata("./examples/data/dpd-train-x.h5"); 
 
 fdata = Dict("train" => FrictionData.(rdata_train), 
             "test"=> FrictionData.(rdata_test));
