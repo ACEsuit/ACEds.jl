@@ -38,6 +38,6 @@ makedocs(;
 
 deploydocs(;
     repo="github.com/ACEsuit/ACEds.jl.git",
-    devbranch="Documentation",
+    devbranch="main",
     push_preview=true,
 )
