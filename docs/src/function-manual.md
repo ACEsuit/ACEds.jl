@@ -1,6 +1,6 @@
 # Function Manual
 
-## ACEFriction.FrictionModels.jl
+## ACEds.FrictionModels.jl
 
 ```@meta
 CurrentModule = ACEds.FrictionModels
@@ -48,7 +48,7 @@ set_params!
 set_zero!
 ```
 
-## ACEFriction.MatrixModels.jl
+## ACEds.MatrixModels.jl
 
 
-## ACEFriction.FrictionFit.jl
+## ACEds.FrictionFit.jl

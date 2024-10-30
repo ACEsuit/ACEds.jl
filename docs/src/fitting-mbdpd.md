@@ -1,6 +1,6 @@
 # Fitting a Friction Tensor for Simulation of (Multi-Body) Dissipative Particle Dynamics 
 
-In this workflow example we demonstrate how `ACEfriction.jl` can be used to fit a momentum-conserving friction tensor as used in Dissipative Particle Dynamics. 
+In this workflow example we demonstrate how `ACEds.jl` can be used to fit a momentum-conserving friction tensor as used in Dissipative Particle Dynamics. 
 
 ## Background on Dissipative Particle Dynamics
 Dissipative particle dynamics can be considered as a special version of the Langevin equation @ref, where the friction tensor $\Gamma$ is such that the total momentuum
@@ -12,8 +12,8 @@ is conserved. In order for this to be the case, the friction tensor must satisfy
 \sum_{i}\Gamma_{ij} = {\bf 0}, \text{ for every } j=1,\dots, N_{\rm at}.
 ```
 
-## Momentum-conserving Friction Models in `ACEfriction.jl`
-`ACEfriction.jl` provides utility functions for the construction of momentum-conserving friction models. Namely, the function [mbdpd_matrixmodel]() yields a pair-wise coupled matrix model with additional symmetries such that resulting friction model satisfies the above constraints. For example, 
+## Momentum-conserving Friction Models in `ACEds.jl`
+`ACEds.jl` provides utility functions for the construction of momentum-conserving friction models. Namely, the function [mbdpd_matrixmodel]() yields a pair-wise coupled matrix model with additional symmetries such that resulting friction model satisfies the above constraints. For example, 
 ```julia
 m_cov = mbdpd_matrixmodel(EuclideanVector(), [:X], [:X];
     maxorder=1, 
@@ -77,7 +77,7 @@ end
 
 After training for 2000 epochs, the resulting model is almost a perfect fit:
 
-![True vs fitted entries of the friction tensor](./scatter-equ-cov.jpg)
+![True vs fitted entries of the friction tensor](./assets/scatter-equ-cov.jpg)
 
 
 ## Multi-Body Dissipative Particle Dynamics

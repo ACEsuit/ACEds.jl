@@ -1,6 +1,6 @@
 # Fitting an Electronic Friction Tensor
 
-In this workflow example we demonstrate how `ACEfriction.jl` can be used to fit a simple 6 x 6 Electronic friction tensor modeling the non-adiabitic interactions of a hydrogen-atom on a copper surface. 
+In this workflow example we demonstrate how `ACEds.jl` can be used to fit a simple 6 x 6 Electronic friction tensor modeling the non-adiabitic interactions of a hydrogen-atom on a copper surface. 
 
 ## Load Electronic Friction Tensor Data
 We first use the function [load_h5fdata]() to load the data of friction tensors from a [custom-formated]() hdf5 file and convert the data to the internal data format [FrictionData].

@@ -11,7 +11,7 @@ You will need to have Julia (v1.7 or newer) installed. The latest release and in
 
 ## Installation
 
-The package `ACEfriction` and some required dependencies can be downloaded from [ACEregistry](https://github.com/ACEsuit/ACEregistry). To add this registry and install `ACEfriction` execute the following steps from within a Julia REPL. 
+The package `ACEds` and some required dependencies can be downloaded from [ACEregistry](https://github.com/ACEsuit/ACEregistry). To add this registry and install `ACEds` execute the following steps from within a Julia REPL. 
 
 1. Add the `ACEregistry` registry:
    ```julia
@@ -19,16 +19,16 @@ The package `ACEfriction` and some required dependencies can be downloaded from 
    Pkg.Registry.add(RegistrySpec(url="https://github.com/ACEsuit/ACEregistry"))
    ```
 
-2. Install `ACEfriction`:
+2. Install `ACEds`:
 
     ```julia
-   Pkg.add("ACEfriction")
+   Pkg.add("ACEds")
    ```
 
-Done! Now you can use the functionality of `ACEfriction` in your project by running `using ACEfriction`.
+Done! Now you can use the functionality of `ACEds` in your project by running `using ACEds`.
 
 !!! note
-    It is recommended to install `ACEfriction` within a dedicated [julia environment](https://pkgdocs.julialang.org/v1/environments/#Creating-your-own-environments), where approriate version bounds can be set within the `Project.toml` file, and versions of dependencies are tracked in a `Manifest.toml` file. 
+    It is recommended to install `ACEds` within a dedicated [julia environment](https://pkgdocs.julialang.org/v1/environments/#Creating-your-own-environments), where approriate version bounds can be set within the `Project.toml` file, and versions of dependencies are tracked in a `Manifest.toml` file. 
     
     To create a new project, simply create a new directory, navigate to that directory and run
     ```julia
