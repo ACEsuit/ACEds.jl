@@ -15,7 +15,7 @@
 [ddocs-url]: https://acesuit.github.io/ACEds.jl/dev/
 
 [docs-img]: https://img.shields.io/badge/docs-stable-blue.svg
-[docs-url]: https://acesuit.github.io/ACEds.jl/stable/
+[docs-url]: https://acesuit.github.io/ACEds.jl/dev/
 
 [ci-img]: https://github.com/ACEsuit/ACEds.jl/actions/workflows/Tests.yml/badge.svg
 [ci-url]: https://github.com/ACEsuit/ACEds.jl/actions/workflows/CI.yml
