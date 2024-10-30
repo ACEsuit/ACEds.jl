@@ -11,8 +11,8 @@ using Documenter, ACEds
 
 makedocs(;
     # modules=[ACEds],
-    # authors="Matthias Sachs <e.matthias.sachs@gmail.com> and contributors",
-    #repo="https://github.com/ACEsuit/ACEds.jl/blob/{commit}{path}#{line}",
+    authors="Matthias Sachs <e.matthias.sachs@gmail.com> and contributors",
+    repo="https://github.com/ACEsuit/ACEds.jl/blob/{commit}{path}#{line}",
     sitename="ACEds.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
