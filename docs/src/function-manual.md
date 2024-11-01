@@ -1,4 +1,4 @@
-# Function Manual
+# Function Manual (@id Function-Manual)
 
 ## ACEds.FrictionModels.jl
 
